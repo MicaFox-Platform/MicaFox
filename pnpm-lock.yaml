@@ -35,6 +35,12 @@ importers:
 
   examples/node-basic:
     dependencies:
+      '@probex-platform/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      '@probex-platform/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
       fastify:
         specifier: ^5.11.2
         version: 5.12.7
@@ -42,6 +48,15 @@ importers:
       '@probex-platform/configs':
         specifier: workspace:*
         version: link:../../packages/configs
+      '@types/ws':
+        specifier: ^8.18.2
+        version: 8.18.2
+      tsx:
+        specifier: ^4.23.15
+        version: 4.23.15
+      ws:
+        specifier: ^8.22.1
+        version: 8.22.1
 
   packages/configs:
     dependencies:

@@ -15,7 +15,7 @@ pnpm monorepo, Node >= 22, TypeScript (strict, NodeNext), Vitest, ESLint, Pretti
 | `packages/configs`    | shared tsconfig / eslint / prettier / vitest | -             |
 | `packages/protocol`   | messages, protocol version, `Connector`      | -             |
 | `packages/sdk`        | debugger and default connector, in host app  | protocol      |
-| `examples/node-basic` | demo app                                     | sdk           |
+| `examples/node-basic` | demo app                                     | sdk, protocol |
 
 Dependencies point down this table only.
 

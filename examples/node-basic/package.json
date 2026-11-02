@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx --conditions=@probex-platform/source --watch src/index.ts",
+    "dev:hub": "tsx --conditions=@probex-platform/source src/hub/fake-hub.ts",
     "build": "rm -rf ./dist && tsc -b",
     "typecheck": "tsc -b",
     "test": "vitest run"
@@ -17,9 +18,14 @@
     "node": ">=22"
   },
   "dependencies": {
+    "@probex-platform/protocol": "workspace:*",
+    "@probex-platform/sdk": "workspace:*",
     "fastify": "^5.11.2"
   },
   "devDependencies": {
-    "@probex-platform/configs": "workspace:*"
+    "@probex-platform/configs": "workspace:*",
+    "@types/ws": "^8.18.2",
+    "tsx": "^4.23.15",
+    "ws": "^8.22.1"
   }
 }
