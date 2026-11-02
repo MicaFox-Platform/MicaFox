@@ -11,7 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest --coverage",
     "test:coverage": "vitest run --coverage",
-    "lint": "eslint .",
+    "lint": "eslint . && bash .github/scripts/check-structure.sh",
     "lint:fix": "eslint . --fix",
     "format": "prettier . --check",
     "format:fix": "prettier . --write",
