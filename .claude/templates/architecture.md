@@ -26,6 +26,18 @@ This component          Other component
       │◀────── reply ──────────│
 ```
 
+## Layout
+
+The component's folder tree: one line per folder and per file that is not a test, saying what it holds. At most 10
+source files per folder, grouped into sub-component folders by concept: `.claude/rules/code-quality.md#structure`.
+
+```text
+packages/<package>/src/<component>/
+├── index.ts            the component's only entry
+├── <component>.ts      what the entry exports
+└── <sub-component>/    one concept, entered through its index.ts
+```
+
 ## Key flows
 
 ### Flow name

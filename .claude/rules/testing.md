@@ -21,6 +21,17 @@ floor, not the goal: a line that runs without an assertion about its result is n
   in the PR hand-over. Never cover it with a hollow test.
 - Before finishing, ask of each test: would it fail if the code under test returned a wrong value? If not, fix it.
 
+## Where tests live
+
+- A unit test sits next to its module: `backoff.test.ts` beside `backoff.ts`.
+- A module that needs more than 3 test files becomes a folder holding the module and its tests, named by behavior:
+  `hub-connector/{index.ts, hub-connector.ts, connect.test.ts, close.test.ts}`, not `hub-connector-connect.test.ts`
+  beside it (`pnpm lint`).
+- A test that is not about one module lives in `packages/<name>/test/`, never loose in `src/`:
+  - examples of `docs/api/` and their copies: `test/docs/<doc>.test.ts` and `test/docs/<doc>-<example>.test-d.ts`;
+  - checks of the lint boundaries of the package's components: `test/boundaries.test.ts`;
+  - end-to-end tests: `test/e2e/` (below).
+
 ## How
 
 - Name tests `it("does X when Y")`; one behavior per test; no logic (`if`, loops) inside a test. (Testing BP 1.1)
@@ -48,7 +59,7 @@ floor, not the goal: a line that runs without an assertion about its result is n
 ## Type tests
 
 - Only for public types whose shape is the contract (protocol, SDK public API): what a user can and cannot write.
-- They live in `<module>.test-d.ts` next to the source and use `expectTypeOf` and `assertType` only, never a
+- They live in `<module>.test-d.ts` next to the source (doc examples: see above) and use `expectTypeOf` and `assertType` only, never a
   runtime `expect`. Vitest does not run them; `pnpm typecheck` compiles them and fails on a broken assertion.
 - A rejected shape: `// @ts-expect-error <reason>` directly above `assertType<T>(...)`, with the wrong field on the
   first line of the call, where tsc reports it.

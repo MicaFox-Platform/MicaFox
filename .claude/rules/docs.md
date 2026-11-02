@@ -32,7 +32,9 @@ Only the decided design. No alternatives, no "we considered", no open questions:
 made from `.claude/templates/architecture.md` is input for `/architect` only and is never merged as a draft.
 
 `overview.md` has the sections Components (diagram), Packages, Key flows, Decisions (ADR links).
-`<component>.md` has the sections Purpose, Boundaries, Interactions (diagram), Key flows, Decisions. A package that
+`<component>.md` has the sections Purpose, Boundaries, Interactions (diagram), Layout (folder tree), Key flows,
+Decisions. Layout is the decided folder tree of the component; a change that adds, moves or removes a folder or a
+source file updates it in the same PR. A package that
 is one component gets `<package>.md`; a package with several large components gets a folder `<package>/` with one
 `<component>.md` per component (`sdk/connector.md`, `sdk/debugger.md`).
 

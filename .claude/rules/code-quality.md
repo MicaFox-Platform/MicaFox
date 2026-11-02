@@ -10,8 +10,19 @@ as clear and as fast as it found it. Limits marked (ESLint) are enforced by `pac
 
 ## Structure
 
+A reader finds a file from the folder names alone. The tree of a component is designed in its architecture doc
+(`## Layout`), not grown file by file.
+
+- Folders by component, never by layer: no `types/`, `services/`, `utils/` or `helpers/`. (Node BP 1.1)
 - One concept per module. A component is a folder whose `index.ts` is its only entry; other modules import the
   folder, not its files. (Node BP 1.3, 3.9)
+- A folder holds at most 10 source files, tests not counted (`pnpm lint`). Before it outgrows that, group its files
+  by sub-concept into sub-component folders, each with its own `index.ts` (`connector/session/`,
+  `connector/outbound/`). A root file imports a sub-component as `./session/index.js`; a sub-component imports a
+  sibling as `../outbound/index.js`, never its files, and never the files of its parent (ESLint).
+- Folders and files are kebab-case and named after the concept they hold (`outbound/`, `token-bucket.ts`), not after
+  a ticket, a flow step or a test kind.
+- No empty folders and no leftovers: a move or split that is given up is undone completely (`pnpm lint`).
 - No `utils.ts`, `helpers.ts` or `common.ts`: name a module after what it does (`backoff.ts`, `redact.ts`).
 - Split by responsibility, not by size. A file over 300 lines or a function over 50 lines is split (ESLint), and each
   part gets a name that says what it does.

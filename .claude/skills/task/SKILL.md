@@ -35,6 +35,10 @@ An open design question → stop and suggest `/architect`.
 
 ## 4. Plan
 
+Every plan that adds, moves or removes a file names where each file goes, from the `## Layout` of the component's
+architecture doc. A file that has no place there, or a folder it would push past 10 source files, means the plan
+first updates the Layout (`.claude/rules/code-quality.md#structure`); a new sub-component folder is part of the plan.
+
 - **S** — ≤ 2 files, behavior is clear: go.
 - **M** — several files, clear goal: a 3–6 line plan inline, then go.
 - **L** — public API, protocol, new package or dependency, or ambiguity: write the plan, delegate to `critic` without
