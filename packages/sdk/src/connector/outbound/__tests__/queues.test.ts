@@ -1,7 +1,7 @@
 import { Buffer } from "node:buffer";
 import { describe, expect, it } from "vitest";
 
-import { SendQueues, type QueuedMessage, type QueueLimits } from "./queues.js";
+import { SendQueues, type QueuedMessage, type QueueLimits } from "../queues.js";
 
 const LARGE: QueueLimits = { maxMessages: 1000, maxBytes: 1_048_576 };
 

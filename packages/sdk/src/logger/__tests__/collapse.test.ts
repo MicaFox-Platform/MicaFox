@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createLogger, type Logger, type SdkLogger } from "./index.js";
+import { createLogger, type Logger, type SdkLogger } from "../index.js";
 
 type Call = [level: string, ...args: unknown[]];
 

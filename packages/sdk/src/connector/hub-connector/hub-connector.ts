@@ -6,7 +6,6 @@ import { HandlerList } from "./handlers.js";
 import { readErrorCode, type SdkLogger } from "../../logger/index.js";
 import {
   Attempt,
-  buildHello,
   checkHubTarget,
   type AttemptEvents,
   type AttemptFailure,
@@ -14,6 +13,7 @@ import {
 } from "../connection/index.js";
 import { resolveConnectorConfig, type HubConnectorOptions, type ResolvedConnectorOptions } from "../options/index.js";
 import { Batcher } from "../outbound/index.js";
+import { buildHello } from "../session/index.js";
 
 const COMPONENT = "connector";
 

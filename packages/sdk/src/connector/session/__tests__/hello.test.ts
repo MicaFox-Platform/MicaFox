@@ -1,8 +1,8 @@
 import { hostname } from "node:os";
 import { describe, expect, it, vi } from "vitest";
 
-import { buildHello } from "./hello.js";
-import { SDK_VERSION } from "./version.js";
+import { buildHello } from "../hello.js";
+import { SDK_VERSION } from "../version.js";
 
 // os is the boundary: the real hostname() in the other tests, a failing one where a test asks for it
 vi.mock(import("node:os"), async (importOriginal) => {

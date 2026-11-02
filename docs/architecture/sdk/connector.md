@@ -78,15 +78,16 @@ packages/sdk/src/connector/
 │   ├── config.ts           options plus the logger: the debugger's or the connector's own
 │   ├── labels.ts           labels from the option or PROBEX_LABELS
 │   └── read-field.ts       defensive reads of app objects and environment variables
-├── connection/             one WebSocket to the hub and its session
+├── connection/             one WebSocket to the hub
 │   ├── attempt.ts          one connection: TLS, upgrade, handshake, frames, close
 │   ├── attempt-failure.ts  why an attempt ended, without secrets
 │   ├── hub-url.ts          checks the URL and the token before any connect
+│   └── heartbeat.ts        liveness pings and the dead-connection timeout
+├── session/                what is said on a connection: the handshake and the version check
 │   ├── hello.ts            the hello sent first on every connection
 │   ├── version.ts          the SDK version sent in hello
 │   ├── welcome.ts          checks the first frame from the hub
-│   ├── inbound.ts          reads every later frame from the hub
-│   └── heartbeat.ts        liveness pings and the dead-connection timeout
+│   └── inbound.ts          reads every later frame from the hub
 └── outbound/               messages on their way to the hub
     ├── batcher.ts          serializes, queues and writes batches under the rate limit
     ├── queues.ts           the control queue and the data buffer with their bounds
@@ -94,8 +95,9 @@ packages/sdk/src/connector/
     └── token-bucket.ts     the rate limit
 ```
 
-Each folder is entered through its `index.ts`. `hub-connector/` uses the other three; `connection/` reads `Labels`
-from `options/`; `options/` and `outbound/` use no other folder.
+Each folder is entered through its `index.ts` and keeps its tests in its `__tests__/`. `hub-connector/` uses the
+other four; `connection/` uses `session/`, which reads `Labels` from `options/`; `options/` and `outbound/` use no
+other folder.
 
 ## Key flows
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { checkFirstFrame } from "./welcome.js";
+import { checkFirstFrame } from "../welcome.js";
 
 describe("checkFirstFrame", () => {
   it("accepts a welcome of the SDK's protocol version", () => {

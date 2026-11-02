@@ -1,7 +1,7 @@
 import type { Connector, ConnectorStatus, Message } from "@probex-platform/protocol";
 import { assertType, describe, expectTypeOf, it } from "vitest";
 
-import { HubConnector, type HubConnectorOptions, type LogContext, type Logger, type LogLevel } from "./index.js";
+import { HubConnector, type HubConnectorOptions, type LogContext, type Logger, type LogLevel } from "../index.js";
 
 type Write = (message: string, context: LogContext) => void;
 

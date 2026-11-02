@@ -15,7 +15,7 @@ import {
   type Snapshot,
   type Value,
   type Welcome,
-} from "./index.js";
+} from "../index.js";
 
 type Handler<T> = (value: T) => void;
 

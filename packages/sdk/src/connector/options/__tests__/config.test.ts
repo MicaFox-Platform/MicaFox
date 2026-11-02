@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { LOGGER_KEY, resolveConnectorConfig } from "./config.js";
-import { createLogger, SdkLogger, type Logger } from "../../logger/index.js";
+import { createLogger, SdkLogger, type Logger } from "../../../logger/index.js";
+import { LOGGER_KEY, resolveConnectorConfig } from "../config.js";
 
 type Call = [level: string, ...args: unknown[]];
 

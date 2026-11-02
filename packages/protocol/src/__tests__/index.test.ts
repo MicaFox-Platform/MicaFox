@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import * as protocol from "./index.js";
+import * as protocol from "../index.js";
 
 describe("protocol", () => {
   it("exports no runtime values besides the wire constants", () => {

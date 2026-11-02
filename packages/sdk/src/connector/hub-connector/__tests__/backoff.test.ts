@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { Backoff } from "./backoff.js";
+import { Backoff } from "../backoff.js";
 
 const waits = (backoff: Backoff, count: number): number[] => Array.from({ length: count }, () => backoff.nextWaitMs());
 

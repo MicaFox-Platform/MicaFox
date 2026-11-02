@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createLogger, type Logger, type SdkLogger } from "./index.js";
+import { createLogger, type Logger, type SdkLogger } from "../index.js";
 
 const HOLD_KEY = Symbol.for("probex.logger.hold");
 
@@ -87,7 +87,7 @@ describe("hold", () => {
   it("makes a logger from a second module instance queue its lines", async () => {
     const first = setup();
     vi.resetModules();
-    const other = await import("./index.js");
+    const other = await import("../index.js");
     const app = createRecorder();
     const second = other.createLogger({ component: "connector", env: {}, console: createRecorder().logger });
     second.set({ logger: app.logger, logLevel: "warn" }, "connector");
@@ -103,7 +103,7 @@ describe("hold", () => {
   it("ends the hold of a second module instance", async () => {
     const first = setup();
     vi.resetModules();
-    const other = await import("./index.js");
+    const other = await import("../index.js");
     const second = other.createLogger({ component: "connector", env: {}, console: createRecorder().logger });
 
     second.hold();

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { HandlerList } from "./handlers.js";
+import { HandlerList } from "../handlers.js";
 
 const createList = (): { list: HandlerList<string>; reported: unknown[]; calls: string[] } => {
   const reported: unknown[] = [];

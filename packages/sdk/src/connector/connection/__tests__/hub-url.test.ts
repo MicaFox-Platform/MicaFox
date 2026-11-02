@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { checkHubTarget } from "./hub-url.js";
+import { checkHubTarget } from "../hub-url.js";
 
 const TOKEN = "s3cr3t-token";
 

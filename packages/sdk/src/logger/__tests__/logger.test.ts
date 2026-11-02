@@ -2,7 +2,7 @@ import { Console } from "node:console";
 import { Writable } from "node:stream";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createLogger, type Logger } from "./index.js";
+import { createLogger, type Logger } from "../index.js";
 
 // A real Node console writing to a string, to check how util.format treats what the logger passes
 const createNodeConsole = (): { console: Console; read: () => string } => {

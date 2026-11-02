@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { useFakeHubs } from "../../../test/connector/fake-hub.js";
+import { useFakeHubs } from "../../../../test/connector/fake-hub.js";
 import {
   advanceToReconnect,
   connectFully,
   createHarness,
   settle,
   useConnectorFakeTimers,
-} from "../../../test/connector/harness.js";
+} from "../../../../test/connector/harness.js";
 
 describe("HubConnector close()", () => {
   const hubs = useFakeHubs();

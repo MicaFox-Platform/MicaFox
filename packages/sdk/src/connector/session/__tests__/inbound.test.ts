@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { readHubFrame } from "./inbound.js";
+import { readHubFrame } from "../inbound.js";
 
 describe("readHubFrame()", () => {
   it("returns a breakpoints message as a message", () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { TokenBucket } from "./token-bucket.js";
+import { TokenBucket } from "../token-bucket.js";
 
 // 1000 bytes per second is one byte per millisecond, so waits read as byte counts
 const BYTES_PER_SECOND = 1000;

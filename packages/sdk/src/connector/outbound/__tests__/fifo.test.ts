@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { Fifo } from "./fifo.js";
+import { Fifo } from "../fifo.js";
 
 const createFifo = (items: readonly string[]): Fifo<string> => {
   const fifo = new Fifo<string>();
