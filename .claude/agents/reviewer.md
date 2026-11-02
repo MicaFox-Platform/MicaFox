@@ -19,6 +19,10 @@ You review the current branch of ProbeX. You never modify files.
      repeat the arrange step, type checks padded with runtime `expect` instead of living in `*.test-d.ts`;
    - cost on the hot path: lookups by scanning inside loops, quadratic copies, `shift()` on growing queues, caches,
      queues, maps or retries without a bound, recursion over depth the app controls;
+   - the tree, not only the lines: list every folder the diff touches (`ls`) and check it against
+     `.claude/rules/code-quality.md#structure`, `.claude/rules/testing.md#where-tests-live` and the `## Layout` of
+     its architecture doc: files in a folder they do not belong to, a folder about to outgrow 8 source files, a test
+     outside a `__tests__/`, a new or moved file the Layout does not list;
    - structure and naming against `.claude/rules/code-quality.md`: a class without state or lifecycle, static-only
      classes, singletons instead of injected dependencies, I/O mixed into decision logic, `utils`-style modules,
      names that hide units, abbreviate or differ from the docs;

@@ -52,8 +52,9 @@ the same scripts on every pull request: see [Checks](#checks).
 
 ## Testing
 
-- Unit tests sit next to the code as `*.test.ts`; the configs package keeps its tests in `packages/configs/test/`,
-  and end-to-end tests have their own folder (below).
+- Unit tests live in the `__tests__/` folder of the folder that holds their module, so folders list only code.
+  Tests that are not about one module (doc examples, lint boundaries, end-to-end) live in `packages/<name>/test/`;
+  the configs package keeps all its tests there.
   Coverage of `packages/*/src` must stay ≥ 80% in lines, branches and functions; a line no meaningful test can
   reach is excluded in `vitest.config.ts` with the reason, never covered by a hollow test.
 - Test behavior through the public surface. Mock only at the boundaries: the WebSocket, time and `node:inspector`.
@@ -77,8 +78,9 @@ public guides. The rules distilled from them, with the parts that apply to an em
 | [Node.js Best Practices](https://github.com/goldbergyoni/nodebestpractices)                            | [code quality](../.claude/rules/code-quality.md), [SDK](../.claude/rules/sdk.md)               |
 | [JavaScript Testing Best Practices](https://github.com/goldbergyoni/javascript-testing-best-practices) | [testing](../.claude/rules/testing.md)                                                         |
 
-- **Structure.** One concept per module, a folder with one `index.ts` entry per component, decisions kept apart from
-  I/O. Functions by default; a class only for state with a lifecycle.
+- **Structure.** Folders by component, each entered through its `index.ts`; at most 8 source files per folder,
+  grouped into sub-component folders by concept; no empty folders. One concept per module, decisions kept apart
+  from I/O. Functions by default; a class only for state with a lifecycle.
 - **Naming.** Google's identifier rules: acronyms as words (`instanceId`), no `I` prefix, no `_` prefix except on
   an unused parameter, units in names (`timeoutMs`).
 - **Efficiency.** Know the complexity of what you write; every cache, queue and buffer is bounded; the hot path is
@@ -87,7 +89,9 @@ public guides. The rules distilled from them, with the parts that apply to an em
   instead of enums, explicit return types on exports, `undefined` rather than `null`. Prettier owns formatting.
 
 ESLint enforces every rule it can, including limits on file and function size, nesting, complexity and
-parameters: see the [configs preset](api/configs.md#probex-platformconfigseslint).
+parameters: see the [configs preset](api/configs.md#probex-platformconfigseslint). `pnpm lint` also runs
+`.github/scripts/check-structure.sh` for the folder rules ESLint cannot check: files per folder, tests outside
+`__tests__/` and empty folders.
 
 ## Making a change
 

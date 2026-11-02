@@ -21,6 +21,21 @@ floor, not the goal: a line that runs without an assertion about its result is n
   in the PR hand-over. Never cover it with a hollow test.
 - Before finishing, ask of each test: would it fail if the code under test returned a wrong value? If not, fix it.
 
+## Where tests live
+
+A folder lists only the code it runs; its tests sit one level down, in its own `__tests__/` (`pnpm lint`).
+
+- A unit test lives in the `__tests__/` of the folder that holds its module: `connection/__tests__/hello.test.ts`
+  tests `connection/hello.ts`. A sub-component with tests has its own `__tests__/`; a `__tests__/` never holds the
+  tests of a sibling, parent or child folder.
+- `__tests__/` holds only `*.test.ts` and `*.test-d.ts` files, no subfolders and no helpers. A file is named after
+  its module: `hello.test.ts`, or `hub-connector-connect.test.ts` when a module needs several, one per behavior.
+- A test that is not about one folder lives in `packages/<name>/test/`, never in `src/`:
+  - examples of `docs/api/` and their copies: `test/docs/<doc>.test.ts` and `test/docs/<doc>-<example>.test-d.ts`;
+  - checks of the lint boundaries of the package's components: `test/boundaries.test.ts`;
+  - helpers and fixtures shared by tests: `test/<component>/`;
+  - end-to-end tests: `test/e2e/` (below).
+
 ## How
 
 - Name tests `it("does X when Y")`; one behavior per test; no logic (`if`, loops) inside a test. (Testing BP 1.1)
@@ -48,7 +63,7 @@ floor, not the goal: a line that runs without an assertion about its result is n
 ## Type tests
 
 - Only for public types whose shape is the contract (protocol, SDK public API): what a user can and cannot write.
-- They live in `<module>.test-d.ts` next to the source and use `expectTypeOf` and `assertType` only, never a
+- They live in `__tests__/<module>.test-d.ts` beside the module's tests (doc examples: see above) and use `expectTypeOf` and `assertType` only, never a
   runtime `expect`. Vitest does not run them; `pnpm typecheck` compiles them and fails on a broken assertion.
 - A rejected shape: `// @ts-expect-error <reason>` directly above `assertType<T>(...)`, with the wrong field on the
   first line of the call, where tsc reports it.

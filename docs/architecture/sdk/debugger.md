@@ -100,6 +100,10 @@ The parts live in `packages/sdk/src/debugger/`:
 - `InspectorSession` — wraps `node:inspector`. On the main thread, `post` answers synchronously, also while the
   thread is paused; failures come back as results and are never thrown.
 
+## Layout
+
+None yet.
+
 ## Key flows
 
 ### Starting

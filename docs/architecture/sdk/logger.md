@@ -65,6 +65,20 @@ Levels:
 - `info` — the lifecycle: started, stopped, turned off by `PROBEX_ENABLED`.
 - `debug` — details for diagnosing ProbeX itself: an unknown message type, how a breakpoint was resolved.
 
+## Layout
+
+```text
+packages/sdk/src/logger/
+├── index.ts         the logger's only entry: createLogger, SdkLogger and the public types
+├── logger.ts        SdkLogger: options, level filter, collapsing and holding lines during a pause
+├── app-logger.ts    the Logger the app passes and calls to it that never throw
+├── context.ts       the fields of a log line and readErrorCode
+├── level.ts         log levels and the default level
+├── collapse.ts      collapses repeats of one problem into a summary line
+├── line-queue.ts    the bounded queue of lines held during a pause
+└── pause-hold.ts    the process-wide pause state shared by every logger
+```
+
 ## Key flows
 
 ### Resolving the logger
