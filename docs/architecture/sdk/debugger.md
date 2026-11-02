@@ -102,7 +102,16 @@ The parts live in `packages/sdk/src/debugger/`:
 
 ## Layout
 
-None yet.
+```text
+packages/sdk/src/debugger/
+├── index.ts                the debugger's only entry: Debugger, InspectorSession and their types
+├── debugger.ts             Debugger: configure(), run() and stop(), and the not running, running and stopping states
+├── options.ts              DebuggerOptions, the fields of a configure() call, enabled and the custom connector check
+├── connector-link.ts       ConnectorLink: subscribes to a connector, connects it and catches what an async one rejects
+└── inspector-session.ts    InspectorSession: node:inspector calls that answer synchronously and never throw
+```
+
+`Breakpoints`, `SourceMaps`, `RateLimiter` and `Capture` get their own sub-component folders when they are built.
 
 ## Key flows
 

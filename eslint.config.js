@@ -52,4 +52,6 @@ export default [
   ...restrictImports("logger", []),
   // The connector may become its own package with the logger: docs/architecture/sdk/connector.md#boundaries
   ...restrictImports("connector", ["@probex-platform/protocol", "ws", "../logger/index.js"]),
+  // The debugger imports the connector and the logger, never their files: docs/architecture/sdk/overview.md#packages
+  ...restrictImports("debugger", ["@probex-platform/protocol", "../connector/index.js", "../logger/index.js"]),
 ];
