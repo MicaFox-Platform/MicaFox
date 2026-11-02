@@ -84,3 +84,31 @@ describe("logger imports", { timeout: 60_000 }, () => {
     expect(messages).toEqual([]);
   });
 });
+
+describe("debugger imports", { timeout: 60_000 }, () => {
+  it.each([
+    "ws",
+    "vitest",
+    "@probex-platform/sdk",
+    "../connector/options/index.js",
+    "../connector/hub-connector/hub-connector.js",
+    "../logger/logger.js",
+    "util",
+  ])("rejects %s in a root file", async (specifier) => {
+    const messages = await findRestrictedImports("debugger/debugger.ts", specifier);
+
+    expect(messages).toHaveLength(1);
+  });
+
+  it.each([
+    "@probex-platform/protocol",
+    "../connector/index.js",
+    "../logger/index.js",
+    "node:inspector",
+    "./inspector-session.js",
+  ])("allows %s in a root file", async (specifier) => {
+    const messages = await findRestrictedImports("debugger/debugger.ts", specifier);
+
+    expect(messages).toEqual([]);
+  });
+});
