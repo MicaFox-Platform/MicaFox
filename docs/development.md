@@ -15,7 +15,7 @@ table only, and packages import each other by package name, never by relative pa
 | `packages/configs`    | shared tsconfig, ESLint, Prettier and Vitest presets          | -             |
 | `packages/protocol`   | messages, `PROTOCOL_VERSION` and the `Connector` type         | -             |
 | `packages/sdk`        | `src/debugger/` and `src/connector/`, run inside the host app | protocol      |
-| `examples/node-basic` | demo app to try the SDK by hand                               | sdk           |
+| `examples/node-basic` | demo app to try the SDK by hand                               | sdk, protocol |
 
 A package exports its `src/index.ts` under the `@probex-platform/source` condition, which `pnpm dev`, tests and
 typecheck resolve: packages read each other's sources directly, so development needs no build step.
@@ -53,8 +53,8 @@ the same scripts on every pull request: see [Checks](#checks).
 ## Testing
 
 - Unit tests live in the `__tests__/` folder of the folder that holds their module, so folders list only code.
-  Tests that are not about one module (doc examples, lint boundaries, end-to-end) live in `packages/<name>/test/`;
-  the configs package keeps all its tests there.
+  Tests that are not about one module (doc examples, lint boundaries, end-to-end) live in `packages/<name>/test/`,
+  or in `examples/<name>/tests/` for the whole system; the configs package keeps all its tests there.
   Coverage of `packages/*/src` must stay ≥ 80% in lines, branches and functions; a line no meaningful test can
   reach is excluded in `vitest.config.ts` with the reason, never covered by a hollow test.
 - Test behavior through the public surface. Mock only at the boundaries: the WebSocket, time and `node:inspector`.
@@ -63,7 +63,8 @@ the same scripts on every pull request: see [Checks](#checks).
   Vitest does not run them; `pnpm typecheck` compiles them and fails on a broken assertion.
 - End-to-end tests run a component in a real Node process. A package keeps its own in
   `packages/<name>/test/e2e/<component>/`: a small fixture app started as a child process, and one test file per
-  behavior of the component. Tests of the whole system, through the public API only, belong in `examples/`.
+  behavior of the component. Tests of the whole system, through the public API only, live in `examples/<name>/tests/`
+  and start the example's app and fake hub as child processes.
 
 Full rules: [testing](../.claude/rules/testing.md).
 

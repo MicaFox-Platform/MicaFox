@@ -3,6 +3,7 @@ paths:
   - "**/*.test.ts"
   - "**/*.test-d.ts"
   - "packages/*/test/**"
+  - "examples/*/tests/**"
 ---
 
 # Testing
@@ -35,6 +36,7 @@ A folder lists only the code it runs; its tests sit one level down, in its own `
   - checks of the lint boundaries of the package's components: `test/boundaries.test.ts`;
   - helpers and fixtures shared by tests: `test/<component>/`;
   - end-to-end tests: `test/e2e/` (below).
+- An example's end-to-end tests of the whole system, with their harness: `examples/<name>/tests/` (below).
 
 ## How
 
@@ -54,8 +56,8 @@ A folder lists only the code it runs; its tests sit one level down, in its own `
   what a real process adds; each one starts a process.
 - A package's own: `packages/<name>/test/e2e/<component>/`, with a fixture app started as a child process, a
   harness that drives it, and one `<behavior>.test.ts` per behavior of the component, one `it` per scenario. They may
-  import the package's sources by relative path, since they live in it. The whole system: in `examples/`, through the
-  public API only.
+  import the package's sources by relative path, since they live in it. The whole system: in `examples/<name>/tests/`,
+  through the public API only, with their harness beside them; it starts the example's own `src/` as child processes.
 - A run ends when the process exits by itself; a deadline after the last request only kills one that never does, and
   a run that fails earlier kills its process. No sleeps and no assertion on elapsed real time: order is shown by
   markers the fixture writes to the same output as the code under test.
