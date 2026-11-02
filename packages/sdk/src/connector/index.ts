@@ -1,2 +1,2 @@
-export { HubConnector } from "./hub-connector.js";
-export type { HubConnectorOptions } from "./options.js";
+export { HubConnector } from "./hub-connector/index.js";
+export type { HubConnectorOptions } from "./options/index.js";

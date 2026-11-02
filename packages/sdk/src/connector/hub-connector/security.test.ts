@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useFakeHubs, type FakeHub, type UpgradeReply } from "../../test/connector/fake-hub.js";
+import { useFakeHubs, type FakeHub, type UpgradeReply } from "../../../test/connector/fake-hub.js";
 import {
   advanceToReconnect,
   createHarness,
   useConnectorFakeTimers,
   type Harness,
-} from "../../test/connector/harness.js";
+} from "../../../test/connector/harness.js";
 
 // Each secret is unique, so a leak shows which one escaped
 const TOKEN = "token-SECRET-1";

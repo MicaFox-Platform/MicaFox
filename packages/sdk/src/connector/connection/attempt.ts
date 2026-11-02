@@ -8,7 +8,7 @@ import { Heartbeat } from "./heartbeat.js";
 import type { HubTarget } from "./hub-url.js";
 import { readHubFrame, type HubFrame, type IgnoredFrame } from "./inbound.js";
 import { checkFirstFrame } from "./welcome.js";
-import { readErrorCode } from "../logger/index.js";
+import { readErrorCode } from "../../logger/index.js";
 
 /** What an attempt tells its connector. */
 export interface AttemptEvents {

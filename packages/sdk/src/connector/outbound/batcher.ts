@@ -2,9 +2,8 @@ import type { Message } from "@probex-platform/protocol";
 import { Buffer } from "node:buffer";
 
 import { SendQueues, type AddOutcome, type QueueLimits } from "./queues.js";
-import { isRecord } from "./read-field.js";
 import { TokenBucket } from "./token-bucket.js";
-import { readErrorCode, type SdkLogger } from "../logger/index.js";
+import { readErrorCode, type SdkLogger } from "../../logger/index.js";
 
 /** Where the batcher writes: the socket of an attempt the hub has welcomed. */
 export interface BatchTarget {
@@ -40,7 +39,7 @@ const DATA_TYPES: ReadonlySet<string> = new Set(["snapshot"]);
 
 // Read defensively: an app in plain JavaScript can pass anything
 const readMessageField = (message: unknown, name: string): unknown =>
-  isRecord(message) ? Reflect.get(message, name) : undefined;
+  typeof message === "object" && message !== null ? Reflect.get(message, name) : undefined;
 
 // JSON.stringify returns undefined for a value JSON cannot hold, such as a function, and throws on a cycle, a BigInt
 // or a throwing toJSON()

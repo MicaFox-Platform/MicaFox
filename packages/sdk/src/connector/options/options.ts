@@ -1,6 +1,6 @@
 import { resolveLabels, type Labels } from "./labels.js";
 import { isRecord, readEnv, readOption, withPrefix, type Warn } from "./read-field.js";
-import type { Environment, Logger, LogLevel } from "../logger/index.js";
+import type { Environment, Logger, LogLevel } from "../../logger/index.js";
 
 /** `HubConnectorOptions` after resolution: every number has a valid value; the strings have no default. */
 export interface ResolvedConnectorOptions {

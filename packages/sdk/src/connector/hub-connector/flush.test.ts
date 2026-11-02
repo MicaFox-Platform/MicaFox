@@ -3,8 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WebSocket } from "ws";
 
 import type { HubConnector } from "./hub-connector.js";
-import { useFakeHubs } from "../../test/connector/fake-hub.js";
-import { connectFully, createHarness, parseFrame, settle } from "../../test/connector/harness.js";
+import { useFakeHubs } from "../../../test/connector/fake-hub.js";
+import { connectFully, createHarness, parseFrame, settle } from "../../../test/connector/harness.js";
 
 const status = (breakpointId: string): Message => ({
   version: 1,

@@ -1,4 +1,4 @@
-import type { Environment } from "../logger/index.js";
+import type { Environment } from "../../logger/index.js";
 
 /** Writes a warning about an option that was replaced by its default or skipped. */
 export type Warn = (message: string) => void;

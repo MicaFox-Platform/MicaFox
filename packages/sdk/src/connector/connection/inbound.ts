@@ -1,7 +1,5 @@
 import { PROTOCOL_VERSION, type Batch, type Message } from "@probex-platform/protocol";
 
-import { isRecord } from "./read-field.js";
-
 /** A frame the connector logs and drops; `reason` is fixed text that never quotes the frame. */
 export interface IgnoredFrame {
   kind: "ignored";
@@ -40,6 +38,8 @@ export const parseJson = (text: string): unknown => {
 // Own keys only: a hub could send "toString" or "__proto__" as a type
 const isKnownType = (type: string): type is MessageType => Object.hasOwn(SENDERS, type);
 
+const UNTYPED_MESSAGE = "ignored a message from the hub without a numeric version and a string type";
+
 const ignore = (level: IgnoredFrame["level"], reason: string): IgnoredFrame => ({ kind: "ignored", level, reason });
 
 const readByType = (message: object, type: string): HubFrame => {
@@ -74,10 +74,14 @@ export const readHubFrame = (text: string | undefined): HubFrame => {
     return ignore("warn", "ignored a frame from the hub that is not valid JSON");
   }
 
-  const version: unknown = isRecord(message) ? Reflect.get(message, "version") : undefined;
-  const type: unknown = isRecord(message) ? Reflect.get(message, "type") : undefined;
-  if (!isRecord(message) || typeof version !== "number" || typeof type !== "string") {
-    return ignore("warn", "ignored a message from the hub without a numeric version and a string type");
+  if (typeof message !== "object" || message === null) {
+    return ignore("warn", UNTYPED_MESSAGE);
+  }
+
+  const version: unknown = Reflect.get(message, "version");
+  const type: unknown = Reflect.get(message, "type");
+  if (typeof version !== "number" || typeof type !== "string") {
+    return ignore("warn", UNTYPED_MESSAGE);
   }
 
   if (version !== PROTOCOL_VERSION) {

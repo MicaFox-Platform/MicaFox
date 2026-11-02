@@ -1,6 +1,6 @@
 import { CLOSE_CODES } from "@probex-platform/protocol";
 
-import { readErrorCode } from "../logger/index.js";
+import { readErrorCode } from "../../logger/index.js";
 
 /** Why an attempt ended; `message` never holds the token, the URL's userinfo or query, or text from the hub. */
 export interface AttemptFailure {

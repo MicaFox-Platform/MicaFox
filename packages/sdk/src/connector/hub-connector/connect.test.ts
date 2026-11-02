@@ -2,10 +2,10 @@ import type { Message } from "@probex-platform/protocol";
 import { hostname } from "node:os";
 import { describe, expect, it, vi } from "vitest";
 
-import type { HubConnectorOptions } from "./options.js";
-import { SDK_VERSION } from "./version.js";
-import { useFakeHubs } from "../../test/connector/fake-hub.js";
-import { createHarness, parseFrame, settle } from "../../test/connector/harness.js";
+import { useFakeHubs } from "../../../test/connector/fake-hub.js";
+import { createHarness, parseFrame, settle } from "../../../test/connector/harness.js";
+import { SDK_VERSION } from "../connection/version.js";
+import type { HubConnectorOptions } from "../options/index.js";
 
 const TOKEN = "hub-token-1234";
 const UUID = /^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/;

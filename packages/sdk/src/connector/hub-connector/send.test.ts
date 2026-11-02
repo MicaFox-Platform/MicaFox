@@ -1,14 +1,14 @@
 import type { Message } from "@probex-platform/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useFakeHubs, type FakeHub, type HubConnection } from "../../test/connector/fake-hub.js";
+import { useFakeHubs, type FakeHub, type HubConnection } from "../../../test/connector/fake-hub.js";
 import {
   advanceToReconnect,
   createHarness,
   parseFrame,
   useConnectorFakeTimers,
   type Harness,
-} from "../../test/connector/harness.js";
+} from "../../../test/connector/harness.js";
 
 const FLUSH_INTERVAL_MS = 100;
 

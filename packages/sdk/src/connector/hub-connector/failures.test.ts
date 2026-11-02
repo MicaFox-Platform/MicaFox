@@ -2,13 +2,13 @@ import { CLOSE_CODES } from "@probex-platform/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WebSocket } from "ws";
 
-import { findClosedPort, useFakeHubs, type FakeHub, type HubConnection } from "../../test/connector/fake-hub.js";
+import { findClosedPort, useFakeHubs, type FakeHub, type HubConnection } from "../../../test/connector/fake-hub.js";
 import {
   advanceToReconnect,
   createHarness,
   useConnectorFakeTimers,
   type Harness,
-} from "../../test/connector/harness.js";
+} from "../../../test/connector/harness.js";
 
 const RECONNECT = { minDelayMs: 1000, maxDelayMs: 8000 };
 

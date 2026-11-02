@@ -1,8 +1,8 @@
 import { PROTOCOL_VERSION, type Hello } from "@probex-platform/protocol";
 import { hostname } from "node:os";
 
-import type { Labels } from "./labels.js";
 import { SDK_VERSION } from "./version.js";
+import type { Labels } from "../options/index.js";
 
 /** What a `hello` says about the app instance besides the fixed fields. */
 export interface HelloFields {

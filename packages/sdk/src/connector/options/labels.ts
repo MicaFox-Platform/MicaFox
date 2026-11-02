@@ -1,5 +1,5 @@
 import { isRecord, readEnv, readField, withPrefix, type Warn } from "./read-field.js";
-import type { Environment } from "../logger/index.js";
+import type { Environment } from "../../logger/index.js";
 
 /** Labels the hub can target breakpoints by. */
 export type Labels = Readonly<Record<string, string>>;

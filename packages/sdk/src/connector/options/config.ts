@@ -1,6 +1,6 @@
 import { resolveOptions, type ResolvedConnectorOptions } from "./options.js";
 import { isRecord, readField, readOption, type Warn } from "./read-field.js";
-import { createLogger, SdkLogger, type Environment, type Logger } from "../logger/index.js";
+import { createLogger, SdkLogger, type Environment, type Logger } from "../../logger/index.js";
 
 /** The key under which the debugger hands its logger to the `HubConnector` it creates; not in `HubConnectorOptions`. */
 export const LOGGER_KEY: unique symbol = Symbol.for("probex.logger");

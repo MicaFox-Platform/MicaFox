@@ -2,13 +2,13 @@ import { once } from "node:events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WebSocket } from "ws";
 
-import { useFakeHubs, type HubConnection } from "../../test/connector/fake-hub.js";
+import { useFakeHubs, type HubConnection } from "../../../test/connector/fake-hub.js";
 import {
   advanceToReconnect,
   connectFully,
   useConnectorFakeTimers,
   type Harness,
-} from "../../test/connector/harness.js";
+} from "../../../test/connector/harness.js";
 
 const RECONNECT = { minDelayMs: 1000, maxDelayMs: 8000 };
 const BREAKPOINTS = '{"version":1,"type":"breakpoints","breakpoints":[]}';

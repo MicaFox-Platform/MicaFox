@@ -2,7 +2,7 @@ import type { Message, Snapshot } from "@probex-platform/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Batcher, type BatchTarget, type BatcherSettings } from "./batcher.js";
-import { createLogger, type Logger } from "../logger/index.js";
+import { createLogger, type Logger } from "../../logger/index.js";
 
 const PREFIX = "[probex] connector: ";
 

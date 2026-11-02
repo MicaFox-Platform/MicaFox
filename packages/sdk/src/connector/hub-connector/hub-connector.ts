@@ -1,16 +1,19 @@
 import type { Connector, ConnectorStatus, Message } from "@probex-platform/protocol";
 import { randomUUID } from "node:crypto";
 
-import type { AttemptFailure } from "./attempt-failure.js";
-import { Attempt, type AttemptEvents } from "./attempt.js";
 import { Backoff } from "./backoff.js";
-import { Batcher } from "./batcher.js";
-import { resolveConnectorConfig } from "./config.js";
 import { HandlerList } from "./handlers.js";
-import { buildHello } from "./hello.js";
-import { checkHubTarget, type HubTarget } from "./hub-url.js";
-import type { HubConnectorOptions, ResolvedConnectorOptions } from "./options.js";
-import { readErrorCode, type SdkLogger } from "../logger/index.js";
+import { readErrorCode, type SdkLogger } from "../../logger/index.js";
+import {
+  Attempt,
+  buildHello,
+  checkHubTarget,
+  type AttemptEvents,
+  type AttemptFailure,
+  type HubTarget,
+} from "../connection/index.js";
+import { resolveConnectorConfig, type HubConnectorOptions, type ResolvedConnectorOptions } from "../options/index.js";
+import { Batcher } from "../outbound/index.js";
 
 const COMPONENT = "connector";
 

@@ -2,8 +2,8 @@ import { CLOSE_CODES, type Breakpoints, type Message } from "@probex-platform/pr
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { HubConnector } from "./hub-connector.js";
-import { useFakeHubs, type HubConnection } from "../../test/connector/fake-hub.js";
-import { advanceToReconnect, connectFully, useConnectorFakeTimers } from "../../test/connector/harness.js";
+import { useFakeHubs, type HubConnection } from "../../../test/connector/fake-hub.js";
+import { advanceToReconnect, connectFully, useConnectorFakeTimers } from "../../../test/connector/harness.js";
 
 const RECONNECT = { minDelayMs: 1000, maxDelayMs: 8000 };
 
