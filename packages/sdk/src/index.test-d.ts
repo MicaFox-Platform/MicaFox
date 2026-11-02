@@ -67,7 +67,7 @@ describe("logger types", () => {
   });
 });
 
-// The signature blocks of docs/api/sdk/connector.md; its examples are compiled from connector-docs-*.test-d.ts
+// The signature blocks of docs/api/sdk/connector.md; its examples are compiled from test/docs/connector-*.test-d.ts
 describe("connector types", () => {
   it("defines HubConnectorOptions as in docs/api/sdk/connector.md", () => {
     expectTypeOf<HubConnectorOptions>().toEqualTypeOf<{

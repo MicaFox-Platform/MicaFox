@@ -2,9 +2,9 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-const DOC = path.join(import.meta.dirname, "../../../docs/api/sdk/connector.md");
+const DOC = path.join(import.meta.dirname, "../../../../docs/api/sdk/connector.md");
 // The doc's examples in order, each copied into a file that `pnpm typecheck` compiles
-const COPIES = ["connector-docs-hubconnector.test-d.ts", "connector-docs-usage.test-d.ts"];
+const COPIES = ["connector-hubconnector.test-d.ts", "connector-usage.test-d.ts"];
 
 const readBlocks = (markdown: string): string[] =>
   Array.from(markdown.matchAll(/```ts\n([\s\S]*?)```/g), (match) => match[1] ?? "");
