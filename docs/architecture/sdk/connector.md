@@ -64,6 +64,39 @@ it: [API](../../api/sdk/connector.md).
 The debugger sees only the [`Connector`](../../api/protocol.md#connector) interface. On the wire every frame is one
 JSON protocol message or a [`Batch`](../../api/protocol.md#batch) of them.
 
+## Layout
+
+```text
+packages/sdk/src/connector/
+├── index.ts                the connector's only entry: HubConnector, HubConnectorOptions
+├── hub-connector/          the class the app sees: lifecycle, status, reconnects
+│   ├── hub-connector.ts    HubConnector: connect, send, close, handlers; drives attempts and the batcher
+│   ├── handlers.ts         the onMessage and onStatus handler lists; a throwing handler is logged
+│   └── backoff.ts          reconnect delays with jitter
+├── options/                what the app passes, resolved once
+│   ├── options.ts          HubConnectorOptions, their defaults and environment variables
+│   ├── config.ts           options plus the logger: the debugger's or the connector's own
+│   ├── labels.ts           labels from the option or PROBEX_LABELS
+│   └── read-field.ts       defensive reads of app objects and environment variables
+├── connection/             one WebSocket to the hub and its session
+│   ├── attempt.ts          one connection: TLS, upgrade, handshake, frames, close
+│   ├── attempt-failure.ts  why an attempt ended, without secrets
+│   ├── hub-url.ts          checks the URL and the token before any connect
+│   ├── hello.ts            the hello sent first on every connection
+│   ├── version.ts          the SDK version sent in hello
+│   ├── welcome.ts          checks the first frame from the hub
+│   ├── inbound.ts          reads every later frame from the hub
+│   └── heartbeat.ts        liveness pings and the dead-connection timeout
+└── outbound/               messages on their way to the hub
+    ├── batcher.ts          serializes, queues and writes batches under the rate limit
+    ├── queues.ts           the control queue and the data buffer with their bounds
+    ├── fifo.ts             the queue both are built on
+    └── token-bucket.ts     the rate limit
+```
+
+Each folder is entered through its `index.ts`. `hub-connector/` uses the other three; `connection/` reads `Labels`
+from `options/`; `options/` and `outbound/` use no other folder.
+
 ## Key flows
 
 ### Connecting
