@@ -33,8 +33,12 @@ export const createRecordingLogger = (
 export class FakeConnector implements Connector {
   connectCount = 0;
   closeCount = 0;
+  /** Every message the debugger sent, in order. */
+  readonly sent: Message[] = [];
   /** Runs inside `connect()`, before it returns. */
   onConnect: () => void = () => undefined;
+  /** Runs inside `send()`, after it recorded the message; what it returns, `send()` returns, as an async one would. */
+  onSend: () => unknown = () => undefined;
   /** Runs inside every unsubscribe call, before it returns. */
   onUnsubscribe: () => void = () => undefined;
   /** A buggy connector: unsubscribing leaves the handler registered. */
@@ -51,8 +55,10 @@ export class FakeConnector implements Connector {
     this.onConnect();
   }
 
-  send(): void {
-    // The debugger sends nothing yet
+  send(message: Message): void {
+    this.sent.push(message);
+    // Typed void like Connector.send, yet a custom connector may return a promise
+    return this.onSend() as undefined;
   }
 
   onMessage(handler: (message: Message) => void): () => void {
@@ -117,6 +123,31 @@ export class FakeInspectorBinding extends EventEmitter implements InspectorBindi
   post(method: string, _params: object | undefined, callback: (error: Error | null, result?: object) => void): void {
     this.posted.push(method);
     callback(null, {});
+  }
+}
+
+/** An inspector session for `Breakpoints` that answers every command with `{}` and lets the test emit events. */
+export class FakeBreakpointsInspector {
+  readonly posted: string[] = [];
+  /** Runs inside `post()`, as V8 emits events inside a command. */
+  onPost: (method: string) => void = () => undefined;
+  private readonly handlers = new Map<string, (params: unknown) => void>();
+
+  post(method: string): { ok: true; value: object } {
+    this.posted.push(method);
+    this.onPost(method);
+    return { ok: true, value: {} };
+  }
+
+  on(event: string, handler: (params: unknown) => void): () => void {
+    this.handlers.set(event, handler);
+    return () => {
+      this.handlers.delete(event);
+    };
+  }
+
+  emit(event: string, params: unknown): void {
+    this.handlers.get(event)?.(params);
   }
 }
 
