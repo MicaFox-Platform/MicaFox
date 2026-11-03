@@ -1,0 +1,233 @@
+// Helpers for tests that run against the real V8 inspector of the test process: fixture modules loaded from disk
+// and a session that records what crosses the boundary.
+
+import type { BreakpointStatus } from "@probex-platform/protocol";
+import { randomUUID } from "node:crypto";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { Session } from "node:inspector";
+import { createRequire } from "node:module";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+
+import { createRecordingLogger, type LoggedLine } from "./fakes.js";
+import { Breakpoints } from "../../src/debugger/breakpoints/index.js";
+import { InspectorSession, type InspectorBinding } from "../../src/debugger/index.js";
+import { createLogger } from "../../src/logger/index.js";
+
+/**
+ * A module with a loop; its lines are what the tests set breakpoints on:
+ * 1 function, 2 `let sum`, 3 `for`, 4 `sum += `, 5 `}`, 6 `return`.
+ */
+export const CHECKOUT_SOURCE = `exports.total = function total(items) {
+  let sum = 0;
+  for (const item of items) {
+    sum += item.price;
+  }
+  return sum;
+};
+`;
+
+/** A module whose function pauses at a `debugger` statement. */
+export const DEBUGGER_STATEMENT_SOURCE = `exports.pause = function pause() {
+  debugger;
+  return 1;
+};
+`;
+
+/** Returns what `exports.total` of a checkout module returned for two items. */
+export const TOTAL_OF_TWO_ITEMS = 30;
+
+export const TWO_ITEMS = [{ price: 10 }, { price: 20 }];
+
+/** What a fixture module exports. */
+export interface CheckoutModule {
+  total: (items: Array<{ price: number }>) => number;
+}
+
+export interface PauseModule {
+  pause: () => number;
+}
+
+/**
+ * A directory of CommonJS modules that Node loads itself, so that V8 reports them without a source map. A module
+ * stays alive in V8 after its test, so every file name carries a tag that is unique to the instance: a later test
+ * never matches a file of an earlier one.
+ */
+export class Fixtures {
+  private readonly dir = realpathSync(mkdtempSync(path.join(tmpdir(), "probex-fixtures-")));
+  private readonly tag = randomUUID().slice(0, 8);
+  private readonly require = createRequire(import.meta.url);
+
+  /** The path a hub would send for the fixture `relative`, such as `orders/checkout-1a2b3c4d.cjs`. */
+  file(relative: string): string {
+    const { dir, name, ext } = path.parse(relative);
+    return path.posix.join(dir, `${name}-${this.tag}${ext}`);
+  }
+
+  /** Writes `source` to the fixture `relative` and returns its absolute path. */
+  write(relative: string, source: string): string {
+    const file = path.join(this.dir, this.file(relative));
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, source);
+    return file;
+  }
+
+  /** Loads a checkout module; a second call after `unload()` loads it again, as a new script with the same URL. */
+  loadCheckout(file: string): CheckoutModule {
+    // The fixture source above is what the module exports
+    return this.require(file) as CheckoutModule;
+  }
+
+  loadPause(file: string): PauseModule {
+    return this.require(file) as PauseModule;
+  }
+
+  unload(file: string): void {
+    // The module cache is how a test loads the same file again
+    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+    delete this.require.cache[file];
+  }
+
+  urlOf(file: string): string {
+    return pathToFileURL(file).href;
+  }
+
+  remove(): void {
+    rmSync(this.dir, { recursive: true, force: true });
+  }
+}
+
+type InspectorListener = Parameters<InspectorBinding["on"]>[1];
+
+/** A real `node:inspector` session that records the commands sent and the pauses, and can fail chosen commands. */
+export class TracedSession implements InspectorBinding {
+  readonly posted: Array<{ method: string; params: object | undefined }> = [];
+  /** The `hitBreakpoints` of every `Debugger.paused`, in order. */
+  readonly pauses: string[][] = [];
+  /** Commands answered with an error without reaching V8. */
+  readonly failing = new Set<string>();
+  /** Commands answered with a fixed result without reaching V8. */
+  readonly answers = new Map<string, object>();
+  /** Runs before each command reaches V8, to observe the state the debugger is in when it sends it. */
+  beforePost: (method: string) => void = () => undefined;
+  private readonly session = new Session();
+
+  /** Pauses that no listener resumed, which the safety net resumed instead of leaving the test process hung. */
+  unhandledPauses = 0;
+  private resumesAtPause = 0;
+
+  /** The methods posted so far. */
+  get methods(): string[] {
+    return this.posted.map(({ method }) => method);
+  }
+
+  count(method: string): number {
+    return this.methods.filter((posted) => posted === method).length;
+  }
+
+  connect(): void {
+    this.session.connect();
+    // Registered before the debugger's own listener, so a pause is recorded before it is resumed
+    this.session.on("Debugger.paused", (message: { params: { hitBreakpoints?: string[] } }) => {
+      this.pauses.push(message.params.hitBreakpoints ?? []);
+      this.resumesAtPause = this.count("Debugger.resume");
+    });
+  }
+
+  /** Adds a last listener that resumes a pause nobody resumed, so a test of a missing handler fails, not hangs. */
+  addSafetyNet(): void {
+    this.session.on("Debugger.paused", () => {
+      if (this.count("Debugger.resume") === this.resumesAtPause) {
+        this.unhandledPauses += 1;
+        this.session.post("Debugger.resume");
+      }
+    });
+  }
+
+  disconnect(): void {
+    this.session.disconnect();
+  }
+
+  post(method: string, params: object | undefined, callback: (error: Error | null, result?: object) => void): void {
+    this.posted.push({ method, params });
+    this.beforePost(method);
+    if (this.failing.has(method)) {
+      callback(new Error(`${method} failed`));
+      return;
+    }
+
+    const answer = this.answers.get(method);
+    if (answer !== undefined) {
+      callback(null, answer);
+      return;
+    }
+
+    this.session.post(method, params, callback);
+  }
+
+  on(event: string, listener: InspectorListener): unknown {
+    return this.session.on(event, listener);
+  }
+
+  off(event: string, listener: InspectorListener): unknown {
+    return this.session.off(event, listener);
+  }
+}
+
+/** A `Breakpoints` on a real inspector session, with the statuses it sent and the failures it reported. */
+export interface BreakpointsUnderTest {
+  breakpoints: Breakpoints;
+  session: TracedSession;
+  fixtures: Fixtures;
+  sent: BreakpointStatus[];
+  failures: unknown[];
+  lines: LoggedLine[];
+  /** Delivers a `breakpoints` message with `entries`. */
+  apply: (...entries: unknown[]) => void;
+  /** The messages logged at `level`. */
+  messagesAt: (level: LoggedLine["level"]) => string[];
+  /** Stops the breakpoints, disconnects the session and deletes the fixtures. */
+  dispose: () => void;
+}
+
+export const createBreakpoints = (): BreakpointsUnderTest => {
+  const lines: LoggedLine[] = [];
+  const logger = createLogger({ component: "debugger", env: {}, console: createRecordingLogger(lines) });
+  logger.set({ logLevel: "debug" }, "debugger");
+  const traced = new TracedSession();
+  const inspector = new InspectorSession(logger, traced);
+  inspector.connect();
+  const sent: BreakpointStatus[] = [];
+  const failures: unknown[] = [];
+  const breakpoints = new Breakpoints({
+    session: inspector,
+    logger,
+    send: (status) => {
+      sent.push(status);
+    },
+    fail: (error) => {
+      failures.push(error);
+    },
+  });
+  breakpoints.start();
+  const fixtures = new Fixtures();
+
+  return {
+    breakpoints,
+    session: traced,
+    fixtures,
+    sent,
+    failures,
+    lines,
+    apply: (...entries) => {
+      breakpoints.apply({ version: 1, type: "breakpoints", breakpoints: entries });
+    },
+    messagesAt: (level) => lines.filter((line) => line.level === level).map((line) => line.message),
+    dispose: () => {
+      breakpoints.stop();
+      inspector.disconnect();
+      fixtures.remove();
+    },
+  };
+};

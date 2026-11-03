@@ -107,11 +107,19 @@ packages/sdk/src/debugger/
 ├── index.ts                the debugger's only entry: Debugger, InspectorSession and their types
 ├── debugger.ts             Debugger: configure(), run() and stop(), and the not running, running and stopping states
 ├── options.ts              DebuggerOptions, the fields of a configure() call, enabled and the custom connector check
-├── connector-link.ts       ConnectorLink: subscribes to a connector, connects it and catches what an async one rejects
-└── inspector-session.ts    InspectorSession: node:inspector calls that answer synchronously and never throw
+├── connector-link.ts       ConnectorLink: subscribes to, connects and sends to a connector; catches its rejections
+├── inspector-session.ts    InspectorSession: node:inspector calls that answer synchronously and never throw
+└── breakpoints/            Breakpoints: the hub's list as V8 breakpoints, their statuses and every pause
+    ├── index.ts            the sub-component's only entry: Breakpoints
+    ├── breakpoints.ts      Breakpoints: applies a list, resolves pending entries, resumes every pause, stops
+    ├── entry.ts            ValidEntry, InvalidEntry and the comparison of two entries
+    ├── read-list.ts        reads and validates the entries of a breakpoints message, with the limits on the list
+    ├── script-registry.ts  ScriptRegistry: the loaded scripts with a file URL or an absolute path, one per URL
+    ├── match-script.ts     picks the script whose path ends with the most segments of an entry's file
+    └── v8-breakpoints.ts   V8Breakpoints: Debugger.setBreakpointByUrl and removeBreakpoint, shared by URL and line
 ```
 
-`Breakpoints`, `SourceMaps`, `RateLimiter` and `Capture` get their own sub-component folders when they are built.
+`SourceMaps`, `RateLimiter` and `Capture` get their own sub-component folders when they are built.
 
 ## Key flows
 
@@ -135,8 +143,8 @@ packages/sdk/src/debugger/
 2. Entries are compared by `id` with the current ones. An entry with the same `file`, `line` and `limits` is left
    as it is, with no V8 calls. Removed and changed entries lose their V8 breakpoint; new and changed entries are
    resolved.
-3. The first non-empty list turns the `Debugger` domain on: V8 reports every loaded script with `scriptParsed`, and
-   later ones as they load. An empty list turns it off.
+3. The first list with a valid entry turns the `Debugger` domain on: V8 reports every loaded script with
+   `scriptParsed`, and later ones as they load. A list without one, such as an empty list, turns it off.
 4. Resolving: script URLs are turned from `file://` into paths, map sources are resolved against the map's
    `sourceRoot` and URL, and all paths use `/`. Candidates are scripts with a source map whose sources include a
    path ending in the entry's last segment, and scripts without one whose path does, extension included. The

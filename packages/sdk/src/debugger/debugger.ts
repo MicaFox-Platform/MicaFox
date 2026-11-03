@@ -2,6 +2,7 @@ import type { Connector, ConnectorStatus, Message } from "@probex-platform/proto
 import { Session, url as readInspectorUrl } from "node:inspector";
 import { isMainThread } from "node:worker_threads";
 
+import { Breakpoints } from "./breakpoints/index.js";
 import { ConnectorLink } from "./connector-link.js";
 import { InspectorSession, type InspectorBinding } from "./inspector-session.js";
 import {
@@ -37,6 +38,7 @@ class DebuggerStartError extends Error {
 interface Running {
   readonly link: ConnectorLink;
   readonly session: InspectorSession;
+  readonly breakpoints: Breakpoints;
 }
 
 type State = { kind: "notRunning" } | { kind: "running"; running: Running } | { kind: "stopping"; done: Promise<void> };
@@ -185,9 +187,21 @@ export class Debugger {
   }
 
   private startWith(connector: Connector): void {
+    const link = new ConnectorLink(connector, this.logger);
+    const session = new InspectorSession(this.logger, this.createInspectorBinding());
     const running: Running = {
-      link: new ConnectorLink(connector, this.logger),
-      session: new InspectorSession(this.logger, this.createInspectorBinding()),
+      link,
+      session,
+      breakpoints: new Breakpoints({
+        session,
+        logger: this.logger,
+        send: (status) => {
+          link.send(status);
+        },
+        fail: (error) => {
+          this.failRunning(running, error);
+        },
+      }),
     };
     this.state = { kind: "running", running };
     const isCurrent = (): boolean => this.isCurrent(running);
@@ -217,6 +231,8 @@ export class Debugger {
       if (!connected.ok) {
         throw new DebuggerStartError("the inspector session could not connect", { cause: connected.error });
       }
+
+      running.breakpoints.start();
     } catch (error) {
       this.logger.log("error", "could not start; not started", { component: COMPONENT, error });
       void this.tearDown(running);
@@ -246,7 +262,11 @@ export class Debugger {
         return;
       }
 
-      // No message type is handled yet: breakpoints come with the Breakpoints part
+      if (message.type === "breakpoints") {
+        running.breakpoints.apply(message);
+        return;
+      }
+
       this.logger.log("debug", `ignored a ${message.type} message`, { component: COMPONENT });
     } catch (error) {
       this.failRunning(running, error);
@@ -278,6 +298,7 @@ export class Debugger {
     this.state = { kind: "stopping", done: promise };
 
     try {
+      running.breakpoints.stop();
       running.session.disconnect();
       running.link.unsubscribe();
       finish();

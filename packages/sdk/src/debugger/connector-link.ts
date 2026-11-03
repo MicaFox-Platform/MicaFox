@@ -52,6 +52,19 @@ export class ConnectorLink {
     }
   }
 
+  /** Sends `message` to the connector; a connector that throws or rejects is logged, never rethrown. */
+  send(message: Message): void {
+    try {
+      // Typed void, yet a custom connector may return a promise: read the result as unknown
+      const connector: { send: (message: Message) => unknown } = this.connector;
+      catchRejection(connector.send(message), (error) => {
+        this.logSendError(error);
+      });
+    } catch (error) {
+      this.logSendError(error);
+    }
+  }
+
   /** Removes every handler `start()` added; a custom connector stays open for the app to close. */
   unsubscribe(): void {
     for (const unsubscribe of this.unsubscribes.splice(0)) {
@@ -65,6 +78,10 @@ export class ConnectorLink {
         this.logUnsubscribeError(error);
       }
     }
+  }
+
+  private logSendError(error: unknown): void {
+    this.logger.log("error", "sending to the connector failed", { component: COMPONENT, error });
   }
 
   private logUnsubscribeError(error: unknown): void {
