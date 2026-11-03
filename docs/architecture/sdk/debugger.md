@@ -44,9 +44,10 @@ limits, redacts secrets and sends them to the hub through a connector. How to us
   - Does not start when the inspector is already open at `run()`, by `--inspect` or `inspector.open()`.
   - Resumes every pause it did not cause, including `debugger` statements, so another debugger attached to the
     process does not work while breakpoints are set.
-  - Memory is bounded: 100 breakpoints, source maps up to 8 MiB each, decoded only for scripts that have
-    breakpoints and dropped with them. Only scripts with a `file:` URL or an absolute path are recorded, one record
-    per URL; scripts without a URL, such as `eval` and `new Function`, are ignored.
+  - Memory is bounded: 100 breakpoints, source maps up to 8 MiB and 1,500,000 segments each, about 36 MB decoded,
+    decoded only for scripts that have breakpoints and dropped with them. Only scripts with a `file:` URL or an
+    absolute path are recorded, one record per URL; scripts without a URL, such as `eval` and `new Function`, are
+    ignored.
   - Reads source maps inline (`data:` URLs) or from a relative `sourceMappingURL` resolved against the script's
     path; any other scheme gives the breakpoint status `error`. Bundles, where many sources map into one script,
     are not supported.
@@ -104,22 +105,32 @@ The parts live in `packages/sdk/src/debugger/`:
 
 ```text
 packages/sdk/src/debugger/
-├── index.ts                the debugger's only entry: Debugger, InspectorSession and their types
-├── debugger.ts             Debugger: configure(), run() and stop(), and the not running, running and stopping states
-├── options.ts              DebuggerOptions, the fields of a configure() call, enabled and the custom connector check
-├── connector-link.ts       ConnectorLink: subscribes to, connects and sends to a connector; catches its rejections
-├── inspector-session.ts    InspectorSession: node:inspector calls that answer synchronously and never throw
-└── breakpoints/            Breakpoints: the hub's list as V8 breakpoints, their statuses and every pause
-    ├── index.ts            the sub-component's only entry: Breakpoints
-    ├── breakpoints.ts      Breakpoints: applies a list, resolves pending entries, resumes every pause, stops
-    ├── entry.ts            ValidEntry, InvalidEntry and the comparison of two entries
-    ├── read-list.ts        reads and validates the entries of a breakpoints message, with the limits on the list
-    ├── script-registry.ts  ScriptRegistry: the loaded scripts with a file URL or an absolute path, one per URL
-    ├── match-script.ts     picks the script whose path ends with the most segments of an entry's file
-    └── v8-breakpoints.ts   V8Breakpoints: Debugger.setBreakpointByUrl and removeBreakpoint, shared by URL and line
+├── index.ts                    the debugger's only entry: Debugger, InspectorSession and their types
+├── debugger.ts                 Debugger: configure(), run(), stop(), and the not running, running and stopping states
+├── options.ts                  DebuggerOptions: the fields of a configure() call, enabled, the custom connector check
+├── connector-link.ts           ConnectorLink: subscribes to, connects and sends to a connector; catches its rejections
+├── inspector-session.ts        InspectorSession: node:inspector calls that answer synchronously and never throw
+├── breakpoints/                Breakpoints: the hub's list as V8 breakpoints, their statuses and every pause
+│   ├── index.ts                the sub-component's only entry: Breakpoints
+│   ├── breakpoints.ts          Breakpoints: applies a list, resolves pending entries, resumes every pause, stops
+│   ├── entry.ts                ValidEntry, InvalidEntry and the comparison of two entries
+│   ├── read-list.ts            reads and validates the entries of a breakpoints message, with the limits on the list
+│   ├── script-registry.ts      ScriptRegistry: the loaded scripts with a file URL or an absolute path, one per URL
+│   ├── match-script.ts         picks the script whose path ends with the most segments of an entry's file
+│   └── v8-breakpoints.ts       V8Breakpoints: Debugger.setBreakpointByUrl and removeBreakpoint, shared by URL and line
+└── source-map-decoder/         decodeSourceMap: the text of a map into its two indexes, in slices
+    ├── index.ts                the sub-component's only entry: decodeSourceMap and the types of its result
+    ├── decode-source-map.ts    decodeSourceMap: checks the size, runs the steps below in slices, never throws
+    ├── parse-source-map.ts     checks the JSON's depth and number of values in slices, parses it, reads the fields
+    ├── decode-mappings.ts      VlqCursor and the mappings string read into segments in generated order
+    ├── sort-by-original.ts     orders the segments by source and original line, first generated position first
+    ├── source-map-index.ts     SourceMapIndex: original line to generated position, generated position to original
+    ├── sliced-work.ts          WorkBudget and runSliced: slices of fixed work with a yield to the event loop between
+    └── source-map-error.ts     SourceMapError: the fixed reason of a map that cannot be decoded
 ```
 
-`SourceMaps`, `RateLimiter` and `Capture` get their own sub-component folders when they are built.
+`SourceMaps`, `RateLimiter` and `Capture` get their own sub-component folders when they are built; `SourceMaps`
+uses `source-map-decoder/`.
 
 ## Key flows
 
@@ -172,8 +183,11 @@ packages/sdk/src/debugger/
 4. A map larger than 8 MiB, unreadable or invalid gives the breakpoint status `error` with the reason and logs a
    warning.
 5. The mappings are decoded into indexes from original line to generated position and back, kept while the script
-   has breakpoints. A breakpoint on a module's top-level code can miss the module's first run, because a map file
-   is read after the script is loaded.
+   has breakpoints. Decoding runs in slices of fixed work and yields to the event loop between them. Only
+   `JSON.parse` runs in one piece; a check before it bounds the text to a depth of 8 and 50,000 values, which keeps
+   it to a few milliseconds. Index maps (`sections`), mappings that are not in generated order and maps of more than
+   1,500,000 segments are invalid; a `null` entry of `sources` maps to nothing. A breakpoint on a module's top-level
+   code can miss the module's first run, because a map file is read after the script is loaded.
 
 ### Capturing a snapshot
 
