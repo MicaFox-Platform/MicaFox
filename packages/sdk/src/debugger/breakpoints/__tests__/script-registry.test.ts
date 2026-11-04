@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ScriptRegistry } from "../script-registry.js";
+import { ScriptRegistry, toBaseName } from "../script-registry.js";
 
 describe("ScriptRegistry", () => {
   it("records a script with a file URL", () => {
@@ -9,7 +9,7 @@ describe("ScriptRegistry", () => {
     registry.record({ url: "file:///app/src/checkout.js", sourceMapURL: "" });
 
     expect(registry.findCandidates("checkout.js")).toEqual([
-      { url: "file:///app/src/checkout.js", segments: ["app", "src", "checkout.js"], hasSourceMap: false },
+      { url: "file:///app/src/checkout.js", segments: ["app", "src", "checkout.js"] },
     ]);
   });
 
@@ -73,12 +73,58 @@ describe("ScriptRegistry", () => {
     expect(registry.findCandidates("checkout.js")).toEqual([]);
   });
 
+  it("records the source map URL of a script and finds it by base name", () => {
+    const registry = new ScriptRegistry();
+
+    registry.record({ url: "file:///app/dist/checkout.js", sourceMapURL: "checkout.js.map" });
+
+    expect(registry.findMapped("checkout")).toEqual([
+      {
+        url: "file:///app/dist/checkout.js",
+        segments: ["app", "dist", "checkout.js"],
+        sourceMapUrl: "checkout.js.map",
+      },
+    ]);
+  });
+
+  it("does not find a script without a map by base name", () => {
+    const registry = new ScriptRegistry();
+
+    registry.record({ url: "file:///app/dist/checkout.js", sourceMapURL: "" });
+
+    expect(registry.findMapped("checkout")).toEqual([]);
+  });
+
+  it("drops a script from the base-name index when its URL is recorded again without a map", () => {
+    const registry = new ScriptRegistry();
+    registry.record({ url: "file:///app/dist/checkout.js", sourceMapURL: "checkout.js.map" });
+
+    registry.record({ url: "file:///app/dist/checkout.js" });
+
+    expect(registry.findMapped("checkout")).toEqual([]);
+  });
+
   it("forgets every record on clear", () => {
     const registry = new ScriptRegistry();
     registry.record({ url: "file:///app/checkout.js" });
+    registry.record({ url: "file:///app/invoice.js", sourceMapURL: "invoice.js.map" });
 
     registry.clear();
 
-    expect(registry.findCandidates("checkout.js")).toEqual([]);
+    expect({ plain: registry.findCandidates("checkout.js"), mapped: registry.findMapped("invoice") }).toEqual({
+      plain: [],
+      mapped: [],
+    });
+  });
+});
+
+describe("toBaseName", () => {
+  it.each([
+    ["checkout.ts", "checkout"],
+    ["checkout.test.ts", "checkout.test"],
+    ["Makefile", "Makefile"],
+    [".env", ".env"],
+  ])("gives %s without its last extension", (fileName, expected) => {
+    expect(toBaseName(fileName)).toBe(expected);
   });
 });

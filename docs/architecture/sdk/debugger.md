@@ -45,12 +45,12 @@ limits, redacts secrets and sends them to the hub through a connector. How to us
   - Resumes every pause it did not cause, including `debugger` statements, so another debugger attached to the
     process does not work while breakpoints are set.
   - Memory is bounded: 100 breakpoints, source maps up to 8 MiB and 1,500,000 segments each, about 36 MB decoded,
-    decoded only for scripts that have breakpoints and dropped with them. Only scripts with a `file:` URL or an
-    absolute path are recorded, one record per URL; scripts without a URL, such as `eval` and `new Function`, are
-    ignored.
+    read one at a time only for scripts that may hold an entry's file, and kept decoded only for scripts that have
+    breakpoints. Only scripts with a `file:` URL or an absolute path are recorded, one record per URL; scripts
+    without a URL, such as `eval` and `new Function`, are ignored.
   - Reads source maps inline (`data:` URLs) or from a relative `sourceMappingURL` resolved against the script's
-    path; any other scheme gives the breakpoint status `error`. Bundles, where many sources map into one script,
-    are not supported.
+    path; a map with any other scheme is not read, and an entry that nothing else resolves gets the status `error`.
+    Bundles, where many sources map into one script, are not supported.
   - Imports only `@probex-platform/protocol`, the connector and logger modules and Node built-ins; source maps are
     decoded by its own VLQ decoder.
   - Never keeps the host process alive: every timer is unref'd. While `stop()` flushes the connector it created,
@@ -70,7 +70,7 @@ limits, redacts secrets and sends them to the hub through a connector. How to us
         │                       Breakpoints                        │
         └─────┬──────────────────┬─────────────────┬────────┬───┬──┘
               │                  │                 │        │   ▲
-              │ resolve file:line│ allow hit?      │ capture│   │
+              │ read map, sources│ allow hit?      │ capture│   │
               │                  │                 │        │   │ set, remove, resume ▼
               ▼                  ▼                 ▼        │   │
         ┌────────────┐    ┌─────────────┐     ┌─────────┐   │   │ ▲ scriptParsed, paused
@@ -93,8 +93,9 @@ The parts live in `packages/sdk/src/debugger/`:
   stopping.
 - `Breakpoints` — holds the latest list from the hub, the V8 breakpoint of each entry and its status, and handles
   every pause.
-- `SourceMaps` — finds the script and position for a repository path and line, and the original position for a
-  script position.
+- `SourceMaps` — reads the maps of loaded scripts, one at a time, and keeps their resolved sources and, while a
+  breakpoint is set through one, its index from original line to generated position and back. `Breakpoints` finds
+  an entry's script and position with them.
 - `RateLimiter` — token buckets per breakpoint and per process, and the pause budget.
 - `Capture` — reads the stack and variables of a paused frame into a [`Snapshot`](../../api/protocol.md#snapshot),
   and redacts secrets by name as it goes.
@@ -113,11 +114,17 @@ packages/sdk/src/debugger/
 ├── breakpoints/                Breakpoints: the hub's list as V8 breakpoints, their statuses and every pause
 │   ├── index.ts                the sub-component's only entry: Breakpoints
 │   ├── breakpoints.ts          Breakpoints: applies a list, resolves pending entries, resumes every pause, stops
-│   ├── entry.ts                ValidEntry, InvalidEntry and the comparison of two entries
+│   ├── entry.ts                ValidEntry, InvalidEntry, the comparison of two entries and the status of an outcome
 │   ├── read-list.ts            reads and validates the entries of a breakpoints message, with the limits on the list
-│   ├── script-registry.ts      ScriptRegistry: the loaded scripts with a file URL or an absolute path, one per URL
-│   ├── match-script.ts         picks the script whose path ends with the most segments of an entry's file
-│   └── v8-breakpoints.ts       V8Breakpoints: Debugger.setBreakpointByUrl and removeBreakpoint, shared by URL and line
+│   ├── script-registry.ts      ScriptRegistry: the loaded scripts, one per URL, by file name and mapped by base name
+│   ├── find-location.ts        findLocation: an entry's script and position, or the maps it waits for
+│   ├── match-path.ts           picks the candidate whose path ends with the most segments of an entry's file
+│   └── v8-breakpoints.ts       V8Breakpoints: Debugger.setBreakpointByUrl and removeBreakpoint, shared by position
+├── source-maps/                SourceMaps: reads the maps of loaded scripts and keeps what each one is needed for
+│   ├── index.ts                the sub-component's only entry: SourceMaps and the types of what it knows of a map
+│   ├── source-maps.ts          SourceMaps: one read per script record, shared; the index kept while an entry holds it
+│   ├── read-source-map.ts      readSourceMap: a data: URL in place or a relative file with node:fs/promises, 8 MiB
+│   └── map-sources.ts          resolveMapSources: the sources of a map against its sourceRoot and URL, as paths
 └── source-map-decoder/         decodeSourceMap: the text of a map into its two indexes, in slices
     ├── index.ts                the sub-component's only entry: decodeSourceMap and the types of its result
     ├── decode-source-map.ts    decodeSourceMap: checks the size, runs the steps below in slices, never throws
@@ -129,8 +136,8 @@ packages/sdk/src/debugger/
     └── source-map-error.ts     SourceMapError: the fixed reason of a map that cannot be decoded
 ```
 
-`SourceMaps`, `RateLimiter` and `Capture` get their own sub-component folders when they are built; `SourceMaps`
-uses `source-map-decoder/`.
+`RateLimiter` and `Capture` get their own sub-component folders when they are built. `Breakpoints` uses
+`source-maps/`, which uses `source-map-decoder/`.
 
 ## Key flows
 
@@ -157,11 +164,12 @@ uses `source-map-decoder/`.
 3. The first list with a valid entry turns the `Debugger` domain on: V8 reports every loaded script with
    `scriptParsed`, and later ones as they load. A list without one, such as an empty list, turns it off.
 4. Resolving: script URLs are turned from `file://` into paths, map sources are resolved against the map's
-   `sourceRoot` and URL, and all paths use `/`. Candidates are scripts with a source map whose sources include a
-   path ending in the entry's last segment, and scripts without one whose path does, extension included. The
-   candidate whose path ends with the most segments of `file` wins; a tie gives status `error`, no candidate gives
-   `pending`. A candidate whose map is still loading keeps the entry `pending`, see
-   [Loading a source map](#loading-a-source-map).
+   `sourceRoot` and URL, and all paths use `/`. Candidates are the sources of the maps of scripts whose file name
+   without its extension equals the entry's, such as `dist/checkout.js` for `src/checkout.ts`, that end in the
+   entry's last segment, and scripts without a map whose path does, extension included. The candidate whose path
+   ends with the most segments of `file` wins; a tie gives status `error`, no candidate gives `pending`, or `error`
+   with the reason of a map that could not be used. While a map of such a script is unread or loading, the entry
+   stays `pending`, see [Loading a source map](#loading-a-source-map).
 5. The line is mapped to the first generated position of that original line, or of the next line that has one, and
    the breakpoint is set with `Debugger.setBreakpointByUrl` by the script's URL and position, so V8 also sets it in
    every later script with the same URL, such as a module reloaded by a test runner. V8 moves it to the next
@@ -170,24 +178,34 @@ uses `source-map-decoder/`.
 6. After each message, the status of every listed breakpoint is sent as a
    [`breakpointStatus`](../../api/protocol.md#breakpointstatus), a control message. Later changes, such as a map
    finishing to load or a rate limit, are sent when they happen.
-7. A `pending` breakpoint is resolved again on every `scriptParsed` with a matching file name. A script with the
-   URL of a recorded one replaces it.
+7. A `pending` breakpoint is resolved again on every `scriptParsed` with a matching file name, or with a matching
+   base name for a script with a map, and when a map it waits for is read. A script with the URL of a recorded one
+   replaces it, and its map is read again when it is needed.
 
 ### Loading a source map
 
 1. On `scriptParsed`, the script's URL and `sourceMapURL` are recorded; nothing is read.
-2. When a breakpoint needs the map, a `data:` URL is decoded in place; a relative URL is resolved against the
-   script's path and read with `node:fs/promises`. Entries that need the same map share one read.
-3. When the read ends, each waiting entry is set only if it is still listed with the same fields and the debugger
-   is running.
-4. A map larger than 8 MiB, unreadable or invalid gives the breakpoint status `error` with the reason and logs a
-   warning.
-5. The mappings are decoded into indexes from original line to generated position and back, kept while the script
-   has breakpoints. Decoding runs in slices of fixed work and yields to the event loop between them. Only
-   `JSON.parse` runs in one piece; a check before it bounds the text to a depth of 8 and 50,000 values, which keeps
-   it to a few milliseconds. Index maps (`sections`), mappings that are not in generated order and maps of more than
-   1,500,000 segments are invalid; a `null` entry of `sources` maps to nothing. A breakpoint on a module's top-level
-   code can miss the module's first run, because a map file is read after the script is loaded.
+2. An entry needs the maps of the recorded scripts with a `sourceMapURL` whose file name without its last extension
+   equals that of the entry's `file`: `checkout.js` and `checkout.mjs` for `checkout.ts`, `checkout.test.js` for
+   `checkout.test.ts`. Maps of other scripts are never read. A `data:` URL with the `application/json` media type
+   is decoded in place; a URL without a scheme is resolved against the script's path and read with
+   `node:fs/promises`; any other scheme, `file:` included, is not read. Maps are read one at a time, entries that
+   need the same map share one read, and a map is read once per script record and again only to bring back a
+   dropped index.
+3. When the read ends, the entries still waiting for it are resolved again from the current list, so an entry is
+   set only if it is still listed with the same fields; after `stop()` or with the domain off the read is ignored.
+4. A map larger than 8 MiB, unreadable, invalid or with another scheme logs a warning and is left out of resolving;
+   an entry with no other candidate gets the status `error` with the reason, and is resolved again when a script
+   it may match loads. Other entries are unaffected.
+5. The mappings are decoded into indexes from original line to generated position and back. The index is kept while
+   the script has breakpoints set through it and dropped with the last one; for other scripts only the resolved
+   sources are kept, so a pending entry does not read their maps again, and a script that wins later is read
+   again. Both are dropped with the script's record. Decoding runs in slices of fixed work and yields to the event
+   loop between them. Only `JSON.parse` runs in one piece; a check before it bounds the text to a depth of 8 and
+   50,000 values, which keeps it to a few milliseconds. Index maps (`sections`), mappings that are not in generated
+   order and maps of more than 1,500,000 segments are invalid; a `null` entry of `sources` maps to nothing. A
+   breakpoint on the top-level code of a module with a source map, inline or in a file, can miss the module's first
+   run, because the map is read and decoded after the script is loaded.
 
 ### Capturing a snapshot
 

@@ -187,13 +187,38 @@ export interface BreakpointsUnderTest {
   apply: (...entries: unknown[]) => void;
   /** The messages logged at `level`. */
   messagesAt: (level: LoggedLine["level"]) => string[];
+  /** Resolves when a line at `level` starting with `prefix` is logged, after the call that logged it returns. */
+  waitForLine: (level: LoggedLine["level"], prefix: string) => Promise<void>;
   /** Stops the breakpoints, disconnects the session and deletes the fixtures. */
   dispose: () => void;
 }
 
+// Resolves a wait when its line is logged; the promise settles after the call that logged it returns
+const createLineWaiters = (): {
+  onLine: (line: LoggedLine) => void;
+  waitForLine: BreakpointsUnderTest["waitForLine"];
+} => {
+  const waiters: Array<{ level: LoggedLine["level"]; prefix: string; resolve: () => void }> = [];
+  return {
+    onLine: (line) => {
+      for (const waiter of waiters.filter(
+        ({ level, prefix }) => line.level === level && line.message.startsWith(prefix),
+      )) {
+        waiters.splice(waiters.indexOf(waiter), 1);
+        waiter.resolve();
+      }
+    },
+    waitForLine: (level, prefix) =>
+      new Promise((resolve) => {
+        waiters.push({ level, prefix, resolve });
+      }),
+  };
+};
+
 export const createBreakpoints = (): BreakpointsUnderTest => {
   const lines: LoggedLine[] = [];
-  const logger = createLogger({ component: "debugger", env: {}, console: createRecordingLogger(lines) });
+  const { onLine, waitForLine } = createLineWaiters();
+  const logger = createLogger({ component: "debugger", env: {}, console: createRecordingLogger(lines, onLine) });
   logger.set({ logLevel: "debug" }, "debugger");
   const traced = new TracedSession();
   const inspector = new InspectorSession(logger, traced);
@@ -224,6 +249,7 @@ export const createBreakpoints = (): BreakpointsUnderTest => {
       breakpoints.apply({ version: 1, type: "breakpoints", breakpoints: entries });
     },
     messagesAt: (level) => lines.filter((line) => line.level === level).map((line) => line.message),
+    waitForLine,
     dispose: () => {
       breakpoints.stop();
       inspector.disconnect();
