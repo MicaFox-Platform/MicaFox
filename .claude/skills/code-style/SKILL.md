@@ -15,6 +15,6 @@ Request: $ARGUMENTS
    say so and propose a line in `.claude/rules/` instead.
 3. **Change.** On a `build/<kebab-case>` branch from an up-to-date `staging`, change the config, and update any
    `.claude/rules/*.md` line or example that describes the same thing.
-4. **Apply.** `pnpm verify:fix`, fix by hand what auto-fix cannot, then `pnpm verify` must be green.
+4. **Apply.** `pnpm verify:fix`, fix by hand what auto-fix cannot, then `pnpm verify:brief` must be green.
 5. **Hand over and ship** per the Workflow section of `CLAUDE.md`. When the rule rewrites many files, ship the
    config change and the mass fix as two commits.

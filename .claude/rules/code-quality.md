@@ -38,22 +38,18 @@ A reader finds a file from the folder names alone. The tree of a component is de
 - No static-only classes and no inheritance chains: compose and inject. (Google § Classes)
 - Dependencies (transport, clock, inspector session, logger) come in through constructor or factory parameters,
   never through imported singletons, so tests replace them at the boundary.
-- A function does one thing at one level of abstraction. Return early instead of nesting: depth ≤ 3, complexity ≤ 10,
-  ≤ 3 parameters, else one options object (ESLint).
-- Never mutate a parameter (ESLint); return a new value or keep the state in its owner.
+- A function does one thing at one level of abstraction. Return early instead of nesting (ESLint: depth ≤ 3,
+  complexity ≤ 10, ≤ 3 parameters, else one options object).
+- Never mutate a parameter, its properties included; return a new value or keep the state in its owner.
 - A boolean parameter that switches behavior becomes two functions or a named option.
 
 ## Naming
 
-| Kind                                        | Case             | Example                           |
-| ------------------------------------------- | ---------------- | --------------------------------- |
-| class, interface, type, type parameter      | `UpperCamelCase` | `BreakpointStore`, `T`            |
-| variable, function, method, property        | `lowerCamelCase` | `resolveLocation`                 |
-| module-level or static readonly constant    | `CONSTANT_CASE`  | `PROTOCOL_VERSION`                |
-| quoted wire name (HTTP header, env var key) | as the wire says | `"Authorization"`, `PROBEX_TOKEN` |
-
+- Case: `UpperCamelCase` for types and type parameters, `lowerCamelCase` for values and members, `CONSTANT_CASE`
+  only for module-level and static readonly constants (`PROTOCOL_VERSION`), quoted wire names as the wire spells
+  them (`"Authorization"`, `PROBEX_TOKEN`). ESLint checks the shapes but allows `CONSTANT_CASE` on any `const`.
 - Acronyms are words: `instanceId`, `hubUrl`, `parseJson`. No `I` prefix, no `_` prefix or suffix except an unused
-  parameter, no type in the name (`breakpointList`). (Google § Naming, ESLint)
+  parameter, no type in the name (`breakpointList`). (Google § Naming)
 - Descriptive over short: one letter only in a scope of ≤ 10 lines; only well-known abbreviations (`id`, `url`).
 - Functions are verbs (`captureSnapshot`), factories `createX`, handlers `onX`; booleans read as a yes/no question
   (`isActive`, `hasSourceMap`, `shouldRetry`).
