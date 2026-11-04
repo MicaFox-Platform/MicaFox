@@ -37,14 +37,15 @@ pnpm verify    # everything must pass on a fresh clone
 ## Commands
 
 ```text
-pnpm dev        → every package and the demo app in watch mode (tsx --watch)
-pnpm build      → build every package to dist/, dependencies first
-pnpm typecheck  → typecheck every package, then the root files and tests
-pnpm test       → one Vitest run over all packages
-pnpm lint       → one ESLint run over the repo
-pnpm format     → one Prettier check over the repo
-pnpm verify     → lint → format → typecheck → test:coverage (≥ 80%), stops at the first failure
-pnpm verify:fix → auto-fix lint and formatting
+pnpm dev          → every package and the demo app in watch mode (tsx --watch)
+pnpm build        → build every package to dist/, dependencies first
+pnpm typecheck    → typecheck every package, then the root files and tests
+pnpm test         → one Vitest run over all packages; pnpm test <paths> runs only those test files
+pnpm lint         → one ESLint run over the repo
+pnpm format       → one Prettier check over the repo
+pnpm verify       → lint → format → typecheck → test:coverage (≥ 80%), stops at the first failure
+pnpm verify:brief → the same steps, one line per green step and the start of a failure (for AI agents)
+pnpm verify:fix   → auto-fix lint and formatting
 ```
 
 One package: `pnpm --filter @probex-platform/sdk test`, `pnpm --filter @probex-platform/node-basic dev`. CI runs
@@ -203,10 +204,10 @@ forks wait for a maintainer to approve their CI run.
 
 Claude Code runs these hooks from [.claude/settings.json](../.claude/settings.json) on top of the checks above:
 
-| Hook             | Runs                      | Does                                                               |
-| ---------------- | ------------------------- | ------------------------------------------------------------------ |
-| `guard-git.sh`   | before each shell command | blocks bad branch names, work on `main`/`staging`, merges          |
-| `format-file.sh` | after each file edit      | runs Prettier and `eslint --fix` on the file, reports what is left |
-| `stop-verify.sh` | before the agent finishes | requires a green `pnpm verify` (`format` if only Markdown changed) |
+| Hook             | Runs                      | Does                                                                     |
+| ---------------- | ------------------------- | ------------------------------------------------------------------------ |
+| `guard-git.sh`   | before each shell command | blocks bad branch names, work on `main`/`staging`, merges                |
+| `format-file.sh` | after each file edit      | runs Prettier and `eslint --fix` on the file, reports what is left       |
+| `stop-verify.sh` | before the agent finishes | requires a green `pnpm verify:brief` (`format` if only Markdown changed) |
 
 Agents are also denied force-pushes, `gh pr merge` and edits to `pnpm-lock.yaml`.

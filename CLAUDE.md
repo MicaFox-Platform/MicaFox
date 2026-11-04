@@ -22,23 +22,11 @@ Dependencies point down this table only.
 ## Commands
 
 - `pnpm verify` — lint, format check, typecheck, tests with coverage ≥ 80%. The gate; CI runs the same scripts.
+- `pnpm verify:brief` — the same checks with a short report; use it instead of `pnpm verify`.
 - `pnpm verify:fix` — auto-fix lint and formatting.
-- `pnpm --filter @probex-platform/sdk test` — tests of one package.
+- `pnpm test <test file paths>` — only the tests you are working on; the full run is part of `verify`.
 
 Run checks only through `package.json` scripts, never retyped tool commands, so they cannot drift.
-
-## Tracker
-
-Trello board https://trello.com/b/hzrnwdVz/probex-platform; card format `.claude/templates/card.md`, new
-architecture doc `.claude/templates/architecture.md`, new API doc `.claude/templates/api.md`.
-
-| List        | Holds                         | Who moves cards into it                         |
-| ----------- | ----------------------------- | ----------------------------------------------- |
-| Backlog     | new cards from `/task-design` | `/task-design`                                  |
-| Planned     | ready to be done              | user                                            |
-| In Progress | being done                    | `/task` when it starts                          |
-| In Review   | PR open                       | `/task` when the PR is open; then only the user |
-| Done        | merged                        | user                                            |
 
 ## Workflow
 
@@ -61,8 +49,8 @@ architecture doc `.claude/templates/architecture.md`, new API doc `.claude/templ
   link. Fixes to an open PR: same flow, then commit and push to its branch.
 - Never merge PRs, push to `main`/`staging` or edit `pnpm-lock.yaml` by hand.
 
-Hooks format every edited file, block git commands that break this flow and run `pnpm verify` before you finish;
-fix what they report instead of arguing with it.
+Hooks format every edited file, block git commands that break this flow and run `pnpm verify:brief` before you
+finish; fix what they report instead of arguing with it.
 
 ## Hard rules
 

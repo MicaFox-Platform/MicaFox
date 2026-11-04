@@ -3,12 +3,17 @@
 set -uo pipefail
 cd "$(git rev-parse --show-toplevel)" || exit 1
 
-base=$(git merge-base origin/staging HEAD)
+# Optional base: the commit the last review saw, so a rework is assessed on its own delta
+base=${1:-$(git merge-base origin/staging HEAD)}
+git rev-parse --verify --quiet "$base^{commit}" >/dev/null || {
+  echo "unknown base commit: $base" >&2
+  exit 1
+}
 changed=$({
   git diff --name-only "$base"
   git ls-files --others --exclude-standard
 } | sort -u)
-sources=$(grep -E '^packages/[^/]+/src/.*\.ts$' <<<"$changed" | grep -vE '\.(test|d)\.ts$')
+sources=$(grep -E '^packages/[^/]+/src/.*\.ts$' <<<"$changed" | grep -vE '/__tests__/|\.(test|test-d|d)\.ts$')
 
 section() {
   echo "$1:"
@@ -40,15 +45,26 @@ importers=$(for file in $sources; do
     grep -vxF "$file" | sed "s|^|$file ← |"
 done)
 
+# Tests live in the module folder's __tests__/: foo.ts → foo.test.ts, foo.test-d.ts or foo-<behavior>.test.ts;
+# index.ts may also be tested under its folder's name (hub-connector/index.ts → hub-connector-*.test.ts)
+has_test() {
+  compgen -G "$1/__tests__/$2.test.ts" >/dev/null || compgen -G "$1/__tests__/$2.test-d.ts" >/dev/null ||
+    compgen -G "$1/__tests__/$2-*.test.ts" >/dev/null
+}
 untested=$(for file in $sources; do
-  [[ -f ${file%.ts}.test.ts ]] || echo "$file"
+  dir=$(dirname "$file")
+  name=$(basename "$file" .ts)
+  has_test "$dir" "$name" && continue
+  [[ $name == index ]] && has_test "$dir" "$(basename "$dir")" && continue
+  echo "$file"
 done)
 
-echo "base: $(git rev-parse --short "$base") (merge-base with origin/staging)"
+if [[ -n ${1:-} ]]; then origin="given"; else origin="merge-base with origin/staging"; fi
+echo "base: $(git rev-parse --short "$base") ($origin)"
 section "changed files" "$changed"
 section "affected packages (changed and their dependents)" \
   "$(pnpm --silent ls -r --depth -1 --filter "...[$base]" --json 2>/dev/null | jq -r '.[].name')"
 section "sensitive areas" "$sensitive"
 section "importers of changed source files" "$importers"
-section "changed source files without a sibling .test.ts" "$untested"
+section "changed source files with no test named after them (may be tested through another module)" "$untested"
 section "docs changed" "$(grep -E '^docs/' <<<"$changed")"

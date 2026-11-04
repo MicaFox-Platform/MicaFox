@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Stop: Claude may finish only when `pnpm verify` is green (`format` alone for Markdown-only changes).
+# Stop: Claude may finish only when `pnpm verify` is green, run as `verify:brief` for a short report (`format` alone
+# for Markdown-only changes).
 # Silent when green, when nothing changed against staging, or when the tree equals the last green run.
 set -uo pipefail
 
@@ -23,13 +24,13 @@ key=$({
 } | shasum -a 256 | cut -d' ' -f1)
 [[ -f $cache && $(cat "$cache") == "$key" ]] && exit 0
 
-if grep -qvE '\.md$' <<<"$changed"; then script=verify; else script=format; fi
-if out=$(pnpm "$script" 2>&1); then
+if grep -qvE '\.md$' <<<"$changed"; then script=verify:brief; else script=format; fi
+if out=$(pnpm --silent "$script" 2>&1); then
   mkdir -p "$(dirname "$cache")" && echo "$key" >"$cache"
   exit 0
 fi
 {
   echo "pnpm $script is red, fix it before finishing:"
-  tail -n 30 <<<"$out"
+  head -n 50 <<<"$out"
 } >&2
 exit 2

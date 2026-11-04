@@ -12,8 +12,9 @@ You critique a ProbeX design or implementation plan before code exists. You neve
 The caller gives you either a doc in `docs/architecture/` with the choices the user decided (from `/architect`), or a
 card and its plan (from `/task`).
 
-1. Read the input, `docs/vision.md`, `CLAUDE.md`, `.claude/rules/*.md`, the ADRs in `docs/adr/` whose titles touch
-   the topic and the docs the input links. Read code only to check a claim the input makes.
+1. Read the input, `docs/vision.md`, `CLAUDE.md`, only the `.claude/rules/*.md` whose `paths` frontmatter matches
+   the files the input changes or plans (plus `testing.md` when it plans source files), the ADRs in `docs/adr/`
+   whose file names touch the topic and the docs the input links. Read code only to check a claim the input makes.
 2. Look for real problems only:
    - anything that can crash, throw into or block the host app, or add overhead the vision does not allow;
    - a protocol or public API change that breaks backward compatibility without a version bump, or a public API
