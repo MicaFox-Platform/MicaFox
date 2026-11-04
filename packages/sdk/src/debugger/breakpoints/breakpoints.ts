@@ -1,12 +1,20 @@
-import { PROTOCOL_VERSION, type BreakpointStatus } from "@probex-platform/protocol";
+import type { BreakpointStatus } from "@probex-platform/protocol";
 
-import { isSameEntry, type ListedEntry, type ValidEntry } from "./entry.js";
-import { matchScript, type ScriptMatch } from "./match-script.js";
+import {
+  isSameEntry,
+  isSameStatus,
+  isUnresolved,
+  toStatus,
+  type ListedEntry,
+  type Outcome,
+  type ValidEntry,
+} from "./entry.js";
+import { findLocation, mayResolveTo, type Location } from "./find-location.js";
 import { readBreakpointList } from "./read-list.js";
-import { ScriptRegistry, toSegments } from "./script-registry.js";
+import { ScriptRegistry, toSegments, type MappedRecord, type ScriptRecord } from "./script-registry.js";
 import { V8Breakpoints, type V8Inspector } from "./v8-breakpoints.js";
-import { isRecord } from "../../connector/index.js";
 import type { SdkLogger } from "../../logger/index.js";
+import { SourceMaps } from "../source-maps/index.js";
 
 const COMPONENT = "debugger";
 
@@ -31,8 +39,6 @@ class BreakpointsError extends Error {
   override readonly name = "BreakpointsError";
 }
 
-type Outcome = { status: "pending" } | { status: "active"; place: string } | { status: "error"; message: string };
-
 /** An entry of the latest list and what became of it. */
 interface Applied {
   entry: ListedEntry;
@@ -43,33 +49,31 @@ interface Applied {
 
 const PENDING: Outcome = { status: "pending" };
 
-const toStatus = (breakpointId: string, outcome: Outcome): BreakpointStatus => {
-  const base = { version: PROTOCOL_VERSION, type: "breakpointStatus", breakpointId } as const;
-  return outcome.status === "error"
-    ? { ...base, status: "error", message: outcome.message }
-    : { ...base, status: outcome.status };
-};
-
-const readHitBreakpoints = (params: unknown): string[] => {
-  const hit: unknown = isRecord(params) ? Reflect.get(params, "hitBreakpoints") : undefined;
-  return Array.isArray(hit) ? (hit as unknown[]).filter((id): id is string => typeof id === "string") : [];
-};
-
 /**
- * The breakpoints the hub listed, set in V8 in the scripts without a source map. Holds the latest list, the status
- * of each entry, and resumes every pause. Time and memory are bounded by the 100 entries it holds and the scripts
- * the app loads while any is set.
+ * The breakpoints the hub listed, set in V8 in the loaded scripts, through their source maps where they have one.
+ * Holds the latest list, the status of each entry, and resumes every pause. Time and memory are bounded by the 100
+ * entries it holds and the scripts the app loads while any is set.
  */
 export class Breakpoints {
   private readonly applied = new Map<string, Applied>();
   private readonly scripts = new ScriptRegistry();
   private readonly v8: V8Breakpoints;
+  private readonly sourceMaps: SourceMaps<MappedRecord>;
   private readonly unsubscribes: Array<() => void> = [];
   private isDomainOn = false;
   private isStopped = false;
 
   constructor(private readonly dependencies: BreakpointsDependencies) {
     this.v8 = new V8Breakpoints(dependencies.session, dependencies.logger);
+    this.sourceMaps = new SourceMaps<MappedRecord>({
+      logger: dependencies.logger,
+      onRead: (script) => {
+        this.guard(() => {
+          this.onMapRead(script);
+        });
+      },
+      fail: dependencies.fail,
+    });
   }
 
   /** Listens to the inspector's events; none arrives while the `Debugger` domain is off. */
@@ -116,6 +120,7 @@ export class Breakpoints {
     // The pause handler stays until the domain is off: a warning logged here runs app code, which may pause
     this.v8.removeAll();
     this.applied.clear();
+    this.sourceMaps.clear();
     this.turnOff();
     for (const unsubscribe of this.unsubscribes.splice(0)) {
       unsubscribe();
@@ -157,6 +162,9 @@ export class Breakpoints {
   private drop(id: string, current: Applied): void {
     if (current.outcome.status === "active") {
       this.v8.release(id, current.outcome.place);
+      if (current.outcome.mapUrl !== undefined) {
+        this.sourceMaps.release(current.outcome.mapUrl, id);
+      }
     }
 
     this.applied.delete(id);
@@ -171,23 +179,32 @@ export class Breakpoints {
     return { entry, segments, outcome: this.locate(entry, segments) };
   }
 
+  // docs/architecture/sdk/debugger.md#loading-a-source-map: an entry waiting for a map is pending until it is read
   private locate(entry: ValidEntry, segments: readonly string[]): Outcome {
-    const fileName = segments.at(-1);
-    const match: ScriptMatch =
-      fileName === undefined ? { kind: "none" } : matchScript(segments, this.scripts.findCandidates(fileName));
+    const location = findLocation(entry, segments, {
+      findCandidates: (fileName) => this.scripts.findCandidates(fileName),
+      findMapped: (baseName) => this.scripts.findMapped(baseName),
+      viewMap: (script) => this.sourceMaps.view(script),
+    });
 
-    switch (match.kind) {
-      case "none":
+    switch (location.kind) {
+      case "pending":
+        for (const script of location.reads) {
+          this.sourceMaps.load(script);
+        }
+
         return PENDING;
-      case "several":
-        return { status: "error", message: "file matches several files" };
-      case "one":
-        return this.setBreakpoint(entry, match.script.url);
+      case "error":
+        return location.isRetryable === true
+          ? { status: "error", message: location.message, isRetryable: true }
+          : { status: "error", message: location.message };
+      case "script":
+        return this.setBreakpoint(entry, location);
     }
   }
 
-  private setBreakpoint(entry: ValidEntry, url: string): Outcome {
-    const acquired = this.v8.acquire(entry.id, url, entry.line);
+  private setBreakpoint(entry: ValidEntry, location: Extract<Location, { kind: "script" }>): Outcome {
+    const acquired = this.v8.acquire(entry.id, location.url, location.position);
     if (!acquired.ok) {
       const message =
         acquired.reason === "noCode"
@@ -196,31 +213,50 @@ export class Breakpoints {
       return { status: "error", message };
     }
 
-    const { location } = acquired;
+    const placed = acquired.location;
     this.log(
       "debug",
-      `${entry.id} ${entry.file}:${String(entry.line)} → ${location.url}:${String(location.line)}:${String(location.column)}`,
+      `${entry.id} ${entry.file}:${String(entry.line)} → ${placed.url}:${String(placed.line)}:${String(placed.column)}`,
     );
-    return { status: "active", place: acquired.place };
+    if (location.mapped === undefined) {
+      return { status: "active", place: acquired.place };
+    }
+
+    this.sourceMaps.hold(location.mapped, entry.id);
+    return { status: "active", place: acquired.place, mapUrl: location.mapped.url };
   }
 
-  // A pending entry is resolved again when a script with its file name loads; the new status is sent
+  // A pending entry is resolved again when a script it may resolve to loads; the new status is sent
   private onScriptParsed(params: unknown): void {
-    const fileName = this.scripts.record(params)?.segments.at(-1);
-    if (fileName === undefined) {
+    const script = this.scripts.record(params);
+    if (script !== undefined) {
+      // A script with the URL of a recorded one replaces it, so the map read for the old one no longer applies
+      this.sourceMaps.forget(script.url);
+      this.resolvePending(script);
+    }
+  }
+
+  // The entries waiting for this map are resolved again; then its index is dropped unless one of them holds it
+  private onMapRead(script: MappedRecord): void {
+    if (this.isStopped) {
       return;
     }
 
+    this.resolvePending(script);
+    this.sourceMaps.trim(script);
+  }
+
+  private resolvePending(script: ScriptRecord): void {
     const changed: string[] = [];
     for (const [id, current] of this.applied) {
-      if (current.entry.kind !== "valid" || current.outcome.status !== "pending") {
+      if (current.entry.kind !== "valid" || !isUnresolved(current.outcome)) {
         continue;
       }
 
-      if (current.segments.at(-1) === fileName) {
+      if (mayResolveTo(current.segments.at(-1), script)) {
         const outcome = this.locate(current.entry, current.segments);
-        if (outcome.status !== "pending") {
-          this.applied.set(id, { ...current, outcome });
+        this.applied.set(id, { ...current, outcome });
+        if (!isSameStatus(current.outcome, outcome)) {
           changed.push(id);
         }
       }
@@ -234,7 +270,7 @@ export class Breakpoints {
   private onPaused(params: unknown): void {
     try {
       this.dependencies.logger.hold();
-      if (!this.v8.owns(readHitBreakpoints(params))) {
+      if (!this.v8.ownsPause(params)) {
         this.log("debug", "resumed a pause that none of the breakpoints caused");
       }
     } catch (error) {
@@ -258,6 +294,7 @@ export class Breakpoints {
     this.dependencies.session.post("Debugger.disable");
     this.v8.forgetAll();
     this.scripts.clear();
+    this.sourceMaps.clear();
     this.isDomainOn = false;
     this.dependencies.fail(resumed.error);
   }
@@ -298,6 +335,7 @@ export class Breakpoints {
     }
 
     this.scripts.clear();
+    this.sourceMaps.clear();
     this.isDomainOn = false;
     this.log("debug", "Debugger domain off");
   }

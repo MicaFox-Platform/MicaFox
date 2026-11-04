@@ -22,11 +22,14 @@ status `rateLimited` until its budget refills. Capturing stops after 10 ms per p
 a snapshot cut by either limit is `truncated`. An array, `Set` or `Map` with more children than `maxItems` is captured
 with its size only. Details: [capturing a snapshot](../../architecture/sdk/debugger.md#capturing-a-snapshot).
 
-The hub sets breakpoints by the file's path in your repository. For TypeScript, ship source maps: inline or as
-`.map` files next to the JavaScript; bundled output is not supported. While breakpoints are set, the debugger
-resumes every pause it did not cause, including `debugger` statements, so do not attach another debugger to the
-process. When the process runs with `--inspect`, ProbeX does not start. A breakpoint on a module's top-level code
-can miss the module's first run when its map is a separate `.map` file. Design:
+The hub sets breakpoints by the file's path in your repository. For TypeScript, ship source maps: inline as a
+`data:` URL or as `.map` files referenced by a relative URL; a map URL with a scheme, such as `file:` or `https:`,
+and a map over 8 MiB are not read. Keep each compiled file's name, without its extension, the same as its
+source's (`dist/checkout.js` for `src/checkout.ts`); bundled output is not supported. While breakpoints are set,
+the debugger resumes every pause it did not cause, including `debugger` statements, so do not attach another
+debugger to the process. When the process runs with `--inspect`, ProbeX does not start. A breakpoint on the
+top-level code of a module with a source map can miss the module's first run, because the map is read after the
+module loads. Design:
 [debugger architecture](../../architecture/sdk/debugger.md).
 
 **Methods**

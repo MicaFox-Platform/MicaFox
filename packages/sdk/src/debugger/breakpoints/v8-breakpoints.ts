@@ -15,6 +15,12 @@ export interface V8Location {
   column: number;
 }
 
+/** A position in a script: 0-based line and column, as V8 and source maps count. */
+export interface ScriptPosition {
+  line: number;
+  column: number;
+}
+
 /** The outcome of asking for a V8 breakpoint; `place` identifies it for `release()`. */
 export type Acquired = { ok: true; place: string; location: V8Location } | { ok: false; reason: "noCode" | "failed" };
 
@@ -42,9 +48,14 @@ const readSetResult = (value: object, url: string): { v8Id: string; location?: V
   return { v8Id, location: { url, line: lineNumber + 1, column: columnNumber + 1 } };
 };
 
+const readHitBreakpoints = (params: unknown): string[] => {
+  const hit: unknown = isRecord(params) ? Reflect.get(params, "hitBreakpoints") : undefined;
+  return Array.isArray(hit) ? (hit as unknown[]).filter((id): id is string => typeof id === "string") : [];
+};
+
 /**
- * The V8 breakpoints of the entries. Entries that ask for the same URL and line share one, which is removed with the
- * last of them. There are at most 100 entries, so at most 100 places.
+ * The V8 breakpoints of the entries. Entries that ask for the same URL, line and column share one, which is removed
+ * with the last of them. There are at most 100 entries, so at most 100 places.
  */
 export class V8Breakpoints {
   private readonly places = new Map<string, Place>();
@@ -55,9 +66,10 @@ export class V8Breakpoints {
     private readonly logger: SdkLogger,
   ) {}
 
-  /** Sets a breakpoint at `line` (1-based) of the script at `url` for `owner`, or joins the one already there. */
-  acquire(owner: string, url: string, line: number): Acquired {
-    const place = `${String(line)}:${url}`;
+  /** Sets a breakpoint at `position` (0-based) of the script at `url` for `owner`, or joins the one already there. */
+  acquire(owner: string, url: string, position: ScriptPosition): Acquired {
+    const { line, column } = position;
+    const place = `${String(line)}:${String(column)}:${url}`;
     const existing = this.places.get(place);
     if (existing !== undefined) {
       existing.owners.add(owner);
@@ -65,7 +77,7 @@ export class V8Breakpoints {
     }
 
     // By URL, so V8 also sets it in every later script with this URL, such as a module that is loaded again
-    const answer = this.session.post("Debugger.setBreakpointByUrl", { url, lineNumber: line - 1, columnNumber: 0 });
+    const answer = this.session.post("Debugger.setBreakpointByUrl", { url, lineNumber: line, columnNumber: column });
     const result = answer.ok ? readSetResult(answer.value, url) : undefined;
     if (result === undefined) {
       return { ok: false, reason: "failed" };
@@ -96,9 +108,9 @@ export class V8Breakpoints {
     }
   }
 
-  /** Tells whether any of `v8Ids`, the `hitBreakpoints` of a pause, is one of these breakpoints. */
-  owns(v8Ids: readonly string[]): boolean {
-    return v8Ids.some((v8Id) => this.placeByV8Id.has(v8Id));
+  /** Tells whether one of the `hitBreakpoints` of a `Debugger.paused` event is one of these breakpoints. */
+  ownsPause(params: unknown): boolean {
+    return readHitBreakpoints(params).some((v8Id) => this.placeByV8Id.has(v8Id));
   }
 
   /** Forgets every breakpoint without a V8 call, after disabling the domain removed them. */
