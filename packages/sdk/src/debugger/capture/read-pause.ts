@@ -33,6 +33,11 @@ export interface CaptureDependencies {
   session: CaptureInspector;
   /** Where a call frame is shown, through the script's source map where it is decoded; never throws. */
   locateFrame: (frame: PausedLocation) => FrameLocation;
+  /**
+   * Tells whether the value under a variable, property or string map key of this name is replaced with `redacted`
+   * and never read (ADR 0012). Required, so a capture cannot leak by leaving the rules out.
+   */
+  isSecret: (name: string) => boolean;
   /** Defaults to `performance.now()` and `Date.now()`. */
   clock?: CaptureClock;
   /** Defaults to 10 ms and 64 KiB. */
@@ -154,7 +159,7 @@ const addScope = (scope: CallFrame["scopes"][number], reader: ValueReader, list:
 const readVariables = (frame: CallFrame, reader: ValueReader): Variable[] => {
   const list: VariableList = { variables: [], seen: new Set(["this"]) };
   if (frame.receiver !== undefined) {
-    list.variables.push({ name: "this", value: reader.readValue(frame.receiver, 0) });
+    list.variables.push({ name: "this", value: reader.readReceiver(frame.receiver) });
   }
 
   for (const scope of frame.scopes.filter(({ type }) => SCOPE_TYPES.has(type))) {
@@ -195,7 +200,11 @@ export const readPause = (
     budget.charge(frame.function.length + frame.file.length + 64);
   }
 
-  const reader = new ValueReader(dependencies.session, largestLimits(limits), budget);
+  const reader = new ValueReader(dependencies.session, {
+    limits: largestLimits(limits),
+    budget,
+    isSecret: dependencies.isSecret,
+  });
   const variables = readVariables(innermost, reader);
   return { time: clock.epochMs(), stack, variables, truncated: budget.wasCut };
 };

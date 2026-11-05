@@ -10,11 +10,20 @@ export interface CaptureInspector {
   post(method: string, params?: object): { ok: true; value: object } | { ok: false; error: Error };
 }
 
+/** What a reader needs besides the inspector. */
+export interface ReadSettings {
+  limits: ResolvedLimits;
+  budget: CaptureBudget;
+  /** Tells whether the value under a name must be replaced with `redacted` and never read. */
+  isSecret: (name: string) => boolean;
+}
+
 /** The properties of an object, or why they could not be read. */
 export type Listed = { ok: true; list: PropertyList } | { ok: false; reason: string };
 
 type ArrayValue = Extract<Value, { type: "array" }>;
 
+const REDACTED: Value = { type: "redacted" };
 const READ_FAILED = "the inspector could not read the value";
 const ENTRIES = "[[Entries]]";
 // An array index: no leading zeros, so "01" is a name and not an item
@@ -47,11 +56,16 @@ const textOf = (property: Property | undefined): string | undefined => {
  * `maxDepth`, at most 5, plus the entry of a map.
  */
 export class ValueReader {
+  private readonly limits: ResolvedLimits;
+  private readonly budget: CaptureBudget;
+  private readonly isSecret: (name: string) => boolean;
+
   constructor(
     private readonly inspector: CaptureInspector,
-    private readonly limits: ResolvedLimits,
-    private readonly budget: CaptureBudget,
-  ) {}
+    settings: ReadSettings,
+  ) {
+    ({ limits: this.limits, budget: this.budget, isSecret: this.isSecret } = settings);
+  }
 
   /** Reads the own properties of `objectId` in one call, unless the budget is spent. */
   list(objectId: string): Listed {
@@ -77,7 +91,23 @@ export class ValueReader {
   /** Reads a variable of a scope and counts its name. */
   readVariable(property: Property): Variable {
     this.budget.charge(property.name.length + 16);
-    return { name: property.name, value: this.readMember(property, 0) };
+    return { name: property.name, value: this.readNamed(property, 0) };
+  }
+
+  /** Reads the value of `this`, unless a rule matches the name `this`. */
+  readReceiver(remote: RemoteObject): Value {
+    return this.isSecret("this") ? this.redact() : this.readValue(remote, 0);
+  }
+
+  // The value under a name that a rule matches is not read, so a container is never listed and a primitive, which
+  // came with its siblings, is dropped here
+  private readNamed(property: Property, level: number): Value {
+    return this.isSecret(property.name) ? this.redact() : this.readMember(property, level);
+  }
+
+  private redact(): Value {
+    this.budget.charge(sizeOf(REDACTED));
+    return REDACTED;
   }
 
   /** Reads the value of a property or variable, which is `level` objects below its variable; a getter is `accessor`. */
@@ -177,7 +207,7 @@ export class ValueReader {
       }
 
       this.budget.charge(property.name.length + 16);
-      variables.push({ name: property.name, value: this.readMember(property, level) });
+      variables.push({ name: property.name, value: this.readNamed(property, level) });
     }
 
     return { variables, read: variables.length };
@@ -302,7 +332,12 @@ export class ValueReader {
     // The key is read first, so the values come in the order of the map
     const keyProperty = findProperty(listed.list.properties, "key");
     const key = keyProperty === undefined ? undefined : this.readMember(keyProperty, level);
-    const value = this.readMember(findProperty(listed.list.properties, "value"), level);
+    // The name of an entry is its key, when that is a string; the value under a secret key is not read
+    const keyText = textOf(keyProperty);
+    const value =
+      keyText !== undefined && this.isSecret(keyText)
+        ? this.redact()
+        : this.readMember(findProperty(listed.list.properties, "value"), level);
     return key === undefined ? { value } : { key, value };
   }
 }

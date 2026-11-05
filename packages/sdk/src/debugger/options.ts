@@ -10,6 +10,7 @@ export interface DebuggerOptions {
   token?: string;
   service?: string;
   labels?: Record<string, string>;
+  redact?: string[];
   logger?: Logger;
   logLevel?: LogLevel;
   hubConnector?: Pick<HubConnectorOptions, "buffer" | "batch" | "rateLimit" | "reconnect" | "closeTimeoutMs">;
@@ -27,6 +28,7 @@ const OPTION_NAMES: readonly OptionName[] = [
   "token",
   "service",
   "labels",
+  "redact",
   "logger",
   "logLevel",
   "hubConnector",

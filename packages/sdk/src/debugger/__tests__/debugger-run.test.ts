@@ -88,7 +88,7 @@ describe("Debugger.run() options", () => {
     env.PROBEX_LOG_LEVEL = "info";
     probex.run();
 
-    expect(messagesAt("info")).toEqual(["started with a custom connector"]);
+    expect(messagesAt("info")).toEqual(["started with a custom connector and 15 redaction rules"]);
   });
 
   it("keeps the level resolved at run() when PROBEX_LOG_LEVEL changes while running", async () => {
@@ -100,7 +100,7 @@ describe("Debugger.run() options", () => {
     env.PROBEX_LOG_LEVEL = "error";
     await probex.stop();
 
-    expect(messagesAt("info")).toEqual(["started with a custom connector", "stopped"]);
+    expect(messagesAt("info")).toEqual(["started with a custom connector and 15 redaction rules", "stopped"]);
   });
 
   it("reads PROBEX_ENABLED again at the next run()", async () => {
@@ -194,7 +194,7 @@ describe("Debugger.run() starting", () => {
       connects: 1,
       isConnected: true,
       posted: [],
-      info: ["started with a custom connector"],
+      info: ["started with a custom connector and 15 redaction rules"],
     });
   });
 
@@ -314,7 +314,7 @@ describe("Debugger while running", () => {
       closes: connector.closeCount,
     }).toEqual({
       warnings: ["the connector reported closed; stopping"],
-      info: ["started with a custom connector", "stopped"],
+      info: ["started with a custom connector and 15 redaction rules", "stopped"],
       isConnected: false,
       closes: 0,
     });
@@ -414,7 +414,7 @@ describe("Debugger.run() with an unusual connector", () => {
     await probex.stop();
 
     expect({ info: messagesAt("info"), isConnected: binding.isConnected }).toEqual({
-      info: ["started with a custom connector", "stopped"],
+      info: ["started with a custom connector and 15 redaction rules", "stopped"],
       isConnected: false,
     });
   });
@@ -427,7 +427,10 @@ describe("Debugger.run() with an unusual connector", () => {
 
     await probex.stop();
 
-    expect(lines.map((line) => line.message)).toEqual(["started with a custom connector", "stopped"]);
+    expect(lines.map((line) => line.message)).toEqual([
+      "started with a custom connector and 15 redaction rules",
+      "stopped",
+    ]);
   });
 });
 

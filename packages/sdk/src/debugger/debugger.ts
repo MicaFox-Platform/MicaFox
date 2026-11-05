@@ -13,6 +13,7 @@ import {
   type ConfiguredOptions,
   type DebuggerOptions,
 } from "./options.js";
+import { resolveRedaction } from "./redaction/index.js";
 import type { Warn } from "../connector/index.js";
 import { createLogger, type Environment, type Logger, type SdkLogger } from "../logger/index.js";
 
@@ -170,7 +171,9 @@ export class Debugger {
       this.warn(`${ignored.join(", ")} ignored: a custom connector is set`);
     }
 
-    this.startWith(connector);
+    // Resolved once per run(); the capture gets the rules when pauses are wired to it
+    const redaction = resolveRedaction(options.redact, this.env, this.warn);
+    this.startWith(connector, redaction.count);
   }
 
   private findRefusal(): string | undefined {
@@ -186,7 +189,7 @@ export class Debugger {
     return undefined;
   }
 
-  private startWith(connector: Connector): void {
+  private startWith(connector: Connector, redactionRules: number): void {
     const link = new ConnectorLink(connector, this.logger);
     const session = new InspectorSession(this.logger, this.createInspectorBinding());
     const running: Running = {
@@ -239,7 +242,13 @@ export class Debugger {
       return;
     }
 
-    this.logger.log("info", "started with a custom connector", { component: COMPONENT });
+    this.logStarted(redactionRules);
+  }
+
+  private logStarted(redactionRules: number): void {
+    this.logger.log("info", `started with a custom connector and ${String(redactionRules)} redaction rules`, {
+      component: COMPONENT,
+    });
   }
 
   private onStatus(running: Running, status: ConnectorStatus): void {
