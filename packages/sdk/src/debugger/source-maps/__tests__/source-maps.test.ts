@@ -82,7 +82,7 @@ describe("SourceMaps reading", () => {
     expect({ view: test.maps.view(checkout), reads: test.reads }).toEqual({
       view: {
         kind: "read",
-        sources: [{ source: "checkout.ts", segments: ["app", "src", "checkout.ts"] }],
+        sources: [{ source: "checkout.ts", path: "/app/src/checkout.ts", segments: ["app", "src", "checkout.ts"] }],
         index: expect.anything() as unknown,
       },
       reads: [checkout],
@@ -219,7 +219,7 @@ describe("SourceMaps keeping the index", () => {
 
     expect(test.maps.view(checkout)).toEqual({
       kind: "read",
-      sources: [{ source: "checkout.ts", segments: ["app", "src", "checkout.ts"] }],
+      sources: [{ source: "checkout.ts", path: "/app/src/checkout.ts", segments: ["app", "src", "checkout.ts"] }],
     });
   });
 

@@ -38,6 +38,16 @@ export const isSameStatus = (first: Outcome, second: Outcome): boolean =>
   first.status === second.status &&
   (first.status !== "error" || (second.status === "error" && first.message === second.message));
 
+/** How many of `outcomes` have each status, such as `1 active, 2 pending, 0 error`. */
+export const summarizeOutcomes = (outcomes: readonly Outcome[]): string => {
+  const counts = { active: 0, pending: 0, error: 0 };
+  for (const outcome of outcomes) {
+    counts[outcome.status] += 1;
+  }
+
+  return `${String(counts.active)} active, ${String(counts.pending)} pending, ${String(counts.error)} error`;
+};
+
 /** The `breakpointStatus` message of an entry's outcome. */
 export const toStatus = (breakpointId: string, outcome: Outcome): BreakpointStatus => {
   const base = { version: PROTOCOL_VERSION, type: "breakpointStatus", breakpointId } as const;

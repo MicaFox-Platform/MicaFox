@@ -4,7 +4,9 @@ import { fileURLToPath } from "node:url";
 export interface MapSource {
   /** As written in `sources`, which the map's index is looked up by. */
   readonly source: string;
-  /** The path split at `/`: a local path for a `file:` source, the URL's path for any other scheme. */
+  /** The path with `/` separators: a local path for a `file:` source, the URL's path for any other scheme. */
+  readonly path: string;
+  /** `path` split at `/`, without empty and `.` segments. */
   readonly segments: readonly string[];
 }
 
@@ -42,7 +44,11 @@ export const resolveMapSources = (sourceRoot: string, sources: readonly string[]
     const path = toPath(joinRoot(sourceRoot, source), mapUrl);
     if (path !== undefined) {
       // Split once here: every pending entry compares them again on each script that loads
-      resolved.push({ source, segments: path.split("/").filter((segment) => segment !== "" && segment !== ".") });
+      resolved.push({
+        source,
+        path,
+        segments: path.split("/").filter((segment) => segment !== "" && segment !== "."),
+      });
     }
   }
 

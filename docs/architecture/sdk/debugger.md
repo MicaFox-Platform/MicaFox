@@ -30,8 +30,10 @@ limits, redacts secrets and sends them to the hub through a connector. How to us
     Every pause counts, also one resumed at once. Log lines written during a pause are held and written after it;
     the pause path builds a log message only when its level is enabled.
   - No single inspector call reads an unbounded value: an array, typed array, `Set` or `Map` with more children
-    than `maxItems` is captured with its size only. An object's own properties are read in one call, so an object
-    with a very large number of own properties can make that one pause longer than 10 ms.
+    than `maxItems` is captured with its size only. Two values are exceptions, as V8 returns them whole in one
+    reply: an object's own properties are read in one call, and a string comes in full with the object or scope that
+    holds it and is cut afterwards. An object with a very large number of own properties, or a string of many
+    megabytes, can make that one pause longer than 10 ms and cost its size in memory until the pause ends.
   - Without breakpoints the inspector's `Debugger` domain is off, so V8 runs the app as if ProbeX were not there.
   - Runs no user code: getters are never called and nothing is evaluated.
   - A redacted value never reaches the snapshot or the logs: a container under a redacted name is never expanded,
@@ -47,7 +49,8 @@ limits, redacts secrets and sends them to the hub through a connector. How to us
   - Memory is bounded: 100 breakpoints, source maps up to 8 MiB and 1,500,000 segments each, about 36 MB decoded,
     read one at a time only for scripts that may hold an entry's file, and kept decoded only for scripts that have
     breakpoints. Only scripts with a `file:` URL or an absolute path are recorded, one record per URL; scripts
-    without a URL, such as `eval` and `new Function`, are ignored.
+    without a URL, such as `eval` and `new Function`, are ignored. Every script with a URL is also kept by its id, at
+    most 20,000, the oldest dropped first, because V8 names the script of a call frame by id only.
   - Reads source maps inline (`data:` URLs) or from a relative `sourceMappingURL` resolved against the script's
     path; a map with any other scheme is not read, and an entry that nothing else resolves gets the status `error`.
     Bundles, where many sources map into one script, are not supported.
@@ -97,7 +100,8 @@ The parts live in `packages/sdk/src/debugger/`:
   breakpoint is set through one, its index from original line to generated position and back. `Breakpoints` finds
   an entry's script and position with them.
 - `RateLimiter` — token buckets per breakpoint and per process, and the pause budget.
-- `Capture` — reads the stack and variables of a paused frame into a [`Snapshot`](../../api/protocol.md#snapshot),
+- `Capture` — reads the stack and variables of a paused frame into one read, and cuts that read to the limits of
+  each breakpoint as a [`Snapshot`](../../api/protocol.md#snapshot). It asks `Breakpoints` where a frame is shown,
   and redacts secrets by name as it goes.
 - `InspectorSession` — wraps `node:inspector`. On the main thread, `post` answers synchronously, also while the
   thread is paused; failures come back as results and are never thrown.
@@ -116,15 +120,25 @@ packages/sdk/src/debugger/
 │   ├── breakpoints.ts          Breakpoints: applies a list, resolves pending entries, resumes every pause, stops
 │   ├── entry.ts                ValidEntry, InvalidEntry, the comparison of two entries and the status of an outcome
 │   ├── read-list.ts            reads and validates the entries of a breakpoints message, with the limits on the list
-│   ├── script-registry.ts      ScriptRegistry: the loaded scripts, one per URL, by file name and mapped by base name
+│   ├── script-registry.ts      ScriptRegistry: the loaded scripts, one per URL, by file name, by base name and by id
 │   ├── find-location.ts        findLocation: an entry's script and position, or the maps it waits for
 │   ├── match-path.ts           picks the candidate whose path ends with the most segments of an entry's file
 │   └── v8-breakpoints.ts       V8Breakpoints: Debugger.setBreakpointByUrl and removeBreakpoint, shared by position
+├── capture/                    Capture: one pause read into values within the limits, then cut per breakpoint
+│   ├── index.ts                the sub-component's only entry: readPause, cutSnapshot and their types
+│   ├── read-pause.ts           readPause: the call frames, the stack and the variables of the innermost frame
+│   ├── read-value.ts           ValueReader: a value and what is below it with Runtime.getProperties, depth first
+│   ├── read-primitive.ts       the values that V8 describes in full: primitives, null, Date, and the size of a container
+│   ├── remote-object.ts        RemoteObject, Property and the reading of a Runtime.getProperties reply
+│   ├── limits.ts               ResolvedLimits: defaults, caps and the largest of several, and truncateText
+│   ├── budget.ts               CaptureBudget: the 10 ms and 64 KiB of a capture, and the size of a value
+│   └── cut-snapshot.ts         cutSnapshot: a read cut to one breakpoint's limits as a Snapshot, with no V8 call
 ├── source-maps/                SourceMaps: reads the maps of loaded scripts and keeps what each one is needed for
-│   ├── index.ts                the sub-component's only entry: SourceMaps and the types of what it knows of a map
+│   ├── index.ts                the sub-component's only entry: SourceMaps, locateFrame and the types of what it knows
 │   ├── source-maps.ts          SourceMaps: one read per script record, shared; the index kept while an entry holds it
 │   ├── read-source-map.ts      readSourceMap: a data: URL in place or a relative file with node:fs/promises, 8 MiB
-│   └── map-sources.ts          resolveMapSources: the sources of a map against its sourceRoot and URL, as paths
+│   ├── map-sources.ts          resolveMapSources: the sources of a map against its sourceRoot and URL, as paths
+│   └── locate-frame.ts         locateFrame: the file, line and column a frame is shown at, original or generated
 └── source-map-decoder/         decodeSourceMap: the text of a map into its two indexes, in slices
     ├── index.ts                the sub-component's only entry: decodeSourceMap and the types of its result
     ├── decode-source-map.ts    decodeSourceMap: checks the size, runs the steps below in slices, never throws
@@ -136,8 +150,9 @@ packages/sdk/src/debugger/
     └── source-map-error.ts     SourceMapError: the fixed reason of a map that cannot be decoded
 ```
 
-`RateLimiter` and `Capture` get their own sub-component folders when they are built. `Breakpoints` uses
-`source-maps/`, which uses `source-map-decoder/`.
+`RateLimiter` gets its own sub-component folder when it is built. `Breakpoints` uses `source-maps/`, which uses
+`source-map-decoder/`; `Capture` uses `source-maps/` only for the type of a frame's position, which it gets from
+`Breakpoints.locateFrame`.
 
 ## Key flows
 
@@ -221,11 +236,17 @@ packages/sdk/src/debugger/
    turns every breakpoint off and the affected entries get `rateLimited`. One unref'd timer restores breakpoints
    and sends `active` when the buckets and the budget are full again, so a hot line stops pausing.
 5. `Capture` reads up to 20 frames of the stack, then `this` and the scopes of the innermost frame with synchronous
-   `Runtime.getProperties` calls, depth first, within the largest limits of the allowed entries. Frames are mapped
-   to original positions where the script's map is decoded; others keep the generated path and position. The size
-   of an array, typed array, `Set` or `Map` comes from V8's description of it; with more children than `maxItems`
-   only the size is kept, without reading them. At 10 ms or 64 KiB it stops: what is left is `unavailable` and
-   the snapshot is `truncated`. A name that matches the redaction rules, see [Redacting secrets](#redacting-secrets),
+   `Runtime.getProperties` calls, depth first, within the largest limits of the allowed entries. V8 names the script
+   of a frame by id, so `Breakpoints` finds its URL by id and gives the position: the original one where the script's
+   map is decoded, else the generated path (from `file://`) or URL. The scopes read are `local`, `block`, `catch`,
+   `with`, `eval`, `closure` and `module`; `global` and `script` are left out. An object keeps its own enumerable
+   properties, read in one call; a getter is `accessor` and never run. The size of an array, typed array, `Set` or
+   `Map` comes from V8's description of it; with more children than `maxItems` only the size is kept, without
+   reading them. A function's name and an error's message and stack cost one call each; a date comes from its
+   description, to the second. V8 gives no object identity, so a cycle is read again down to `maxDepth` and
+   `circular` is never produced. At 10 ms or 64 KiB it stops: the first value not read is `unavailable` with the
+   reason, the rest is left out (an object is `truncated`, an array, `Set` or `Map` loses its children) and the
+   snapshot is `truncated`. A name that matches the redaction rules, see [Redacting secrets](#redacting-secrets),
    gets the value `redacted` and its children are not read.
 6. The thread resumes, and the pause time, from the start of the handler, is charged to the budget, also for a
    pause resumed at once. One pause serves every entry on the breakpoint.

@@ -52,10 +52,10 @@ const createContext = (
   };
 };
 
-const read = (path: string, withIndex = true): MapView =>
-  withIndex
-    ? { kind: "read", sources: [{ source: "../src/checkout.ts", segments: toSegments(path) }], index }
-    : { kind: "read", sources: [{ source: "../src/checkout.ts", segments: toSegments(path) }] };
+const read = (path: string, withIndex = true): MapView => {
+  const sources = [{ source: "../src/checkout.ts", path, segments: toSegments(path) }];
+  return withIndex ? { kind: "read", sources, index } : { kind: "read", sources };
+};
 
 const MAPPED = { url: "file:///app/dist/checkout.js", sourceMapURL: "checkout.js.map" };
 
