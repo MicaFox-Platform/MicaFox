@@ -349,10 +349,13 @@ From the SDK: the state of the app at one hit of a breakpoint.
 - `stack` — the call stack, innermost first, at most 20 frames. `file`, `line` and `column` are the original source
   position when the SDK has the file's source map loaded, which it does for files with breakpoints; otherwise the
   generated file's path or URL and position. `line` and `column` are 1-based.
-- `variables` — of the innermost frame: `this`, then the local, block and closure scopes, innermost first; a name
-  shadowed by an inner scope appears once. Global variables are not captured.
-- `truncated` — `true` when the snapshot reached 64 KiB of JSON or 10 ms; values not read by then are
+- `variables` — of the innermost frame: `this`, then the local, block, catch, `with`, `eval`, closure and module
+  scopes, innermost first; a name shadowed by an inner scope appears once. Global variables are not captured. A
+  scope that cannot be read appears as one variable named after its type, such as `<closure scope>`, whose value is
   `unavailable`.
+- `truncated` — `true` when the snapshot reached 64 KiB of JSON or 10 ms. The first value not read by then is
+  `unavailable` with the reason, and the rest is left out: the remaining variables and properties, with `truncated`
+  on their object, and the children of an `array`, `set` or `map`.
 
 ```ts
 import type { Snapshot, Value } from "@probex-platform/protocol";
@@ -430,16 +433,18 @@ marked in place:
   full length;
 - an `array`, `set` or `map` with at most `maxItems` children keeps them all; a larger one keeps none, only its
   `length` or `size`, so a huge container is never read;
-- an `object` keeps at most `maxItems` own properties and sets `truncated` when it has more;
+- an `object` keeps at most `maxItems` of its own enumerable properties and sets `truncated` when it has more;
 - below `maxDepth`, `properties`, `items` and `entries` are left out; a missing one means not read, an empty one
   means empty;
-- `circular` stands for an object already on the path from the variable; `accessor` for a getter, which is never
-  run; `unavailable` for a value not read because of a limit or a failure, with the `reason`;
+- `accessor` stands for a getter, which is never run; `unavailable` for a value not read because of a limit or a
+  failure, with the `reason`;
+- `circular` stands for an object that contains itself. The SDK does not produce it, because V8 gives no object
+  identity: an object that refers to itself is read again down to `maxDepth`. A reader still shows it;
 - `redacted` stands for a value whose name matches the SDK's
   [redaction rules](sdk/debugger.md#debuggeroptions); its children were never read and its value is not sent.
 
-A typed array or `Buffer` is an `array` of numbers. A `date` is an ISO 8601 string; an invalid date is
-`unavailable`. A reader shows a `type` it does not know as `unavailable`.
+A typed array or `Buffer` is an `array` of numbers. A `date` is an ISO 8601 string, to the whole second; an invalid
+date is `unavailable`. A reader shows a `type` it does not know as `unavailable`.
 
 ```ts
 import type { Value } from "@probex-platform/protocol";

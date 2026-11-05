@@ -4,6 +4,7 @@ import {
   isSameEntry,
   isSameStatus,
   isUnresolved,
+  summarizeOutcomes,
   toStatus,
   type ListedEntry,
   type Outcome,
@@ -11,10 +12,11 @@ import {
 } from "./entry.js";
 import { findLocation, mayResolveTo, type Location } from "./find-location.js";
 import { readBreakpointList } from "./read-list.js";
-import { ScriptRegistry, toSegments, type MappedRecord, type ScriptRecord } from "./script-registry.js";
+import { ScriptRegistry, isMapped, toSegments, type MappedRecord, type ScriptRecord } from "./script-registry.js";
 import { V8Breakpoints, type V8Inspector } from "./v8-breakpoints.js";
 import type { SdkLogger } from "../../logger/index.js";
-import { SourceMaps } from "../source-maps/index.js";
+import type { PausedLocation } from "../capture/index.js";
+import { SourceMaps, locateFrame, type FrameLocation, type MapView } from "../source-maps/index.js";
 
 const COMPONENT = "debugger";
 
@@ -48,6 +50,7 @@ interface Applied {
 }
 
 const PENDING: Outcome = { status: "pending" };
+const UNREAD: MapView = { kind: "unread" };
 
 /**
  * The breakpoints the hub listed, set in V8 in the loaded scripts, through their source maps where they have one.
@@ -112,6 +115,16 @@ export class Breakpoints {
     const ids = list.entries.map((entry) => entry.id);
     this.logCounts(ids);
     this.report(ids);
+  }
+
+  /**
+   * Where a paused call frame is shown: the original position where the script's map is decoded, which it is while
+   * a breakpoint is set through it, else the script's own path and position. Never throws.
+   */
+  locateFrame(frame: PausedLocation): FrameLocation {
+    const script = this.scripts.findFrameScript(frame.scriptId);
+    const view = script?.record !== undefined && isMapped(script.record) ? this.sourceMaps.view(script.record) : UNREAD;
+    return locateFrame(script?.url, view, { line: frame.lineNumber, column: frame.columnNumber });
   }
 
   /** Removes every breakpoint from V8 and turns the `Debugger` domain off; the debugger is stopping. */
@@ -350,18 +363,8 @@ export class Breakpoints {
   }
 
   private logCounts(ids: readonly string[]): void {
-    const counts = { active: 0, pending: 0, error: 0 };
-    for (const id of ids) {
-      const status = this.applied.get(id)?.outcome.status;
-      if (status !== undefined) {
-        counts[status] += 1;
-      }
-    }
-
-    this.log(
-      "info",
-      `${String(counts.active)} active, ${String(counts.pending)} pending, ${String(counts.error)} error`,
-    );
+    const outcomes = ids.flatMap((id) => this.applied.get(id)?.outcome ?? []);
+    this.log("info", summarizeOutcomes(outcomes));
   }
 
   private guard(action: () => void): void {

@@ -128,3 +128,92 @@ describe("toBaseName", () => {
     expect(toBaseName(fileName)).toBe(expected);
   });
 });
+
+describe("ScriptRegistry frame scripts", () => {
+  it("finds a file script by its id, with its record", () => {
+    const registry = new ScriptRegistry();
+
+    const record = registry.record({ scriptId: "12", url: "file:///app/src/checkout.js" });
+
+    expect(registry.findFrameScript("12")).toEqual({ url: "file:///app/src/checkout.js", record });
+  });
+
+  it("finds a script of Node itself by its id, without a record", () => {
+    const registry = new ScriptRegistry();
+
+    const record = registry.record({ scriptId: "3", url: "node:internal/modules/cjs/loader" });
+
+    expect({ record, found: registry.findFrameScript("3") }).toEqual({
+      record: undefined,
+      found: { url: "node:internal/modules/cjs/loader" },
+    });
+  });
+
+  it.each([
+    ["no URL", { scriptId: "1" }],
+    ["an empty URL, as eval has", { scriptId: "1", url: "" }],
+  ])("does not keep a script with %s", (_name, params) => {
+    const registry = new ScriptRegistry();
+
+    registry.record(params);
+
+    expect(registry.findFrameScript("1")).toBeUndefined();
+  });
+
+  it("does not keep a script whose id is not a string", () => {
+    const registry = new ScriptRegistry();
+
+    registry.record({ scriptId: 1, url: "node:fs" });
+
+    expect([registry.findFrameScript("1"), registry.findFrameScript("undefined")]).toEqual([undefined, undefined]);
+  });
+
+  it("keeps the script of an id when the same URL is recorded again under another id", () => {
+    const registry = new ScriptRegistry();
+    registry.record({ scriptId: "1", url: "file:///app/src/checkout.js" });
+
+    registry.record({ scriptId: "2", url: "file:///app/src/checkout.js" });
+
+    expect([registry.findFrameScript("1")?.url, registry.findFrameScript("2")?.url]).toEqual([
+      "file:///app/src/checkout.js",
+      "file:///app/src/checkout.js",
+    ]);
+  });
+
+  it("drops the oldest script when more than 20,000 are kept", () => {
+    const registry = new ScriptRegistry();
+
+    for (let id = 1; id <= 20_001; id += 1) {
+      registry.record({ scriptId: String(id), url: `node:internal/script-${String(id)}` });
+    }
+
+    expect({ first: registry.findFrameScript("1"), second: registry.findFrameScript("2")?.url }).toEqual({
+      first: undefined,
+      second: "node:internal/script-2",
+    });
+  });
+
+  it("keeps a script recorded again under its id as the newest, so the next eviction spares it", () => {
+    const registry = new ScriptRegistry();
+    for (let id = 1; id <= 20_000; id += 1) {
+      registry.record({ scriptId: String(id), url: `node:internal/script-${String(id)}` });
+    }
+
+    registry.record({ scriptId: "1", url: "node:internal/script-1" });
+    registry.record({ scriptId: "20001", url: "node:internal/script-20001" });
+
+    expect({ first: registry.findFrameScript("1")?.url, second: registry.findFrameScript("2") }).toEqual({
+      first: "node:internal/script-1",
+      second: undefined,
+    });
+  });
+
+  it("forgets every script on clear()", () => {
+    const registry = new ScriptRegistry();
+    registry.record({ scriptId: "1", url: "node:fs" });
+
+    registry.clear();
+
+    expect(registry.findFrameScript("1")).toBeUndefined();
+  });
+});
