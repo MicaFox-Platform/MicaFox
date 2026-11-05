@@ -91,9 +91,9 @@ limits, redacts secrets and sends them to the hub through a connector. How to us
 
 The parts live in `packages/sdk/src/debugger/`:
 
-- `Debugger` — the `probex` object. Resolves the options, creates the logger, the connector and the parts below,
-  hands `breakpoints` messages to `Breakpoints` and sends what they produce. It is not running, running or
-  stopping.
+- `Debugger` — the `probex` object. Resolves the options and the redaction rules, creates the logger, the connector
+  and the parts below, hands `breakpoints` messages to `Breakpoints` and sends what they produce. It is not running,
+  running or stopping.
 - `Breakpoints` — holds the latest list from the hub, the V8 breakpoint of each entry and its status, and handles
   every pause.
 - `SourceMaps` — reads the maps of loaded scripts, one at a time, and keeps their resolved sources and, while a
@@ -133,6 +133,10 @@ packages/sdk/src/debugger/
 │   ├── limits.ts               ResolvedLimits: defaults, caps and the largest of several, and truncateText
 │   ├── budget.ts               CaptureBudget: the 10 ms and 64 KiB of a capture, and the size of a value
 │   └── cut-snapshot.ts         cutSnapshot: a read cut to one breakpoint's limits as a Snapshot, with no V8 call
+├── redaction/                  RedactionRules: the names whose values are redacted, resolved once at run()
+│   ├── index.ts                the sub-component's only entry: resolveRedaction and RedactionRules
+│   ├── redaction-rules.ts      RedactionRules: the built-in names, normalizeName and the match by containment
+│   └── resolve-redaction.ts    resolveRedaction: the built-in names plus redact and PROBEX_REDACT, at most 100
 ├── source-maps/                SourceMaps: reads the maps of loaded scripts and keeps what each one is needed for
 │   ├── index.ts                the sub-component's only entry: SourceMaps, locateFrame and the types of what it knows
 │   ├── source-maps.ts          SourceMaps: one read per script record, shared; the index kept while an entry holds it
@@ -152,7 +156,7 @@ packages/sdk/src/debugger/
 
 `RateLimiter` gets its own sub-component folder when it is built. `Breakpoints` uses `source-maps/`, which uses
 `source-map-decoder/`; `Capture` uses `source-maps/` only for the type of a frame's position, which it gets from
-`Breakpoints.locateFrame`.
+`Breakpoints.locateFrame`. `Debugger` uses `redaction/`; `Capture` gets only its `isSecret`.
 
 ## Key flows
 
@@ -162,10 +166,12 @@ packages/sdk/src/debugger/
    debugger may be attached: it logs a warning and does nothing.
 2. It resolves the options: the value from `configure()`, then the environment, then the default. Without a hub URL
    and without a custom connector it logs an error and does not start.
-3. It creates a `HubConnector` or takes the custom one, subscribes to its messages and status, and calls
-   `connect()`. When a custom connector reports `closed`, the debugger logs a warning and stops itself.
+3. It resolves the [redaction rules](#redacting-secrets), once. It creates a `HubConnector` or takes the custom one,
+   subscribes to its messages and status, and calls `connect()`. When a custom connector reports `closed`, the
+   debugger logs a warning and stops itself.
 4. It connects the inspector session; the `Debugger` domain stays off until there are breakpoints.
 5. If any step fails, an error is logged, what was started is stopped and the debugger is not running.
+6. It logs one info line, `started`, with the number of redaction rules.
 
 ### Applying breakpoints
 
@@ -256,10 +262,12 @@ packages/sdk/src/debugger/
 ### Redacting secrets
 
 1. At `run()` the rules are resolved once: the built-in names, plus the names from `redact` and from
-   `PROBEX_REDACT`. The app adds names; it cannot remove the built-in ones.
+   `PROBEX_REDACT`, at most 100 together, copied from the app's array entry by entry. The app adds names; it cannot
+   remove the built-in ones.
 2. Names are normalized before matching: lowercased, with `_`, `-` and `.` removed, so `api_key`, `API-KEY` and
    `apiKey` are all `apikey`. A rule that is empty after normalizing is skipped with a warning.
-3. A name matches when its normalized form contains a normalized rule, so `dbPassword` matches `password`. A
+3. A name matches when its normalized form contains a normalized rule, so `dbPassword` matches `password`. Only
+   its first 256 characters are matched, so a map keyed by huge strings costs little per entry. A
    false match hides a harmless value; a missed one leaks a secret, so matching errs towards hiding.
 4. Rules apply to every name in the tree at any depth: variables, `this`, object properties and map entries whose
    key is a string. Array items have no name and are not matched.

@@ -38,7 +38,7 @@ describe("Debugger.stop()", () => {
 
     await probex.stop();
 
-    expect(messagesAt("info")).toEqual(["started with a custom connector", "stopped"]);
+    expect(messagesAt("info")).toEqual(["started with a custom connector and 15 redaction rules", "stopped"]);
   });
 
   it("flushes the logger", async () => {

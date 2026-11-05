@@ -30,6 +30,7 @@ const setup = (overrides: Partial<CaptureDependencies> = {}): Setup => {
         line: spot.lineNumber + 1,
         column: spot.columnNumber + 1,
       }),
+      isSecret: () => false,
       clock: FIXED_CLOCK,
       ...overrides,
     },

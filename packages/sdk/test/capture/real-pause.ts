@@ -11,7 +11,7 @@ import {
 } from "../../src/debugger/capture/index.js";
 import { InspectorSession } from "../../src/debugger/index.js";
 import { createLogger } from "../../src/logger/index.js";
-import { createRecordingLogger } from "../debugger/fakes.js";
+import { createRecordingLogger, envOf, type LoggedLine } from "../debugger/fakes.js";
 import { Fixtures, TracedSession } from "../debugger/real-v8.js";
 
 /** What a run of the fixture function gave. */
@@ -19,6 +19,8 @@ export interface RealPause {
   read: PauseRead;
   /** The commands the capture sent, besides the resume. */
   commands: string[];
+  /** Everything the debugger logged during the pause, at every level. */
+  logged: LoggedLine[];
 }
 
 export interface RealPauseOptions {
@@ -48,7 +50,12 @@ const plainLocation = (spot: PausedLocation) => ({
 export const readRealPause = (body: string, options: RealPauseOptions = {}): RealPause => {
   const fixtures = new Fixtures();
   const traced = new TracedSession();
-  const logger = createLogger({ component: "debugger", env: {}, console: createRecordingLogger([]) });
+  const logged: LoggedLine[] = [];
+  const logger = createLogger({
+    component: "debugger",
+    env: envOf(["PROBEX_LOG_LEVEL", "debug"]),
+    console: createRecordingLogger(logged),
+  });
   const session = new InspectorSession(logger, traced);
   session.connect();
   session.post("Debugger.enable");
@@ -59,6 +66,7 @@ export const readRealPause = (body: string, options: RealPauseOptions = {}): Rea
       read = readPause(params, options.limits ?? [undefined], {
         session,
         locateFrame: plainLocation,
+        isSecret: () => false,
         ...options.dependencies,
       });
     } catch (error) {
@@ -87,5 +95,5 @@ export const readRealPause = (body: string, options: RealPauseOptions = {}): Rea
   }
 
   const commands = traced.methods.filter((method) => method.startsWith("Runtime."));
-  return { read, commands };
+  return { read, commands, logged };
 };

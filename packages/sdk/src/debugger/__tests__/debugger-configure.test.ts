@@ -27,7 +27,7 @@ describe("Debugger.configure() while not running", () => {
 
     probex.run();
 
-    expect(messagesAt("info")).toEqual(["started with a custom connector"]);
+    expect(messagesAt("info")).toEqual(["started with a custom connector and 15 redaction rules"]);
   });
 
   it("replaces an earlier object field whole", () => {

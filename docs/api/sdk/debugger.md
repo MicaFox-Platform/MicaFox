@@ -68,7 +68,9 @@ running, so `configure()` and `run()` can be called again.
 - An unexpected error inside the debugger while it runs: it is logged and the debugger stops itself, as if
   `stop()` had been called.
 - An invalid option value, `PROBEX_ENABLED` or `PROBEX_LOG_LEVEL`: a warning is logged and the default is used.
-  A `redact` entry that is empty after normalizing is skipped with a warning; the built-in names always apply.
+  A `redact` or `PROBEX_REDACT` entry that is not a string, cannot be read or is empty after normalizing, such
+  as the one after a trailing comma, is skipped with a warning, and names past the first 100 are ignored with one;
+  the built-in names always apply.
 - A custom `connector` reports `closed`: a warning is logged and the debugger stops itself.
 - The logger throws or returns a rejected promise: the error is ignored; the debugger keeps working.
 
@@ -125,7 +127,8 @@ The options of [`probex.configure()`](#probex). Every field is optional.
   whose values are replaced with `redacted` in snapshots, added to the built-in ones (`password`, `secret`,
   `token`, `apikey`, `authorization`, `cookie`, `session` and more). Case, `_`, `-` and `.` are ignored, and a
   name matches every variable or property whose name contains it, at any depth. The built-in names cannot be
-  removed. Names from the option and from `PROBEX_REDACT` both apply. Default: built-in names only. Rules:
+  removed. Names from the option and from `PROBEX_REDACT` both apply, at most 100 together; a name is matched on its
+  first 256 characters. Default: built-in names only. Rules:
   [redacting secrets](../../architecture/sdk/debugger.md#redacting-secrets),
   [ADR 0012](../../adr/0012-redact-secrets-by-name-inside-the-sdk.md).
 - `logger` — [`Logger`](logger.md#logger), used by the debugger and by the default connector. Default: `console`.
