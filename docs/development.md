@@ -22,7 +22,7 @@ typecheck resolve: packages read each other's sources directly, so development n
 
 ## Setup
 
-Requires Node.js ≥ 22 and pnpm 10.
+Development requires Node.js ≥ 22.13 and pnpm 10; the published packages support Node.js ≥ 22.
 
 ```sh
 git clone https://github.com/MicaFox-Platform/MicaFox.git
@@ -174,16 +174,19 @@ git commit ──▶ commit-msg ──▶ git push ──▶ pre-push ──▶ 
 
 ### On a pull request
 
-CI runs on every pull request into `staging` or `main`, and again on each new commit or rename. The `ci` job, in
-order:
+CI runs on every pull request into `staging` or `main`, and again on each new commit or rename. The `verify` job
+runs on Node 22.13 (the oldest 22.x the dev toolchain runs on) and Node 24; the `ci` job passes when both
+legs pass. Steps, in order:
 
 | Step            | Fails when                                                                                  |
 | --------------- | ------------------------------------------------------------------------------------------- |
 | Only staging    | a pull request into `main` comes from a branch other than `staging`                         |
 | PR title        | the title breaks [Naming](#naming); fix it with `gh pr edit <number> --title "…"`           |
 | Commit messages | a non-merge commit subject breaks [Naming](#naming); skipped for release PRs from `staging` |
-| Linter … Tests  | `pnpm lint`, `pnpm format`, `pnpm typecheck` or `pnpm test:coverage` fails                  |
+| Linter … Tests  | `pnpm lint`, `pnpm format`, `pnpm typecheck` or `pnpm test` fails; coverage is checked once |
 | Build           | `pnpm build` fails                                                                          |
+
+Only the Node 22.13 leg runs the name steps and the coverage run (`pnpm test:coverage`).
 
 The `dependency-review` job fails when the pull request adds a dependency with a known vulnerability of high
 severity or worse. Dependabot pull requests skip the name steps.
