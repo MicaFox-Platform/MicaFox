@@ -84,8 +84,9 @@ Each setting below comes from its environment variable or from `micafox.configur
 | ------------------- | --------------------------------------------------------- | -------------------------------------- |
 | `MICAFOX_ENABLED`   | `false` turns MicaFox off without a code change           | `true`                                 |
 | `MICAFOX_HUB_URL`   | the hub's `wss://` URL, or `ws://` for local testing      | required unless you pass a `connector` |
-| `MICAFOX_TOKEN`     | the token the hub authenticates your app by               | none                                   |
+| `MICAFOX_TOKEN`     | the project key your hub issued                           | none                                   |
 | `MICAFOX_SERVICE`   | the service name the hub targets breakpoints by           | none                                   |
+| `MICAFOX_COMMIT`    | the commit hash the app runs, to show the matching source | none                                   |
 | `MICAFOX_LABELS`    | extra targeting labels, such as `team=payments,region=eu` | no labels                              |
 | `MICAFOX_REDACT`    | extra names to redact, such as `iban,ssn`                 | built-in names only                    |
 | `MICAFOX_LOG_LEVEL` | the lowest level MicaFox logs: `debug` to `silent`        | `warn`                                 |

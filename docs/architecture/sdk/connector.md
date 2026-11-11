@@ -11,7 +11,8 @@ it: [API](../../api/sdk/connector.md).
 
 - Owns:
   - the WebSocket to the hub: TLS, the bearer token in the upgrade request, reconnects with backoff, liveness pings;
-  - the session on each connection: the `hello` → `welcome` handshake and the protocol version check;
+  - the session on each connection: the `hello` → `welcome` handshake, the protocol version check and the modules
+    the session agreed on;
   - outgoing messages: serialization, the control queue and the data buffer, batching and the rate limit;
   - handing incoming messages and status changes to handlers;
   - deciding what it logs and at which level.
@@ -110,11 +111,13 @@ other folder.
 2. After `connect()` returns, the status becomes `connecting`. The connector opens the WebSocket with
    `Authorization: Bearer <token>` when a token is set, and unrefs the socket.
 3. Once open, it sends [`hello`](../../api/protocol.md#hello) as the first frame: protocol version, service, labels,
-   instance id, hostname, pid, SDK and Node versions.
-4. The hub replies [`welcome`](../../api/protocol.md#welcome). The status becomes `connected` and the queued
-   messages start to flow.
-5. The hub sends the full breakpoint state; the debugger applies it. This happens after every connect, so nothing
-   has to survive a disconnect.
+   commit when set, the modules it carries, instance id, hostname, pid, SDK and Node versions. The SDK passes the
+   modules it runs to a `HubConnector` it creates, under `Symbol.for("micafox.modules")` like the logger; a
+   `HubConnector` created by the app sends `["debugger"]`.
+4. The hub replies [`welcome`](../../api/protocol.md#welcome) with the modules it accepts. The status becomes
+   `connected` and the queued messages of those modules start to flow.
+5. When the session holds `debugger`, the hub sends the full breakpoint state; the debugger applies it. This happens
+   after every connect, so nothing has to survive a disconnect.
 6. On failure, or when a live connection drops, the status becomes `disconnected` and the next attempt waits the
    current delay. The delay starts at `reconnect.minDelayMs`, doubles after each failed attempt up to
    `reconnect.maxDelayMs`, and goes back to `reconnect.minDelayMs` after a `welcome`. Each wait is a random value
@@ -130,19 +133,24 @@ other folder.
 
 1. `send(message)` serializes the message once. If `JSON.stringify` throws or returns no string, an error is logged
    and the message is dropped. A `hello` is dropped with a warning: the connector sends its own.
-2. Data messages (snapshots) go to the data buffer. When it is full by `buffer.maxMessages` or `buffer.maxBytes`,
+2. Messages are told apart by `module` and `type`, as types are unique within a module only. Data messages (the
+   debugger's snapshots) go to the data buffer. When it is full by `buffer.maxMessages` or `buffer.maxBytes`,
    the oldest data messages are dropped and a warning is logged. A single data message larger than
    `buffer.maxBytes` is dropped with a warning.
 3. All other messages are control messages (breakpoint status, errors) and go to the control queue, so a burst of
-   snapshots cannot hide a breakpoint's status from the hub. A queued `breakpointStatus` is replaced in its place by a
-   newer one for the same `breakpointId`, so the queue holds at most one per breakpoint. Data never pushes control
-   messages out; when 200 are waiting, the oldest is dropped and a warning is logged. A control message over 4 KiB is
-   dropped with a warning. A new message type is control unless the connector lists it as data.
+   snapshots cannot hide a breakpoint's status from the hub. A queued debugger `breakpointStatus` is replaced in its
+   place by a newer one for the same `breakpointId`, so the queue holds at most one per breakpoint. Data never pushes
+   control messages out; when 200 are waiting, the oldest is dropped and a warning is logged. A control message over
+   4 KiB is dropped with a warning. A new module or message type is control unless the connector lists it as data,
+   so a module that sends large messages lists them as data when it is added.
 4. While `connected`, the batcher runs `batch.flushIntervalMs` after the first queued message, or at once from
    `setImmediate` when `batch.maxMessages` or `batch.maxBytes` are queued. It builds a batch only when the token
    bucket and the socket allow it, so messages wait in the queue and the buffer until then and a newer control
    message still goes first.
-5. A batch takes control messages first, then data, up to `batch.maxMessages` and `batch.maxBytes`, which counts the
+5. A batch takes control messages first, then data, up to `batch.maxMessages` and `batch.maxBytes`. Messages of a
+   module the current session did not agree on are dropped as they are taken, without a log line beyond the
+   warning after `welcome`; the check runs here, not in `send()`, because the next `welcome` may list other
+   modules. The batch size counts the
    frame's UTF-8 size with its `batch` envelope; a single message larger than `batch.maxBytes` goes on its own. It is
    written when the socket is open and has less than `batch.maxBytes` unsent, so a socket the hub is closing gets
    nothing and the messages wait for the next `welcome`. One message goes as itself, several as a `batch` frame.
@@ -154,20 +162,30 @@ other folder.
 
 1. A frame larger than 1 MiB closes the connection with code 1009 and an error; the delay jumps to
    `reconnect.maxDelayMs` and the connector reconnects.
-2. Before `welcome`, any other frame, or a `welcome` whose `version` is not `PROTOCOL_VERSION`, closes the socket
-   with `protocolError`, logs an error and counts as a failed attempt: the delay jumps to `reconnect.maxDelayMs`.
-   `welcome` is not passed to handlers; a later one is ignored at `debug`.
-3. After `welcome`, a binary frame, a frame that is not valid JSON, has no numeric `version` or no string `type`, or
-   a type the SDK sends (`hello`, `batch`, `breakpointStatus`, `snapshot`) is logged as a warning and ignored.
+2. Before `welcome`, any other frame, or a `welcome` whose `version` is not `PROTOCOL_VERSION` or that has no
+   `modules` array, closes the socket with `protocolError`, logs an error and counts as a failed attempt: the delay
+   jumps to `reconnect.maxDelayMs`. From `welcome.modules` the connector keeps, for the session, the first 32
+   entries that are strings and names its `hello` listed; for each module of its `hello` left out it logs one
+   warning. `welcome` is not passed to handlers; a later one is ignored at `debug`.
+3. After `welcome`, a binary frame, a frame that is not valid JSON, or has no numeric `version` or no string `type`
+   is logged as a warning and ignored.
 4. A message whose `version` is not `PROTOCOL_VERSION` closes the session with `protocolError` and an error, like a
    `welcome` of another version: a session speaks one version
    ([ADR 0016](../../adr/0016-use-the-hellos-protocol-version-for-the-session.md)).
-5. A message with an unknown `type` is logged at `debug` and ignored, so older SDKs keep working with newer hubs.
-   The connector module holds the list of types the hub sends.
-6. Every other message goes to each `onMessage` handler, in the order they subscribed, checked for its `version`
-   and `type` only: the [debugger](debugger.md) checks the other fields when it interprets the message. Handlers are
-   called from a copy of the list, so one that unsubscribes or calls `close()` does not skip the others. A handler
-   that throws is logged; the others still run. Status changes reach `onStatus` handlers the same way.
+5. The rest is read in the order of [`Message`](../../api/protocol.md#message):
+   - a session frame: a `hello` or `batch` is logged as a warning, a repeated `welcome` at `debug`, and ignored;
+   - any other message without a string `module` is logged as a warning and ignored;
+   - a `module` the session did not agree on, or that the SDK does not know, is logged at `debug` and ignored;
+   - within the module, a `type` the SDK does not know is logged at `debug` and ignored, so older SDKs keep working
+     with newer hubs; a `type` the SDK sends, such as `breakpointStatus`, is logged as a warning and ignored.
+
+   The connector module holds, per module, the types the hub sends and the types the SDK sends.
+
+6. Every other message goes to each `onMessage` handler, in the order they subscribed, checked for its `version`,
+   `module` and `type` only: the module's handler, such as the [debugger](debugger.md)'s, checks the other fields
+   when it interprets the message. Handlers are called from a copy of the list, so one that unsubscribes or calls
+   `close()` does not skip the others. A handler that throws is logged; the others still run. Status changes reach
+   `onStatus` handlers the same way.
 
 ### Detecting a dead connection
 
@@ -198,5 +216,7 @@ other folder.
 - [0006. Authenticate to the hub with a bearer token](../../adr/0006-authenticate-to-the-hub-with-a-bearer-token.md)
 - [0007. Deliver messages to the hub at most once](../../adr/0007-deliver-messages-to-the-hub-at-most-once.md)
 - [0008. Use WebSocket for the hub connection](../../adr/0008-use-websocket-for-the-hub-connection.md)
+- [0017. Tag messages with their module and agree on modules](../../adr/0017-tag-messages-with-their-module-and-agree-on-modules.md)
+- [0019. Report the deployed commit in hello](../../adr/0019-report-the-deployed-commit-in-hello.md)
 - [0009. Run the hub handshake in the connector](../../adr/0009-run-the-hub-handshake-in-the-connector.md)
 - [0016. Use the hello's protocol version for the session](../../adr/0016-use-the-hellos-protocol-version-for-the-session.md)

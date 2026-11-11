@@ -32,9 +32,12 @@ Every implementation keeps this contract:
 - `connect()` returns at once and connects in the background; a second call does nothing.
 - `send(message)` returns at once; the connector may buffer, batch or, when full, drop messages.
 - `onMessage(handler)` and `onStatus(handler)` return a function that removes the handler. A message reaching an
-  `onMessage` handler has the session's `version` and a `type` the hub sends; its other fields are unchecked, so the
-  handler checks them before it trusts them. A new status handler is not called with the current status, only with
+  `onMessage` handler has the session's `version`, a `module` the session agreed on and a `type` the hub sends; its
+  other fields are unchecked, so the handler checks them before it trusts them, and a module's handler skips
+  messages of other modules. A new status handler is not called with the current status, only with
   later changes.
+- A connector carries messages only of the modules the session agreed on, see [`Welcome`](#welcome); it drops the
+  others on the way out and ignores them on the way in.
 - Handlers are never called synchronously from inside `connect()`, `send()` or `close()`, and a status is never
   reported twice in a row.
 - `close()` resolves once the connector is closed; no handler is called after that. `closed` is reported once and
@@ -77,8 +80,10 @@ const PROTOCOL_VERSION = 1;
 ```
 
 The protocol version this package describes. Every message carries it in `version`; the message types below are
-version 1 and fix `version` to `1`. Additions that old peers can ignore keep it; renaming, removing or retyping
-anything a peer reads bumps it.
+version 1 and fix `version` to `1`. Additions that old peers can ignore keep it: an optional field, a new module, a
+new message type, and a new value of an enumerated field whose reader fallback is documented, such as a
+[`BreakpointStatus`](#breakpointstatus) `status`. Renaming, removing or retyping anything a peer reads bumps it.
+Until the packages' first release on npm, version 1 still changes in place.
 
 A session uses the version of its `hello`: `welcome` and every later message in both directions carry it, and a
 message with another version is a protocol error. A hub accepts every version it still has types for and closes
@@ -97,15 +102,29 @@ const speaksSameVersion = (version: number): boolean => version === PROTOCOL_VER
 type Message = Hello | Welcome | Breakpoints | BreakpointStatus | Snapshot;
 ```
 
-Every protocol message: one JSON object with a numeric `version` and a `type` string. A peer ignores a message
-whose `type` it does not know, a message only the other side sends, and a repeated `hello`, on its own or inside a
-[`Batch`](#batch). Anything that is not UTF-8 JSON text of an object with those two fields is not a protocol
-message.
+Every protocol message: one JSON object with a numeric `version` and a `type` string. Anything that is not UTF-8
+JSON text of an object with those two fields is not a protocol message.
+
+`hello`, `welcome` and `batch` are session frames: they carry no `module`, and no module uses these type names.
+Every other message belongs to an SDK module and names it in `module`; version 1 has one module, `debugger`, with
+the messages [`breakpoints`](#breakpoints), [`breakpointStatus`](#breakpointstatus) and [`snapshot`](#snapshot).
+Type names are unique within a module only, so a peer reads a message in this order:
+
+1. A session frame is handled by its `type`; a repeated `hello` or `welcome` is ignored, on its own or inside a
+   [`Batch`](#batch).
+2. Any other message without a string `module` is ignored with a warning.
+3. A message of a module that is missing from the session's [`hello`](#hello) or [`welcome`](#welcome) `modules`,
+   or that the peer does not know, is ignored.
+4. A message whose `type` the peer does not know within its module, or that only the other side sends, is ignored.
+
+Why: [ADR 0017](../adr/0017-tag-messages-with-their-module-and-agree-on-modules.md). With TypeScript, check `module`
+before `type` to narrow a message.
 
 ```ts
-import type { Message } from "@micafox/protocol";
+import type { Message, Snapshot } from "@micafox/protocol";
 
-const isHello = (message: Message): boolean => message.type === "hello";
+const isSnapshot = (message: Message): message is Snapshot =>
+  "module" in message && message.module === "debugger" && message.type === "snapshot";
 ```
 
 ### `Hello`
@@ -121,6 +140,8 @@ interface Hello {
   pid: number;
   sdk: { name: string; version: string };
   runtime: { name: string; version: string };
+  modules: string[];
+  commit?: string;
 }
 ```
 
@@ -128,15 +149,24 @@ The first message the SDK sends on every connection. `instanceId` is a random UU
 reconnects of one connector; `service` and `labels` are what the hub targets breakpoints by. Why the connector sends
 it: [ADR 0009](../adr/0009-run-the-hub-handshake-in-the-connector.md).
 
+- `modules` — the SDK modules this instance runs, such as `["debugger"]`. A hub ignores names it does not know.
+  `HubConnector` gets the list from the SDK; a connector you write, or a `HubConnector` you create yourself, sends
+  `["debugger"]`.
+- `commit` — the commit the instance runs, as a lowercase hexadecimal hash of 7 to 64 characters; left out when
+  unknown. See [ADR 0019](../adr/0019-report-the-deployed-commit-in-hello.md).
+
 Every connector and hub keeps this handshake:
 
-1. The connector sends the token as `Authorization: Bearer <token>` on the WebSocket upgrade. The hub answers HTTP
-   401 or 403 when it is missing or invalid. See [ADR 0006](../adr/0006-authenticate-to-the-hub-with-a-bearer-token.md).
+1. The connector sends the token as `Authorization: Bearer <token>` on the WebSocket upgrade. The token is the
+   secret project key the hub issued: the hub finds the project by it, and answers HTTP 401 or 403 when it is
+   missing or invalid. A project may have several valid keys, so one can be rotated without downtime. See
+   [ADR 0006](../adr/0006-authenticate-to-the-hub-with-a-bearer-token.md).
 2. The connector sends `hello` as the first frame and nothing else until it receives `welcome`.
 3. The hub sends nothing before `welcome`, and replies `welcome` within 10 s of the `hello`, or closes with
    [`CLOSE_CODES`](#close_codes) `incompatibleVersion` or `protocolError`.
-4. Right after `welcome`, the hub sends the full breakpoint state as a [`breakpoints`](#breakpoints) message, an
-   empty list included.
+4. When both `hello` and `welcome` list `debugger`, the hub sends the full breakpoint state right after `welcome` as
+   a [`breakpoints`](#breakpoints) message, an empty list included.
+5. Each side sends messages only of the modules that both `hello` and `welcome` list.
 
 On the wire:
 
@@ -159,6 +189,8 @@ const hello: Hello = {
   pid: 1,
   sdk: { name: "@micafox/sdk", version: "0.1.0" },
   runtime: { name: "node", version: process.versions.node },
+  modules: ["debugger"],
+  commit: "3f9c2e1a7b6d4c0e9f8a1b2c3d4e5f6a7b8c9d0e",
 };
 ```
 
@@ -168,16 +200,26 @@ const hello: Hello = {
 interface Welcome {
   version: 1;
   type: "welcome";
+  modules: string[];
 }
 ```
 
 The hub's reply to [`hello`](#hello): it accepts the session. A connector reports `connected` and starts sending
 other messages only after it.
 
+- `modules` — the modules of the `hello` the hub accepts for this session, at most 32. Only these exchange
+  messages; a hub lists none it does not support or that the project may not use. Names the `hello` did not list,
+  names the connector does not know and entries that are not strings are ignored, and only the first 32 entries
+  are read. An empty list keeps the session open with no module messages.
+- A `welcome` without a `modules` array is invalid: the connector closes with `protocolError`.
+
+The connector logs one warning per session for each module of its `hello` that `welcome` leaves out, and drops that
+module's outgoing messages. Why: [ADR 0017](../adr/0017-tag-messages-with-their-module-and-agree-on-modules.md).
+
 ```ts
 import { PROTOCOL_VERSION, type Welcome } from "@micafox/protocol";
 
-const welcome: Welcome = { version: PROTOCOL_VERSION, type: "welcome" };
+const welcome: Welcome = { version: PROTOCOL_VERSION, type: "welcome", modules: ["debugger"] };
 ```
 
 ### `Batch`
@@ -206,6 +248,7 @@ const toBatch = (messages: Message[]): Batch => ({ version: PROTOCOL_VERSION, ty
 ```ts
 interface Breakpoints {
   version: 1;
+  module: "debugger";
   type: "breakpoints";
   breakpoints: Breakpoint[];
 }
@@ -216,6 +259,10 @@ From the hub: the complete list of [breakpoints](#breakpoint) the instance shoul
 a [`breakpointStatus`](#breakpointstatus) for every listed breakpoint. An empty list removes all of them. Why a
 full list: [ADR 0010](../adr/0010-send-the-full-breakpoint-set-on-every-change.md).
 
+A hub builds the list on every send, with each `expiresInMs` computed at that moment, and never sends a list it
+cached earlier: a replayed list would give every breakpoint its full time back. See
+[ADR 0018](../adr/0018-expire-breakpoints-in-the-sdk-by-a-time-left-from-the-hub.md).
+
 A hub sends at most 100 entries. In list order, entries after the 100th get status `error`; entries after the
 200th, entries without a string `id`, and repeats of an `id` get no status.
 
@@ -224,8 +271,9 @@ import { PROTOCOL_VERSION, type Breakpoints } from "@micafox/protocol";
 
 const breakpoints: Breakpoints = {
   version: PROTOCOL_VERSION,
+  module: "debugger",
   type: "breakpoints",
-  breakpoints: [{ id: "bp-1", file: "src/orders/checkout.ts", line: 42 }],
+  breakpoints: [{ id: "bp-1", file: "src/orders/checkout.ts", line: 42, expiresInMs: 3_600_000 }],
 };
 ```
 
@@ -236,6 +284,7 @@ interface Breakpoint {
   id: string;
   file: string;
   line: number;
+  expiresInMs: number;
   limits?: CaptureLimits;
 }
 ```
@@ -250,12 +299,25 @@ One breakpoint in [`breakpoints`](#breakpoints).
   `src/orders/checkout.ts`. The SDK matches it to the loaded file whose path ends with the most of its segments,
   through source maps for TypeScript.
 - `line` — 1-based line in `file`. A line without code moves to the next line that has code.
+- `expiresInMs` — the milliseconds the breakpoint has left, an integer of at least `0`; anything else gives status
+  `error`. The SDK counts it down from when the list arrives, also while the hub is unreachable, and lowers a value
+  above 24 h (`86400000`) to 24 h; `0` expires the breakpoint at once. Each list sets the time left again, so the
+  hub extends or shortens a breakpoint by sending a new value; a change of `expiresInMs` alone does not move the
+  breakpoint. When the time runs out, the SDK removes the breakpoint and reports `expired`. An expired `id` stays
+  expired while it is listed: to set it again, the hub sends it under a new `id`. A hub with no expiry chosen by the
+  user sends 1 h. Why: [ADR 0018](../adr/0018-expire-breakpoints-in-the-sdk-by-a-time-left-from-the-hub.md).
 - `limits` — [`CaptureLimits`](#capturelimits) for this breakpoint's snapshots.
 
 ```ts
 import type { Breakpoint } from "@micafox/protocol";
 
-const breakpoint: Breakpoint = { id: "bp-1", file: "src/orders/checkout.ts", line: 42, limits: { maxDepth: 2 } };
+const breakpoint: Breakpoint = {
+  id: "bp-1",
+  file: "src/orders/checkout.ts",
+  line: 42,
+  expiresInMs: 3_600_000,
+  limits: { maxDepth: 2 },
+};
 ```
 
 ### `CaptureLimits`
@@ -287,9 +349,10 @@ const deep: CaptureLimits = { maxDepth: 5, maxItems: 50 };
 ```ts
 interface BreakpointStatus {
   version: 1;
+  module: "debugger";
   type: "breakpointStatus";
   breakpointId: string;
-  status: "pending" | "active" | "rateLimited" | "error";
+  status: "pending" | "active" | "rateLimited" | "expired" | "error";
   message?: string;
 }
 ```
@@ -302,15 +365,21 @@ and whenever it changes.
 - `active` — set; every hit captures a snapshot within the rate limit.
 - `rateLimited` — it ran out of its own rate limit, or the process ran out of its rate limit or pause time, which
   turns every breakpoint off; it is off until the limit refills, then `active` again.
+- `expired` — its [`expiresInMs`](#breakpoint) ran out and it is removed. It stays `expired` while the hub lists
+  its `id`, and is sent again in reply to every such list. A hub that gets `expired` for a breakpoint it still
+  wants, such as after an extension that arrived late, sends it under a new `id`.
 - `error` — it cannot be set. `message` is always set for `error` and says why, for example: invalid fields, `file`
   matches several loaded files, no code at or after `line`, the source map cannot be read, or more than 100
   breakpoints.
+
+Later versions may add statuses: a hub shows a `status` it does not know as unknown and keeps the breakpoint.
 
 ```ts
 import { PROTOCOL_VERSION, type BreakpointStatus } from "@micafox/protocol";
 
 const status: BreakpointStatus = {
   version: PROTOCOL_VERSION,
+  module: "debugger",
   type: "breakpointStatus",
   breakpointId: "bp-1",
   status: "active",
@@ -322,6 +391,7 @@ const status: BreakpointStatus = {
 ```ts
 interface Snapshot {
   version: 1;
+  module: "debugger";
   type: "snapshot";
   breakpointId: string;
   time: number;
