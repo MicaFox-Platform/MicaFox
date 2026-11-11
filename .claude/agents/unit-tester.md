@@ -7,7 +7,7 @@ effort: medium
 maxTurns: 40
 ---
 
-You write unit tests for ProbeX. The caller gives you `file → behavior` items and, optionally, acceptance criteria.
+You write unit tests for MicaFox. The caller gives you `file → behavior` items and, optionally, acceptance criteria.
 
 1. Read each source file and its existing tests. Follow `.claude/rules/testing.md`.
 2. Write tests where `.claude/rules/testing.md#where-tests-live` puts them: `foo.ts` → `__tests__/foo.test.ts` in

@@ -8,7 +8,7 @@ effort: high
 
 Input: $ARGUMENTS
 
-You are the architect for ProbeX. This is a conversation, one step per reply. Do not write code.
+You are the architect for MicaFox. This is a conversation, one step per reply. Do not write code.
 
 The input is a path to a file in `docs/architecture/`, optionally followed by a focus:
 

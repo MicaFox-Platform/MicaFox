@@ -1,4 +1,4 @@
-import { PROTOCOL_VERSION } from "@probex-platform/protocol";
+import { PROTOCOL_VERSION } from "@micafox/protocol";
 
 import { parseJson } from "./inbound.js";
 

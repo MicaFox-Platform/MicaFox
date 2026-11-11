@@ -1,6 +1,6 @@
 // Drives one HubConnector in a test: records its status changes and every line it logs, at debug level.
 
-import type { ConnectorStatus } from "@probex-platform/protocol";
+import type { ConnectorStatus } from "@micafox/protocol";
 import { vi } from "vitest";
 
 import type { FakeHub, FakeHubs, HubConnection } from "./fake-hub.js";
@@ -21,11 +21,11 @@ export interface Harness {
   lines: readonly LoggedLine[];
   /** Resolves when `status` is next reported. */
   nextStatus: (status: ConnectorStatus) => Promise<void>;
-  /** The messages logged at `level`, without the `[probex] connector: ` prefix. */
+  /** The messages logged at `level`, without the `[micafox] connector: ` prefix. */
   messagesAt: (level: keyof Logger) => string[];
 }
 
-const PREFIX = "[probex] connector: ";
+const PREFIX = "[micafox] connector: ";
 
 const createRecordingLogger = (lines: LoggedLine[]): Logger => {
   const record =

@@ -8,7 +8,7 @@ importers:
 
   .:
     devDependencies:
-      '@probex-platform/configs':
+      '@micafox/configs':
         specifier: workspace:*
         version: link:packages/configs
       '@types/node':
@@ -35,17 +35,17 @@ importers:
 
   examples/node-basic:
     dependencies:
-      '@probex-platform/protocol':
+      '@micafox/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
-      '@probex-platform/sdk':
+      '@micafox/sdk':
         specifier: workspace:*
         version: link:../../packages/sdk
       fastify:
         specifier: ^5.11.2
         version: 5.12.7
     devDependencies:
-      '@probex-platform/configs':
+      '@micafox/configs':
         specifier: workspace:*
         version: link:../../packages/configs
       '@types/ws':
@@ -88,20 +88,20 @@ importers:
 
   packages/protocol:
     devDependencies:
-      '@probex-platform/configs':
+      '@micafox/configs':
         specifier: workspace:*
         version: link:../configs
 
   packages/sdk:
     dependencies:
-      '@probex-platform/protocol':
+      '@micafox/protocol':
         specifier: workspace:*
         version: link:../protocol
       ws:
         specifier: ^8.22.1
         version: 8.22.1
     devDependencies:
-      '@probex-platform/configs':
+      '@micafox/configs':
         specifier: workspace:*
         version: link:../configs
       '@types/ws':

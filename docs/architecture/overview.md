@@ -4,7 +4,7 @@
 
 ```text
 ┌──────────────────────────────── Host app (Node.js) ────────────────────────────────┐
-│                              ┌────────────── @probex-platform/sdk ───────────────┐ │
+│                              ┌────────────────── @micafox/sdk ───────────────────┐ │
 │ ┌────┐ Debugger.*, Runtime.* │ ┌──────────┐    send(message)    ┌──────────────┐ │ │  hello, messages (wss)   ┌─────┐
 │ │ V8 │◀──────────────────────┼─│ Debugger │────────────────────▶│ HubConnector │─┼─┼─────────────────────────▶│ Hub │
 │ │    │───────────────────────┼▶│          │◀────────────────────│              │◀┼─┼──────────────────────────│     │
@@ -19,18 +19,19 @@
 └────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-ProbeX debugs a running Node.js app without stopping it. The [SDK](sdk/overview.md) runs inside the host app: its
-[debugger](sdk/debugger.md) sets breakpoints through the V8 inspector and captures snapshots of variables, and its
-[connector](sdk/connector.md), `HubConnector` by default, carries messages to and from the hub over one WebSocket.
-Its [logger](sdk/logger.md) writes the SDK's own problems to the app's logger or `console`. The hub decides which
-breakpoints exist and receives the snapshots; it is not part of this repository yet, and any server that speaks the
-[protocol](protocol.md) can act as one. Every peer builds against the protocol.
+The [SDK](sdk/overview.md) runs inside the host app as a set of modules over one
+[connector](sdk/connector.md), `HubConnector` by default, which carries every module's messages to and from the hub
+over one WebSocket. The [debugger](sdk/debugger.md) is the SDK's only module: it sets breakpoints through the V8
+inspector and captures snapshots of variables without stopping the app. The [logger](sdk/logger.md) writes the SDK's
+own problems to the app's logger or `console`. The hub decides which breakpoints exist and receives the snapshots;
+it is not part of this repository yet, and any server that speaks the [protocol](protocol.md) can act as one. Every
+peer builds against the protocol.
 
 What the host app can rely on:
 
-- The SDK never throws into or crashes the app. An internal error turns ProbeX off; a lost hub connection is
+- The SDK never throws into or crashes the app. An internal error turns MicaFox off; a lost hub connection is
   retried.
-- Without breakpoints V8 runs the app as if ProbeX were not there; with them, pauses are short and capped per
+- Without breakpoints V8 runs the app as if MicaFox were not there; with them, pauses are short and capped per
   second.
 - Memory and traffic are bounded, and the process is kept alive only while `stop()` sends what is left, and
   briefly while the connector connects or closes a connection.
@@ -40,11 +41,11 @@ The exact limits: [SDK API](../api/sdk/overview.md#installation).
 
 ## Packages
 
-- `@probex-platform/protocol` — messages, `PROTOCOL_VERSION` and the `Connector` interface; types and constants
+- `@micafox/protocol` — messages, `PROTOCOL_VERSION` and the `Connector` interface; types and constants
   only. The SDK, custom connectors and hubs import it: [architecture](protocol.md), [API](../api/protocol.md).
-- `@probex-platform/sdk` — the debugger, `HubConnector` and the logger, run in the host app. Depends on the protocol
+- `@micafox/sdk` — the debugger, `HubConnector` and the logger, run in the host app. Depends on the protocol
   and `ws`: [architecture](sdk/overview.md), [API](../api/sdk/overview.md).
-- `@probex-platform/configs` — shared TypeScript, ESLint, Prettier and Vitest presets; dev-time only, never in the
+- `@micafox/configs` — shared TypeScript, ESLint, Prettier and Vitest presets; dev-time only, never in the
   host app: [architecture](configs.md), [API](../api/configs.md).
 
 `examples/node-basic` is a demo app to try the SDK by hand: it runs `HubConnector` beside a Fastify server, with a
@@ -56,7 +57,7 @@ The protocol and the SDK ship as ES modules and CommonJS, so apps load them with
 
 One debugging session, end to end:
 
-1. [Starting](sdk/debugger.md#starting) — `probex.run()` resolves the options and creates the default connector,
+1. [Starting](sdk/debugger.md#starting) — `micafox.run()` resolves the options and creates the default connector,
    unless one is passed.
 2. [Connecting](sdk/connector.md#connecting) — the connector opens the WebSocket and
    [opens a session](protocol.md#opening-a-session) with `hello` → `welcome`.
@@ -69,7 +70,7 @@ One debugging session, end to end:
    and rate-limited.
 6. [Losing the connection](sdk/debugger.md#losing-the-connection) — breakpoints stay set; after the reconnect the
    hub sends the full set again.
-7. [Stopping](sdk/debugger.md#stopping) — `probex.stop()` removes the breakpoints and closes the connector it
+7. [Stopping](sdk/debugger.md#stopping) — `micafox.stop()` removes the breakpoints and closes the connector it
    created, sending buffered snapshots.
 
 Throughout, every part [writes its problems](sdk/logger.md#writing-a-line) through the logger.

@@ -1,4 +1,4 @@
-import { PROTOCOL_VERSION, type CaptureLimits, type Snapshot, type Value } from "@probex-platform/protocol";
+import { PROTOCOL_VERSION, type CaptureLimits, type Snapshot, type Value } from "@micafox/protocol";
 
 import { resolveLimits, truncateText, type ResolvedLimits } from "./limits.js";
 import type { PauseRead } from "./read-pause.js";

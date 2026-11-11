@@ -110,7 +110,7 @@ describe("messages", () => {
       labels: { region: "eu" },
       hostname: "checkout-7d9f",
       pid: 1,
-      sdk: { name: "@probex-platform/sdk", version: "0.1.0" },
+      sdk: { name: "@micafox/sdk", version: "0.1.0" },
       runtime: { name: "node", version: "22.0.0" },
     });
     assertType<Welcome>({ version: PROTOCOL_VERSION, type: "welcome" });

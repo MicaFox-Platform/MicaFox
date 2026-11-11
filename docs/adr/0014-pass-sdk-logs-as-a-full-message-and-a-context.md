@@ -6,7 +6,7 @@ Accepted · 2026-10-29
 
 ## Context
 
-The SDK reports its own problems to the app's logger. Apps should switch ProbeX to the logger they already use by
+The SDK reports its own problems to the app's logger. Apps should switch MicaFox to the logger they already use by
 passing it as it is: `console`, pino and winston must work without wrapper code, and others with a few lines of
 adapter. These loggers disagree on arguments: pino takes `(object, message)` and uses arguments after the message
 only to fill `%s`-style placeholders in it, dropping the rest; winston takes `(message, meta)` and merges the meta

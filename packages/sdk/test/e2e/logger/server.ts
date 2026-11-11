@@ -4,7 +4,7 @@
 // Configured by environment variables:
 // - `E2E_LOGGER` — the app logger passed as `logger` (see app-loggers.ts); unset passes none.
 // - `E2E_LOG_LEVEL` — passed as `logLevel`; unset passes none.
-// - `PROBEX_LOG_LEVEL` — read by the SDK itself.
+// - `MICAFOX_LOG_LEVEL` — read by the SDK itself.
 //
 // Routes, each answered with 204 and marked in stdout as `{"step":"<route>"}`:
 // - `/log?level=&message=&key=&breakpointId=&errorCode=` — logs one line.

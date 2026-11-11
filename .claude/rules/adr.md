@@ -5,7 +5,7 @@ paths:
 
 # ADRs
 
-An ADR answers "why this and not that" for developers and companies using ProbeX. Write one only when the choice
+An ADR answers "why this and not that" for developers and companies using MicaFox. Write one only when the choice
 meets the bar:
 
 1. **Real choice** — at least two viable options.

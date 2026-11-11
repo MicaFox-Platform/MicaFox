@@ -1,8 +1,8 @@
-# @probex-platform/sdk connector API
+# @micafox/sdk connector API
 
 ## Installation
 
-Part of [`@probex-platform/sdk`](overview.md#installation).
+Part of [`@micafox/sdk`](overview.md#installation).
 
 ## Exports
 
@@ -35,15 +35,15 @@ environment variable is not read. Only values that differ per deployment have an
 [ADR 0003](../../adr/0003-configure-the-sdk-from-options-then-env.md). Every number option must be a finite
 integer of at least 1, and `reconnect.minDelayMs` must not exceed `reconnect.maxDelayMs`.
 
-- `options.url` — `string`, env `PROBEX_HUB_URL`. The hub's WebSocket URL, `ws://` or `wss://`; userinfo and a
+- `options.url` — `string`, env `MICAFOX_HUB_URL`. The hub's WebSocket URL, `ws://` or `wss://`; userinfo and a
   fragment in it are not sent. No default.
   Certificates are always verified; add a custom CA with `NODE_EXTRA_CA_CERTS`. HTTP(S) proxies and redirects are
   not followed: the hub must be reachable directly.
-- `options.token` — `string`, env `PROBEX_TOKEN`. Sent as `Authorization: Bearer <token>` when connecting; never
+- `options.token` — `string`, env `MICAFOX_TOKEN`. Sent as `Authorization: Bearer <token>` when connecting; never
   logged. With a token, `ws://` is allowed only to `localhost`, `127.0.0.0/8` and `[::1]`. No default. See
   [ADR 0006](../../adr/0006-authenticate-to-the-hub-with-a-bearer-token.md).
-- `options.service` — `string`, env `PROBEX_SERVICE`. The service name the hub targets breakpoints by. No default.
-- `options.labels` — `Record<string, string>`, env `PROBEX_LABELS` as `key=value` pairs separated by commas, such
+- `options.service` — `string`, env `MICAFOX_SERVICE`. The service name the hub targets breakpoints by. No default.
+- `options.labels` — `Record<string, string>`, env `MICAFOX_LABELS` as `key=value` pairs separated by commas, such
   as `team=payments,region=eu`. Labels the hub can target breakpoints by. A passed object, even `{}`, replaces the
   env value; an entry whose value is not a string or whose key is empty is skipped with a warning, and one whose
   value is `undefined` is skipped silently. Env entries are
@@ -51,7 +51,7 @@ integer of at least 1, and `reconnect.minDelayMs` must not exceed `reconnect.max
   skipped with a warning, an empty entry such as after a trailing comma is skipped silently, and a later key wins.
   Default: no labels.
 - `options.logger` — [`Logger`](logger.md#logger). Default: `console`.
-- `options.logLevel` — [`LogLevel`](logger.md#loglevel), env `PROBEX_LOG_LEVEL`. Default `warn`.
+- `options.logLevel` — [`LogLevel`](logger.md#loglevel), env `MICAFOX_LOG_LEVEL`. Default `warn`.
 - `options.buffer.maxMessages` — `number`, default `1000`. Data messages, such as snapshots, kept while they wait
   to be sent. Control messages, such as breakpoint status, wait in a separate
   queue of 200, at most 4 KiB each, that data never pushes out; it keeps only the latest status of each
@@ -105,7 +105,7 @@ repeated within 60 s is logged once in full, then as one summary line with a cou
 - No `url`, not a `ws://` / `wss://` URL, a `token` with `ws://` to a non-loopback host, or a `token` with
   characters an HTTP header cannot carry: `connect()` logs an error, connects nowhere, and the status stays
   `disconnected`.
-- An invalid number option, `logger`, `logLevel`, `PROBEX_LOG_LEVEL`, `labels` entry or `PROBEX_LABELS` entry: a
+- An invalid number option, `logger`, `logLevel`, `MICAFOX_LOG_LEVEL`, `labels` entry or `MICAFOX_LABELS` entry: a
   warning is logged and the default is used or the entry is skipped. `reconnect.minDelayMs` above
   `reconnect.maxDelayMs`: a warning, and both defaults are used.
 - `options`, an option group such as `buffer`, or `labels` that is not an object: a warning, and the defaults are
@@ -133,14 +133,14 @@ repeated within 60 s is logged once in full, then as one summary line with a cou
   after `close()` returns a function that does nothing.
 
 ```ts
-import { HubConnector } from "@probex-platform/sdk";
+import { HubConnector } from "@micafox/sdk";
 
 const connector = new HubConnector({
-  url: "wss://hub.example.com/probex",
+  url: "wss://hub.example.com/micafox",
   service: "checkout",
   labels: { region: "eu" },
 });
-connector.connect(); // token from PROBEX_TOKEN
+connector.connect(); // token from MICAFOX_TOKEN
 ```
 
 ### `HubConnectorOptions`
@@ -165,18 +165,18 @@ The options of [`HubConnector`](#hubconnector); every field is optional and desc
 
 ## Usage
 
-In most apps the SDK creates the connector: set `PROBEX_HUB_URL`, `PROBEX_TOKEN` and `PROBEX_SERVICE`, and nothing
+In most apps the SDK creates the connector: set `MICAFOX_HUB_URL`, `MICAFOX_TOKEN` and `MICAFOX_SERVICE`, and nothing
 else. To run one yourself:
 
 ```ts
-import { PROTOCOL_VERSION } from "@probex-platform/protocol";
-import { HubConnector } from "@probex-platform/sdk";
+import { PROTOCOL_VERSION } from "@micafox/protocol";
+import { HubConnector } from "@micafox/sdk";
 
-// url falls back to PROBEX_HUB_URL
+// url falls back to MICAFOX_HUB_URL
 const connector = new HubConnector({ batch: { flushIntervalMs: 250 } });
 
 connector.onStatus((status) => {
-  console.info("probex hub:", status);
+  console.info("micafox hub:", status);
 });
 connector.onMessage((message) => {
   console.info("from the hub:", message.type);

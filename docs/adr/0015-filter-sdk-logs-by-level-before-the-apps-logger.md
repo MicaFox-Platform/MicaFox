@@ -14,7 +14,7 @@ line and called it.
 ## Decision
 
 We filter SDK lines by `logLevel` inside the SDK, before the app's logger is called, for the default `console` and
-a passed logger alike. The level comes from the option, then `PROBEX_LOG_LEVEL`, then `warn`.
+a passed logger alike. The level comes from the option, then `MICAFOX_LOG_LEVEL`, then `warn`.
 
 ## Alternatives
 
@@ -25,6 +25,6 @@ a passed logger alike. The level comes from the option, then `PROBEX_LOG_LEVEL`,
 ## Consequences
 
 - A disabled line costs one comparison, and hot paths skip building it.
-- `PROBEX_LOG_LEVEL=debug` shows debug lines with any logger, without a code change.
+- `MICAFOX_LOG_LEVEL=debug` shows debug lines with any logger, without a code change.
 - A passed logger set to `debug` still receives only `warn` and `error` until `logLevel` is lowered too.
-- `logLevel` and `PROBEX_LOG_LEVEL` are public API.
+- `logLevel` and `MICAFOX_LOG_LEVEL` are public API.

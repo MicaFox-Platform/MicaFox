@@ -1,4 +1,4 @@
-import type { Connector, ConnectorStatus, Message } from "@probex-platform/protocol";
+import type { Connector, ConnectorStatus, Message } from "@micafox/protocol";
 import { assertType, describe, expectTypeOf, it } from "vitest";
 
 import { HubConnector, type HubConnectorOptions, type LogContext, type Logger, type LogLevel } from "../index.js";

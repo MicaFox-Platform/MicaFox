@@ -6,15 +6,15 @@ Accepted · 2026-10-21
 
 ## Context
 
-Most apps start the SDK with `probex.run()` and let it create the default connector. The hub URL, token, service,
-labels, log level and whether ProbeX runs at all differ per deployment (local, staging, production) and are set by
+Most apps start the SDK with `micafox.run()` and let it create the default connector. The hub URL, token, service,
+labels, log level and whether MicaFox runs at all differ per deployment (local, staging, production) and are set by
 whoever runs the app, often without touching its code. The same settings are also passed in code and in tests, and
 a `HubConnector` can be created directly, sometimes twice in one process with different settings.
 
 ## Decision
 
-We resolve each option once, from the value passed in code, then its `PROBEX_*` environment variable, then the
-default: `probex` options at `probex.run()`, `HubConnector` options in its constructor. Only values that differ per
+We resolve each option once, from the value passed in code, then its `MICAFOX_*` environment variable, then the
+default: `micafox` options at `micafox.run()`, `HubConnector` options in its constructor. Only values that differ per
 deployment get an environment variable; the list is in the [SDK API](../api/sdk/overview.md#usage).
 
 ## Alternatives
@@ -24,11 +24,11 @@ deployment get an environment variable; the list is in the [SDK API](../api/sdk/
 - **Environment only** — two connectors in one process could not differ, tests would have to change
   `process.env`, and code could not override what the environment says.
 - **Environment before options** — a deployment variable would silently override a value the code passes on
-  purpose, so a test or a second `HubConnector` could not use its own `url` while `PROBEX_HUB_URL` is set.
+  purpose, so a test or a second `HubConnector` could not use its own `url` while `MICAFOX_HUB_URL` is set.
 
 ## Consequences
 
-- An app connects to a hub with no ProbeX code beyond `probex.run()`.
+- An app connects to a hub with no MicaFox code beyond `micafox.run()`.
 - Environment variable names are public API: they are documented in `docs/api/` and renaming one is a breaking
   change.
-- Changes to `process.env` after `probex.run()`, or after a `HubConnector` is created, do not affect them.
+- Changes to `process.env` after `micafox.run()`, or after a `HubConnector` is created, do not affect them.

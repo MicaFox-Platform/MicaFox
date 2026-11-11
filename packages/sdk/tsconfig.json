@@ -1,5 +1,5 @@
 {
-  "extends": "@probex-platform/configs/tsconfig/workspace.json",
+  "extends": "@micafox/configs/tsconfig/workspace.json",
   "references": [
     {
       "path": "../protocol"

@@ -33,7 +33,7 @@ it: [API](../../api/sdk/connector.md).
     hub answers the closing handshake.
   - Memory is bounded: the data buffer by `buffer.maxMessages` and `buffer.maxBytes`, the control queue by 200
     messages of at most 4 KiB each, incoming frames by 1 MiB.
-  - Imports only `@probex-platform/protocol`, `ws`, the SDK [logger](logger.md) and Node built-ins. The logger
+  - Imports only `@micafox/protocol`, `ws`, the SDK [logger](logger.md) and Node built-ins. The logger
     imports no SDK module, so both can move to their own package.
   - TLS certificates are always verified; custom CAs come from `NODE_EXTRA_CA_CERTS`. Redirects are not followed.
   - The token is never logged and never sent over `ws://` to a host other than loopback: `localhost`, `127.0.0.0/8`
@@ -76,7 +76,7 @@ packages/sdk/src/connector/
 ├── options/                what the app passes, resolved once
 │   ├── options.ts          HubConnectorOptions, their defaults and environment variables
 │   ├── config.ts           options plus the logger: the debugger's or the connector's own
-│   ├── labels.ts           labels from the option or PROBEX_LABELS
+│   ├── labels.ts           labels from the option or MICAFOX_LABELS
 │   └── read-field.ts       defensive reads of app objects and environment variables
 ├── connection/             one WebSocket to the hub
 │   ├── attempt.ts          one connection: TLS, upgrade, handshake, frames, close

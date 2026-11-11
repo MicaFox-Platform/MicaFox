@@ -1,9 +1,11 @@
-# ProbeX
+# MicaFox
 
-Open-source runtime debugger for Node.js (Rookout-like): set non-breaking breakpoints and capture snapshots in running apps.
+Open-source runtime platform for Node.js: SDK modules over one connector (`HubConnector` by default). The first
+module is a debugger (Rookout-like): set non-breaking breakpoints and capture snapshots in running apps; error
+tracking and logpoints come later.
 Developers embed it in their own apps, so the public API, protocol and docs are part of the product.
 
-You work as a staff engineer on the ProbeX TypeScript platform team: you own correctness, the host app's safety and
+You work as a staff engineer on the MicaFox TypeScript platform team: you own correctness, the host app's safety and
 the long-term shape of the code, and you push back on anything that breaks the rules below.
 
 ## Packages

@@ -1,7 +1,7 @@
-// The demo app: a Fastify server with a HubConnector beside it, configured by the PROBEX_* environment variables.
+// The demo app: a Fastify server with a HubConnector beside it, configured by the MICAFOX_* environment variables.
 // Until the debugger exists, debugger-stand-in.ts sends the replies it will send. Run it with the fake hub: README.md.
 
-import { HubConnector } from "@probex-platform/sdk";
+import { HubConnector } from "@micafox/sdk";
 import Fastify, { type FastifyInstance } from "fastify";
 
 import { createSampleSnapshot, toActiveStatuses } from "./debugger-stand-in.js";
@@ -16,7 +16,7 @@ const readPort = (): number => {
 };
 
 const createConnector = (): HubConnector => {
-  // url, token, service and labels come from PROBEX_HUB_URL, PROBEX_TOKEN, PROBEX_SERVICE and PROBEX_LABELS
+  // url, token, service and labels come from MICAFOX_HUB_URL, MICAFOX_TOKEN, MICAFOX_SERVICE and MICAFOX_LABELS
   const connector = new HubConnector({ reconnect: RECONNECT });
   connector.onStatus((status) => {
     console.info(`connector status: ${status}`);
@@ -59,8 +59,8 @@ const main = async (): Promise<void> => {
   console.info(`listening on port ${String(server.addresses()[0]?.port)}`);
 
   // Without a hub URL connect() would only log an error: the app runs on without a hub
-  if ((process.env.PROBEX_HUB_URL ?? "") === "") {
-    console.info("PROBEX_HUB_URL is not set: running without a hub");
+  if ((process.env.MICAFOX_HUB_URL ?? "") === "") {
+    console.info("MICAFOX_HUB_URL is not set: running without a hub");
   } else {
     connector.connect();
   }

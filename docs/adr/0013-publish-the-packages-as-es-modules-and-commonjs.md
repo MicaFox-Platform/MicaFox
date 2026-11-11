@@ -6,16 +6,16 @@ Accepted · 2026-10-26
 
 ## Context
 
-Many Node.js apps that would embed the SDK still load packages with `require()`. ProbeX supports Node.js 22 or
+Many Node.js apps that would embed the SDK still load packages with `require()`. MicaFox supports Node.js 22 or
 later, but `require()` of an ES module works only from 22.12, is still experimental in Node 22, and on some 22.x
 releases prints an `ExperimentalWarning` to the host app's stderr. TypeScript before 5.8 refuses to compile a
 CommonJS file that imports a package that ships only ES modules. The SDK must stay invisible in the host app, and
-it must work on every Node 22 release. Custom connectors and hubs import `@probex-platform/protocol`, so it has the
+it must work on every Node 22 release. Custom connectors and hubs import `@micafox/protocol`, so it has the
 same consumers.
 
 ## Decision
 
-We build `@probex-platform/sdk` and `@probex-platform/protocol` twice, as ES modules and as CommonJS, and the
+We build `@micafox/sdk` and `@micafox/protocol` twice, as ES modules and as CommonJS, and the
 `exports` map serves one for `import` and the other for `require()`.
 
 ## Alternatives
@@ -31,7 +31,7 @@ We build `@probex-platform/sdk` and `@probex-platform/protocol` twice, as ES mod
 
 - `import` and `require()` both work on every Node 22 release, without warnings.
 - An app can load both builds, for example through two dependencies. The first copy stores the debugger on
-  `globalThis` under `Symbol.for("probex.debugger")` and every later copy exports it, so this costs memory but not
+  `globalThis` under `Symbol.for("micafox.debugger")` and every later copy exports it, so this costs memory but not
   correctness.
 - The sources cannot use top-level `await`, because the CommonJS build cannot express it.
 - Each package has two build outputs and two type entry points to keep correct. Until the first release both

@@ -19,9 +19,9 @@ type StringOption = "url" | "token" | "service";
 
 // Only values that differ per deployment have an environment variable (ADR 0003)
 const STRING_OPTION_ENV: Readonly<Record<StringOption, string>> = {
-  url: "PROBEX_HUB_URL",
-  token: "PROBEX_TOKEN",
-  service: "PROBEX_SERVICE",
+  url: "MICAFOX_HUB_URL",
+  token: "MICAFOX_TOKEN",
+  service: "MICAFOX_SERVICE",
 };
 
 // The defaults of docs/api/sdk/connector.md#hubconnector

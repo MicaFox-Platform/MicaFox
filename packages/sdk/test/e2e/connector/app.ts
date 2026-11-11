@@ -1,4 +1,4 @@
-// A small host app for the connector E2E tests: creates a HubConnector from the PROBEX_* environment variables and
+// A small host app for the connector E2E tests: creates a HubConnector from the MICAFOX_* environment variables and
 // connects. It is started as a child process by run-app.ts, so the connector runs with a real event loop and exit.
 //
 // Each status change is written to stdout as `{"status":"<status>"}`. With `E2E_HOLD_UNTIL=<status>` the app keeps
@@ -6,7 +6,7 @@
 // the messages of `E2E_SEND`, and with `E2E_CLOSE=1` calls close() right after. `E2E_CONNECTOR_OPTIONS` holds more
 // HubConnector options as JSON.
 
-import type { Message } from "@probex-platform/protocol";
+import type { Message } from "@micafox/protocol";
 
 import { HubConnector, type HubConnectorOptions } from "../../../src/connector/index.js";
 

@@ -1,4 +1,4 @@
-import type { Value } from "@probex-platform/protocol";
+import type { Value } from "@micafox/protocol";
 import { describe, expect, it } from "vitest";
 
 import { readRealPause, type RealPauseOptions } from "../../../../test/capture/real-pause.js";
@@ -170,9 +170,9 @@ describe("readPause values", () => {
   });
 
   it("gives accessor for a getter and never runs it", () => {
-    const value = valueOf("const v = { get total() { globalThis.probexGetterRan = true; return 1; }, plain: 2 };");
+    const value = valueOf("const v = { get total() { globalThis.micafoxGetterRan = true; return 1; }, plain: 2 };");
 
-    const ran: unknown = Reflect.get(globalThis, "probexGetterRan");
+    const ran: unknown = Reflect.get(globalThis, "micafoxGetterRan");
     expect({ value, ran }).toEqual({
       value: {
         type: "object",
@@ -188,10 +188,10 @@ describe("readPause values", () => {
 
   it("does not run the traps of a proxy", () => {
     const value = valueOf(
-      "const v = new Proxy({}, { ownKeys() { globalThis.probexTrapRan = true; return []; }, get() { globalThis.probexTrapRan = true; } });",
+      "const v = new Proxy({}, { ownKeys() { globalThis.micafoxTrapRan = true; return []; }, get() { globalThis.micafoxTrapRan = true; } });",
     );
 
-    const ran: unknown = Reflect.get(globalThis, "probexTrapRan");
+    const ran: unknown = Reflect.get(globalThis, "micafoxTrapRan");
     expect({ value, ran }).toEqual({
       value: { type: "object", className: "Object", properties: [] },
       ran: undefined,

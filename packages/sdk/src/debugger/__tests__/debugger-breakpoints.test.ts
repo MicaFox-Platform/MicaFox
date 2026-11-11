@@ -1,4 +1,4 @@
-import type { Breakpoint, BreakpointStatus, Message } from "@probex-platform/protocol";
+import type { Breakpoint, BreakpointStatus, Message } from "@micafox/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createDebugger, FakeConnector } from "../../../test/debugger/fakes.js";
@@ -43,15 +43,15 @@ const statusesOf = (connector: FakeConnector): Array<[string, BreakpointStatus["
 const runDebugger = (session = new TracedSession()) => {
   const connector = new FakeConnector();
   const test = createDebugger({ createInspectorBinding: () => session });
-  test.probex.configure({ connector });
-  test.probex.run();
+  test.micafox.configure({ connector });
+  test.micafox.run();
   return { ...test, connector, session };
 };
 
 describe("Debugger applying breakpoints", () => {
   it("sends the status of each listed breakpoint through the connector", () => {
     fixtures.loadCheckout(fixtures.write("orders/checkout.cjs", CHECKOUT_SOURCE));
-    const { connector, probex } = runDebugger();
+    const { connector, micafox } = runDebugger();
 
     connector.deliver(breakpointsMessage(checkoutEntry("bp-1", 4), checkoutEntry("bp-2", 100)));
 
@@ -59,34 +59,34 @@ describe("Debugger applying breakpoints", () => {
       ["bp-1", "active"],
       ["bp-2", "error"],
     ]);
-    return probex.stop();
+    return micafox.stop();
   });
 
   it("pauses the app at the breakpoint and resumes it", async () => {
     const module = fixtures.loadCheckout(fixtures.write("orders/checkout.cjs", CHECKOUT_SOURCE));
-    const { connector, probex, session } = runDebugger();
+    const { connector, micafox, session } = runDebugger();
     connector.deliver(breakpointsMessage(checkoutEntry("bp-1", 4)));
 
     const total = module.total(TWO_ITEMS);
 
     expect({ total, pauses: session.pauses.length }).toEqual({ total: TOTAL_OF_TWO_ITEMS, pauses: 2 });
-    await probex.stop();
+    await micafox.stop();
   });
 
   it("makes no Debugger call until the first list arrives", async () => {
-    const { probex, session } = runDebugger();
+    const { micafox, session } = runDebugger();
 
-    await probex.stop();
+    await micafox.stop();
 
     expect(session.methods).toEqual([]);
   });
 
   it("removes every breakpoint and turns the domain off on stop()", async () => {
     const module = fixtures.loadCheckout(fixtures.write("orders/checkout.cjs", CHECKOUT_SOURCE));
-    const { connector, probex, session } = runDebugger();
+    const { connector, micafox, session } = runDebugger();
     connector.deliver(breakpointsMessage(checkoutEntry("bp-1", 4)));
 
-    await probex.stop();
+    await micafox.stop();
     module.total(TWO_ITEMS);
 
     expect({ methods: session.methods.slice(-2), pauses: session.pauses.length }).toEqual({
@@ -96,8 +96,8 @@ describe("Debugger applying breakpoints", () => {
   });
 
   it("ignores a list that arrives after stop()", async () => {
-    const { connector, probex, session } = runDebugger();
-    await probex.stop();
+    const { connector, micafox, session } = runDebugger();
+    await micafox.stop();
 
     connector.deliver(breakpointsMessage(checkoutEntry("bp-1", 4)));
 
@@ -107,7 +107,7 @@ describe("Debugger applying breakpoints", () => {
 
 describe("Debugger failing while applying breakpoints", () => {
   it("logs an error, keeps running and sends the rest when the connector throws on send", async () => {
-    const { connector, probex, messagesAt } = runDebugger();
+    const { connector, micafox, messagesAt } = runDebugger();
     connector.onSend = () => {
       throw new Error("socket closed");
     };
@@ -123,11 +123,11 @@ describe("Debugger failing while applying breakpoints", () => {
       sent: 2,
       subscribers: 2,
     });
-    await probex.stop();
+    await micafox.stop();
   });
 
   it("logs an error and keeps running when an async connector rejects a send", async () => {
-    const { connector, probex, messagesAt } = runDebugger();
+    const { connector, micafox, messagesAt } = runDebugger();
     connector.onSend = () => Promise.reject(new Error("hub unreachable"));
 
     connector.deliver(breakpointsMessage(checkoutEntry("bp-1", 4)));
@@ -137,11 +137,11 @@ describe("Debugger failing while applying breakpoints", () => {
       errors: ["sending to the connector failed"],
       subscribers: 2,
     });
-    await probex.stop();
+    await micafox.stop();
   });
 
   it("warns and keeps running when breakpoints is not an array", async () => {
-    const { connector, probex, messagesAt, session } = runDebugger();
+    const { connector, micafox, messagesAt, session } = runDebugger();
     const message: unknown = { version: 1, type: "breakpoints", breakpoints: "bp-1" };
 
     // A buggy hub: the connector passes on what it received
@@ -152,7 +152,7 @@ describe("Debugger failing while applying breakpoints", () => {
       methods: [],
       subscribers: 2,
     });
-    await probex.stop();
+    await micafox.stop();
   });
 
   it("stops itself and logs an error when the inspector cannot turn the Debugger domain on", () => {

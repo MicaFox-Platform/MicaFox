@@ -32,7 +32,7 @@ const createRecorder = (): { calls: Call[]; logger: Logger } => {
 };
 
 const setup = (envLogLevel?: string) => {
-  const env = Object.fromEntries(envLogLevel === undefined ? [] : [["PROBEX_LOG_LEVEL", envLogLevel]]);
+  const env = Object.fromEntries(envLogLevel === undefined ? [] : [["MICAFOX_LOG_LEVEL", envLogLevel]]);
   const app = createRecorder();
   const fallback = createRecorder();
   const logger = createLogger({ component: "debugger", env, console: fallback.logger });
@@ -75,18 +75,18 @@ describe("defaults", () => {
   });
 
   it("reads process.env and writes to the global console when none is injected", () => {
-    vi.stubEnv("PROBEX_LOG_LEVEL", "debug");
+    vi.stubEnv("MICAFOX_LOG_LEVEL", "debug");
     const debug = vi.spyOn(console, "debug").mockImplementation(() => undefined);
     const logger = createLogger({ component: "debugger" });
 
     logger.log("debug", "breakpoint resolved", { component: "debugger" });
 
-    expect(debug.mock.calls).toEqual([["[probex] debugger: breakpoint resolved"]]);
+    expect(debug.mock.calls).toEqual([["[micafox] debugger: breakpoint resolved"]]);
   });
 });
 
 describe("set", () => {
-  it("uses the logLevel option over PROBEX_LOG_LEVEL", () => {
+  it("uses the logLevel option over MICAFOX_LOG_LEVEL", () => {
     const { app, logger } = setup("error");
 
     logger.set({ logger: app.logger, logLevel: "debug" }, "debugger");
@@ -94,7 +94,7 @@ describe("set", () => {
     expect(logger.enabled("debug")).toBe(true);
   });
 
-  it("uses PROBEX_LOG_LEVEL when no logLevel is passed", () => {
+  it("uses MICAFOX_LOG_LEVEL when no logLevel is passed", () => {
     const { logger } = setup("error");
 
     logger.set({}, "debugger");
@@ -102,7 +102,7 @@ describe("set", () => {
     expect(logger.enabled("warn")).toBe(false);
   });
 
-  it("uses warn when neither the option nor PROBEX_LOG_LEVEL is set", () => {
+  it("uses warn when neither the option nor MICAFOX_LOG_LEVEL is set", () => {
     const { logger } = setup();
 
     logger.set({}, "debugger");
@@ -110,7 +110,7 @@ describe("set", () => {
     expect([logger.enabled("info"), logger.enabled("warn")]).toEqual([false, true]);
   });
 
-  it("treats an empty PROBEX_LOG_LEVEL as unset", () => {
+  it("treats an empty MICAFOX_LOG_LEVEL as unset", () => {
     const { fallback, logger } = setup("");
 
     logger.set({}, "debugger");
@@ -124,18 +124,18 @@ describe("set", () => {
 
     logger.log("warn", "hub unreachable", { component: "connector" });
 
-    expect(fallback.calls).toEqual([["warn", "[probex] connector: hub unreachable"]]);
+    expect(fallback.calls).toEqual([["warn", "[micafox] connector: hub unreachable"]]);
   });
 
-  it("reads PROBEX_LOG_LEVEL when the first line is written if set() was never called", () => {
+  it("reads MICAFOX_LOG_LEVEL when the first line is written if set() was never called", () => {
     const env: Record<string, string | undefined> = {};
     const fallback = createRecorder();
     const logger = createLogger({ component: "debugger", env, console: fallback.logger });
-    Reflect.set(env, "PROBEX_LOG_LEVEL", "debug");
+    Reflect.set(env, "MICAFOX_LOG_LEVEL", "debug");
 
     logger.log("debug", "breakpoint resolved", { component: "debugger" });
 
-    expect(fallback.calls).toEqual([["debug", "[probex] debugger: breakpoint resolved"]]);
+    expect(fallback.calls).toEqual([["debug", "[micafox] debugger: breakpoint resolved"]]);
   });
 });
 
@@ -148,14 +148,14 @@ describe("invalid options", () => {
     expect(app.calls).toEqual([
       [
         "warn",
-        "[probex] connector: logLevel must be one of debug, info, warn, error or silent; using warn",
+        "[micafox] connector: logLevel must be one of debug, info, warn, error or silent; using warn",
         { component: "connector" },
       ],
     ]);
     expect(logger.enabled("info")).toBe(false);
   });
 
-  it("warns once with the caller's component and uses warn when PROBEX_LOG_LEVEL is invalid", () => {
+  it("warns once with the caller's component and uses warn when MICAFOX_LOG_LEVEL is invalid", () => {
     const { app, logger } = setup("DEBUG");
 
     logger.set({ logger: app.logger }, "connector");
@@ -163,7 +163,7 @@ describe("invalid options", () => {
     expect(app.calls).toEqual([
       [
         "warn",
-        "[probex] connector: PROBEX_LOG_LEVEL must be one of debug, info, warn, error or silent; using warn",
+        "[micafox] connector: MICAFOX_LOG_LEVEL must be one of debug, info, warn, error or silent; using warn",
         { component: "connector" },
       ],
     ]);
@@ -177,8 +177,8 @@ describe("invalid options", () => {
     logger.log("error", "token rejected", { component: "connector" });
 
     expect(fallback.calls).toEqual([
-      ["warn", "[probex] connector: logger must be an object with debug, info, warn and error methods; using console"],
-      ["error", "[probex] connector: token rejected"],
+      ["warn", "[micafox] connector: logger must be an object with debug, info, warn and error methods; using console"],
+      ["error", "[micafox] connector: token rejected"],
     ]);
   });
 
@@ -196,8 +196,8 @@ describe("invalid options", () => {
     logger.set({ logger: {}, logLevel: "verbose" }, "connector");
 
     expect(fallback.calls).toEqual([
-      ["warn", "[probex] connector: logLevel must be one of debug, info, warn, error or silent; using warn"],
-      ["warn", "[probex] connector: logger must be an object with debug, info, warn and error methods; using console"],
+      ["warn", "[micafox] connector: logLevel must be one of debug, info, warn, error or silent; using warn"],
+      ["warn", "[micafox] connector: logger must be an object with debug, info, warn and error methods; using console"],
     ]);
   });
 
@@ -208,7 +208,7 @@ describe("invalid options", () => {
 
     logger.log("warn", "50% of the buffer used", { component: "debugger" });
 
-    expect([app.calls, fallback.calls]).toEqual([[], [["warn", "[probex] debugger: 50% of the buffer used"]]]);
+    expect([app.calls, fallback.calls]).toEqual([[], [["warn", "[micafox] debugger: 50% of the buffer used"]]]);
   });
 
   it("warns and uses console when logger is null", () => {
@@ -218,8 +218,8 @@ describe("invalid options", () => {
     logger.log("error", "debugger stopped", { component: "debugger" });
 
     expect(fallback.calls).toEqual([
-      ["warn", "[probex] debugger: logger must be an object with debug, info, warn and error methods; using console"],
-      ["error", "[probex] debugger: debugger stopped"],
+      ["warn", "[micafox] debugger: logger must be an object with debug, info, warn and error methods; using console"],
+      ["error", "[micafox] debugger: debugger stopped"],
     ]);
   });
 
@@ -238,8 +238,8 @@ describe("invalid options", () => {
     logger.log("error", "debugger stopped", { component: "debugger" });
 
     expect(fallback.calls).toEqual([
-      ["warn", "[probex] debugger: logger must be an object with debug, info, warn and error methods; using console"],
-      ["error", "[probex] debugger: debugger stopped"],
+      ["warn", "[micafox] debugger: logger must be an object with debug, info, warn and error methods; using console"],
+      ["error", "[micafox] debugger: debugger stopped"],
     ]);
   });
 
@@ -252,23 +252,23 @@ describe("invalid options", () => {
 
     expect([fallback.calls, app.calls]).toEqual([
       [],
-      [["warn", "[probex] debugger: snapshot dropped", { component: "debugger" }]],
+      [["warn", "[micafox] debugger: snapshot dropped", { component: "debugger" }]],
     ]);
   });
 
-  it("warns about PROBEX_LOG_LEVEL with the owner's component before set() is called", () => {
+  it("warns about MICAFOX_LOG_LEVEL with the owner's component before set() is called", () => {
     const fallback = createRecorder();
-    const env = Object.fromEntries([["PROBEX_LOG_LEVEL", "verbose"]]);
+    const env = Object.fromEntries([["MICAFOX_LOG_LEVEL", "verbose"]]);
     const logger = createLogger({ component: "connector", env, console: fallback.logger });
 
     logger.enabled("debug");
 
     expect(fallback.calls).toEqual([
-      ["warn", "[probex] connector: PROBEX_LOG_LEVEL must be one of debug, info, warn, error or silent; using warn"],
+      ["warn", "[micafox] connector: MICAFOX_LOG_LEVEL must be one of debug, info, warn, error or silent; using warn"],
     ]);
   });
 
-  it("warns about PROBEX_LOG_LEVEL only once per logger", () => {
+  it("warns about MICAFOX_LOG_LEVEL only once per logger", () => {
     const { fallback, logger } = setup("verbose");
 
     logger.log("warn", "configure() ignored while running", { component: "debugger" });
@@ -276,8 +276,8 @@ describe("invalid options", () => {
     logger.set({}, "connector");
 
     expect(fallback.calls).toEqual([
-      ["warn", "[probex] debugger: PROBEX_LOG_LEVEL must be one of debug, info, warn, error or silent; using warn"],
-      ["warn", "[probex] debugger: configure() ignored while running"],
+      ["warn", "[micafox] debugger: MICAFOX_LOG_LEVEL must be one of debug, info, warn, error or silent; using warn"],
+      ["warn", "[micafox] debugger: configure() ignored while running"],
     ]);
   });
 });
@@ -324,13 +324,13 @@ describe("level filter", () => {
 });
 
 describe("message", () => {
-  it("prefixes the message with probex and the component", () => {
+  it("prefixes the message with micafox and the component", () => {
     const { app, logger } = setup();
     logger.set({ logger: app.logger }, "connector");
 
     logger.log("warn", "hub unreachable, retrying in 4 s", { component: "connector" });
 
-    expect(app.calls[0]?.[1]).toBe("[probex] connector: hub unreachable, retrying in 4 s");
+    expect(app.calls[0]?.[1]).toBe("[micafox] connector: hub unreachable, retrying in 4 s");
   });
 
   it("passes % as is to a passed logger", () => {
@@ -339,7 +339,7 @@ describe("message", () => {
 
     logger.log("warn", "GET /orders%20new failed: %s %o", { component: "connector" });
 
-    expect(app.calls[0]?.[1]).toBe("[probex] connector: GET /orders%20new failed: %s %o");
+    expect(app.calls[0]?.[1]).toBe("[micafox] connector: GET /orders%20new failed: %s %o");
   });
 
   it("passes % as is to the default console, which prints a single argument unformatted", () => {
@@ -348,7 +348,7 @@ describe("message", () => {
 
     logger.log("warn", "GET /orders%20new failed: %s", { component: "connector" });
 
-    expect(fallback.calls).toEqual([["warn", "[probex] connector: GET /orders%20new failed: %s"]]);
+    expect(fallback.calls).toEqual([["warn", "[micafox] connector: GET /orders%20new failed: %s"]]);
   });
 
   it("prints % as written through a real default console", () => {
@@ -357,7 +357,7 @@ describe("message", () => {
 
     logger.log("warn", "GET /orders%20new failed: %s", { component: "connector" });
 
-    expect(nodeConsole.read()).toBe("[probex] connector: GET /orders%20new failed: %s\n");
+    expect(nodeConsole.read()).toBe("[micafox] connector: GET /orders%20new failed: %s\n");
   });
 
   it("lets a %s in the message take the context through a real passed console", () => {
@@ -367,7 +367,7 @@ describe("message", () => {
 
     logger.log("warn", "GET /orders%20new failed: %s", { component: "connector" });
 
-    expect(nodeConsole.read()).toBe("[probex] connector: GET /orders%20new failed: { component: 'connector' }\n");
+    expect(nodeConsole.read()).toBe("[micafox] connector: GET /orders%20new failed: { component: 'connector' }\n");
   });
 
   it("calls a passed logger's method with this bound to it", () => {
@@ -392,7 +392,7 @@ describe("message", () => {
 
     logger.log("error", "debugger stopped", { component: "debugger" });
 
-    expect(app.lines).toEqual(["[probex] debugger: debugger stopped"]);
+    expect(app.lines).toEqual(["[micafox] debugger: debugger stopped"]);
   });
 
   it("passes the context to a passed console", () => {
@@ -403,7 +403,7 @@ describe("message", () => {
     logger.log("warn", "snapshot dropped", { component: "debugger", breakpointId: "bp-1" });
 
     expect(fakeConsole.calls).toEqual([
-      ["warn", "[probex] debugger: snapshot dropped", { component: "debugger", breakpointId: "bp-1" }],
+      ["warn", "[micafox] debugger: snapshot dropped", { component: "debugger", breakpointId: "bp-1" }],
     ]);
   });
 
@@ -417,7 +417,7 @@ describe("message", () => {
 
     logger.log("warn", "hub unreachable", { component: "connector" });
 
-    expect(received).toEqual([["[probex] connector: hub unreachable", { component: "connector" }]]);
+    expect(received).toEqual([["[micafox] connector: hub unreachable", { component: "connector" }]]);
   });
 
   it("passes the full message first and the context second to a winston-style logger", () => {
@@ -430,7 +430,7 @@ describe("message", () => {
 
     logger.log("error", "token rejected", { component: "connector" });
 
-    expect(received).toEqual([["[probex] connector: token rejected", { component: "connector" }]]);
+    expect(received).toEqual([["[micafox] connector: token rejected", { component: "connector" }]]);
   });
 });
 
@@ -562,7 +562,7 @@ describe("safe call", () => {
     logger.log("warn", "snapshot dropped", { component: "debugger" });
     logger.log("error", "debugger stopped", { component: "debugger" });
 
-    expect(app.calls).toEqual([["error", "[probex] debugger: debugger stopped", { component: "debugger" }]]);
+    expect(app.calls).toEqual([["error", "[micafox] debugger: debugger stopped", { component: "debugger" }]]);
   });
 
   it("ignores a method getter that starts throwing after set()", () => {
@@ -638,7 +638,7 @@ describe("flush", () => {
     logger.log("warn", "send() called after close()", { component: "connector" });
 
     expect(app.calls).toEqual([
-      ["warn", "[probex] connector: send() called after close()", { component: "connector" }],
+      ["warn", "[micafox] connector: send() called after close()", { component: "connector" }],
     ]);
   });
 });

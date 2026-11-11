@@ -1,4 +1,4 @@
-import { CLOSE_CODES } from "@probex-platform/protocol";
+import { CLOSE_CODES } from "@micafox/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WebSocket } from "ws";
 
@@ -126,7 +126,7 @@ describe("HubConnector failures before welcome", () => {
 
   it.each([401, 403])("logs an error and waits the longest delay on HTTP %i", async (status) => {
     const hub = await hubs.start();
-    hub.reply = { kind: "status", status, headers: { "WWW-Authenticate": 'Bearer realm="probex"' } };
+    hub.reply = { kind: "status", status, headers: { "WWW-Authenticate": 'Bearer realm="micafox"' } };
     const harness = createHarness(hubs, { url: hub.url, reconnect: RECONNECT });
     const disconnected = harness.nextStatus("disconnected");
 
@@ -135,7 +135,7 @@ describe("HubConnector failures before welcome", () => {
     const waitMs = await advanceToReconnect(harness);
 
     expect({ errors: harness.messagesAt("error"), waitMs }).toEqual({
-      errors: [`the hub rejected the token (HTTP ${String(status)}); check PROBEX_TOKEN`],
+      errors: [`the hub rejected the token (HTTP ${String(status)}); check MICAFOX_TOKEN`],
       waitMs: RECONNECT.maxDelayMs,
     });
   });
@@ -172,7 +172,7 @@ describe("HubConnector failures before welcome", () => {
 
   it("logs a warning and reconnects when the hub is unreachable", async () => {
     const port = await findClosedPort();
-    const harness = createHarness(hubs, { url: `ws://127.0.0.1:${String(port)}/probex`, reconnect: RECONNECT });
+    const harness = createHarness(hubs, { url: `ws://127.0.0.1:${String(port)}/micafox`, reconnect: RECONNECT });
     const disconnected = harness.nextStatus("disconnected");
 
     harness.connector.connect();
@@ -182,7 +182,7 @@ describe("HubConnector failures before welcome", () => {
     await connecting;
 
     expect({ warnings: harness.messagesAt("warn"), statuses: harness.statuses.slice(0, 3) }).toEqual({
-      warnings: [`could not connect to the hub at ws://127.0.0.1:${String(port)}/probex (ECONNREFUSED)`],
+      warnings: [`could not connect to the hub at ws://127.0.0.1:${String(port)}/micafox (ECONNREFUSED)`],
       statuses: ["connecting", "disconnected", "connecting"],
     });
   });

@@ -1,4 +1,4 @@
-import type { BreakpointStatus } from "@probex-platform/protocol";
+import type { BreakpointStatus } from "@micafox/protocol";
 
 import {
   isSameEntry,

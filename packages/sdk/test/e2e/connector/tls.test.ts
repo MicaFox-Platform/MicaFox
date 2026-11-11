@@ -20,7 +20,7 @@ describe("connector TLS in a real process", { timeout: E2E_TEST_TIMEOUT_MS }, ()
       const welcomed = welcomeEveryone(hub);
 
       const run = await runApp({
-        hubUrl: `wss://${host}:${String(hub.port)}/probex`,
+        hubUrl: `wss://${host}:${String(hub.port)}/micafox`,
         extraCaCerts: CERT_FILE,
         holdUntil: "connected",
       });

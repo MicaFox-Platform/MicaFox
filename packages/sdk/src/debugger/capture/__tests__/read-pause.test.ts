@@ -1,4 +1,4 @@
-import type { StackFrame, Value } from "@probex-platform/protocol";
+import type { StackFrame, Value } from "@micafox/protocol";
 import { describe, expect, it } from "vitest";
 
 import {

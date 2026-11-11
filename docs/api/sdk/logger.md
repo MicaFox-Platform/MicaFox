@@ -1,8 +1,8 @@
-# @probex-platform/sdk logger API
+# @micafox/sdk logger API
 
 ## Installation
 
-Part of [`@probex-platform/sdk`](overview.md#installation).
+Part of [`@micafox/sdk`](overview.md#installation).
 
 ## Exports
 
@@ -17,7 +17,7 @@ interface Logger {
 }
 ```
 
-Where the SDK writes its own problems: pass it as [`logger`](debugger.md#debuggeroptions) to `probex.configure()`
+Where the SDK writes its own problems: pass it as [`logger`](debugger.md#debuggeroptions) to `micafox.configure()`
 or to a [`HubConnector`](connector.md#hubconnector). `console`, pino and winston fit as they are. Default:
 `console`, printing the message only; pass `console` yourself to print the context too. Design:
 [logger architecture](../../architecture/sdk/logger.md).
@@ -25,7 +25,7 @@ or to a [`HubConnector`](connector.md#hubconnector). `console`, pino and winston
 **Parameters**
 
 - `message` — `string`. Complete on its own, such as
-  `[probex] connector: hub unreachable, retrying in 4 s: connect ECONNREFUSED`.
+  `[micafox] connector: hub unreachable, retrying in 4 s: connect ECONNREFUSED`.
 - `context` — [`LogContext`](#logcontext), always passed. Plain values for loggers that store structured fields;
   pino drops it, winston merges it. See
   [ADR 0014](../../adr/0014-pass-sdk-logs-as-a-full-message-and-a-context.md).
@@ -40,9 +40,9 @@ full, then as one summary line with `count`.
 
 ```ts
 import winston from "winston";
-import { probex } from "@probex-platform/sdk";
+import { micafox } from "@micafox/sdk";
 
-probex.configure({ logger: winston.createLogger({ transports: [new winston.transports.Console()] }) });
+micafox.configure({ logger: winston.createLogger({ transports: [new winston.transports.Console()] }) });
 ```
 
 ### `LogContext`
@@ -70,19 +70,19 @@ type LogLevel = "debug" | "info" | "warn" | "error" | "silent";
 ```
 
 The lowest level the SDK writes; `silent` writes nothing. Set it as `logLevel` in
-[`probex.configure()`](debugger.md#debuggeroptions) or a [`HubConnector`](connector.md#hubconnectoroptions), or with
-`PROBEX_LOG_LEVEL`. Default `warn`. Lines below it are dropped inside the SDK, before your logger is called, so
+[`micafox.configure()`](debugger.md#debuggeroptions) or a [`HubConnector`](connector.md#hubconnectoroptions), or with
+`MICAFOX_LOG_LEVEL`. Default `warn`. Lines below it are dropped inside the SDK, before your logger is called, so
 lower it too when your logger is set to `debug`. Values are matched exactly, in lowercase; an empty
-`PROBEX_LOG_LEVEL` counts as unset, and an invalid value logs a warning and `warn` is used. See
+`MICAFOX_LOG_LEVEL` counts as unset, and an invalid value logs a warning and `warn` is used. See
 [ADR 0015](../../adr/0015-filter-sdk-logs-by-level-before-the-apps-logger.md).
 
-- `error` — ProbeX cannot do its job until something changes, such as a rejected token.
-- `warn` — a problem ProbeX recovers from, or lost data, such as a reconnect or dropped snapshots.
+- `error` — MicaFox cannot do its job until something changes, such as a rejected token.
+- `warn` — a problem MicaFox recovers from, or lost data, such as a reconnect or dropped snapshots.
 - `info` — started, stopped, turned off.
-- `debug` — details for diagnosing ProbeX itself.
+- `debug` — details for diagnosing MicaFox itself.
 
 ```sh
-PROBEX_LOG_LEVEL=debug node app.js
+MICAFOX_LOG_LEVEL=debug node app.js
 ```
 
 ## Usage
@@ -92,9 +92,9 @@ first:
 
 ```ts
 import pino from "pino";
-import { probex, type Logger } from "@probex-platform/sdk";
+import { micafox, type Logger } from "@micafox/sdk";
 
-const log = pino({ name: "probex" });
+const log = pino({ name: "micafox" });
 const logger: Logger = {
   debug: (message, context) => log.debug(context, message),
   info: (message, context) => log.info(context, message),
@@ -102,8 +102,8 @@ const logger: Logger = {
   error: (message, context) => log.error(context, message),
 };
 
-probex.configure({ logger, logLevel: "info" });
-probex.run();
+micafox.configure({ logger, logLevel: "info" });
+micafox.run();
 ```
 
 Any other logger takes the same four lines with its own methods.

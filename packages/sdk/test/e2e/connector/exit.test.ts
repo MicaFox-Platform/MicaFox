@@ -24,7 +24,7 @@ describe("connector process exit", { timeout: E2E_TEST_TIMEOUT_MS }, () => {
   it("lets the app exit by itself when the hub refuses connections", async () => {
     const port = await findClosedPort();
 
-    const run = await runApp({ hubUrl: `ws://127.0.0.1:${String(port)}/probex` });
+    const run = await runApp({ hubUrl: `ws://127.0.0.1:${String(port)}/micafox` });
 
     expect({ exitCode: run.exitCode, statuses: run.statuses }).toEqual({
       exitCode: 0,

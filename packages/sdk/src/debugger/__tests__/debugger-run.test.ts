@@ -1,4 +1,4 @@
-import type { Message, Connector } from "@probex-platform/protocol";
+import type { Message, Connector } from "@micafox/protocol";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -22,56 +22,56 @@ const throwingMessage = (): Message =>
 describe("Debugger.run() options", () => {
   it("logs one info line and does nothing when enabled is false", () => {
     const connector = new FakeConnector();
-    const { probex, lines } = createDebugger();
-    probex.configure({ enabled: false, logLevel: "info", connector });
+    const { micafox, lines } = createDebugger();
+    micafox.configure({ enabled: false, logLevel: "info", connector });
 
-    probex.run();
+    micafox.run();
 
     expect({ lines, connects: connector.connectCount }).toEqual({
-      lines: [{ level: "info", message: "turned off by enabled or PROBEX_ENABLED; not started" }],
+      lines: [{ level: "info", message: "turned off by enabled or MICAFOX_ENABLED; not started" }],
       connects: 0,
     });
   });
 
-  it("does nothing when PROBEX_ENABLED is false", () => {
+  it("does nothing when MICAFOX_ENABLED is false", () => {
     const connector = new FakeConnector();
-    const { probex } = createDebugger({ env: envOf(["PROBEX_ENABLED", "false"]) });
-    probex.configure({ connector });
+    const { micafox } = createDebugger({ env: envOf(["MICAFOX_ENABLED", "false"]) });
+    micafox.configure({ connector });
 
-    probex.run();
+    micafox.run();
 
     expect(connector.connectCount).toBe(0);
   });
 
-  it("prefers the enabled option over PROBEX_ENABLED", () => {
+  it("prefers the enabled option over MICAFOX_ENABLED", () => {
     const connector = new FakeConnector();
-    const { probex } = createDebugger({ env: envOf(["PROBEX_ENABLED", "false"]) });
-    probex.configure({ enabled: true, connector });
+    const { micafox } = createDebugger({ env: envOf(["MICAFOX_ENABLED", "false"]) });
+    micafox.configure({ enabled: true, connector });
 
-    probex.run();
+    micafox.run();
 
     expect(connector.connectCount).toBe(1);
   });
 
-  it("warns and starts when PROBEX_ENABLED is invalid", () => {
+  it("warns and starts when MICAFOX_ENABLED is invalid", () => {
     const connector = new FakeConnector();
-    const { probex, messagesAt } = createDebugger({ env: envOf(["PROBEX_ENABLED", "False"]) });
-    probex.configure({ connector });
+    const { micafox, messagesAt } = createDebugger({ env: envOf(["MICAFOX_ENABLED", "False"]) });
+    micafox.configure({ connector });
 
-    probex.run();
+    micafox.run();
 
     expect({ warnings: messagesAt("warn"), connects: connector.connectCount }).toEqual({
-      warnings: ["PROBEX_ENABLED must be true or false; using true"],
+      warnings: ["MICAFOX_ENABLED must be true or false; using true"],
       connects: 1,
     });
   });
 
   it("warns and starts when the enabled option is not a boolean", () => {
     const connector = new FakeConnector();
-    const { probex, messagesAt } = createDebugger();
-    probex.configure({ enabled: "no" as unknown as boolean, connector });
+    const { micafox, messagesAt } = createDebugger();
+    micafox.configure({ enabled: "no" as unknown as boolean, connector });
 
-    probex.run();
+    micafox.run();
 
     expect({ warnings: messagesAt("warn"), connects: connector.connectCount }).toEqual({
       warnings: ["enabled must be true or false; using true"],
@@ -79,49 +79,49 @@ describe("Debugger.run() options", () => {
     });
   });
 
-  it("reads PROBEX_LOG_LEVEL again at run(), after a line was written before it", () => {
+  it("reads MICAFOX_LOG_LEVEL again at run(), after a line was written before it", () => {
     const env: Record<string, string | undefined> = {};
-    const { probex, messagesAt } = createDebugger({ env });
-    probex.configure(42 as DebuggerOptions);
-    probex.configure({ connector: new FakeConnector() });
+    const { micafox, messagesAt } = createDebugger({ env });
+    micafox.configure(42 as DebuggerOptions);
+    micafox.configure({ connector: new FakeConnector() });
 
-    env.PROBEX_LOG_LEVEL = "info";
-    probex.run();
+    env.MICAFOX_LOG_LEVEL = "info";
+    micafox.run();
 
     expect(messagesAt("info")).toEqual(["started with a custom connector and 15 redaction rules"]);
   });
 
-  it("keeps the level resolved at run() when PROBEX_LOG_LEVEL changes while running", async () => {
-    const env: Record<string, string | undefined> = envOf(["PROBEX_LOG_LEVEL", "info"]);
-    const { probex, messagesAt } = createDebugger({ env });
-    probex.configure({ connector: new FakeConnector() });
-    probex.run();
+  it("keeps the level resolved at run() when MICAFOX_LOG_LEVEL changes while running", async () => {
+    const env: Record<string, string | undefined> = envOf(["MICAFOX_LOG_LEVEL", "info"]);
+    const { micafox, messagesAt } = createDebugger({ env });
+    micafox.configure({ connector: new FakeConnector() });
+    micafox.run();
 
-    env.PROBEX_LOG_LEVEL = "error";
-    await probex.stop();
+    env.MICAFOX_LOG_LEVEL = "error";
+    await micafox.stop();
 
     expect(messagesAt("info")).toEqual(["started with a custom connector and 15 redaction rules", "stopped"]);
   });
 
-  it("reads PROBEX_ENABLED again at the next run()", async () => {
+  it("reads MICAFOX_ENABLED again at the next run()", async () => {
     const env: Record<string, string | undefined> = {};
     const connector = new FakeConnector();
-    const { probex } = createDebugger({ env });
-    probex.configure({ connector });
-    probex.run();
-    await probex.stop();
+    const { micafox } = createDebugger({ env });
+    micafox.configure({ connector });
+    micafox.run();
+    await micafox.stop();
 
-    env.PROBEX_ENABLED = "false";
-    probex.run();
+    env.MICAFOX_ENABLED = "false";
+    micafox.run();
 
     expect(connector.connectCount).toBe(1);
   });
 
   it("warns that the hub options are ignored when a custom connector is set", () => {
-    const { probex, messagesAt } = createDebugger();
-    probex.configure({ url: "wss://hub.example.com", labels: { team: "payments" }, connector: new FakeConnector() });
+    const { micafox, messagesAt } = createDebugger();
+    micafox.configure({ url: "wss://hub.example.com", labels: { team: "payments" }, connector: new FakeConnector() });
 
-    probex.run();
+    micafox.run();
 
     expect(messagesAt("warn")).toEqual(["url, labels ignored: a custom connector is set"]);
   });
@@ -130,10 +130,10 @@ describe("Debugger.run() options", () => {
 describe("Debugger.run() refusals", () => {
   it("warns and does nothing when the inspector is already open", () => {
     const connector = new FakeConnector();
-    const { probex, messagesAt } = createDebugger({ inspectorUrl: () => "ws://127.0.0.1:9229/4f6a" });
-    probex.configure({ connector });
+    const { micafox, messagesAt } = createDebugger({ inspectorUrl: () => "ws://127.0.0.1:9229/4f6a" });
+    micafox.configure({ connector });
 
-    probex.run();
+    micafox.run();
 
     expect({ warnings: messagesAt("warn"), connects: connector.connectCount }).toEqual({
       warnings: ["the inspector is already open (--inspect or inspector.open()); not started"],
@@ -143,21 +143,21 @@ describe("Debugger.run() refusals", () => {
 
   it("warns and does nothing in a worker thread", () => {
     const connector = new FakeConnector();
-    const { probex, messagesAt } = createDebugger({ isMainThread: false });
-    probex.configure({ connector });
+    const { micafox, messagesAt } = createDebugger({ isMainThread: false });
+    micafox.configure({ connector });
 
-    probex.run();
+    micafox.run();
 
     expect({ warnings: messagesAt("warn"), connects: connector.connectCount }).toEqual({
-      warnings: ["run() in a worker thread does nothing; ProbeX debugs the main thread only"],
+      warnings: ["run() in a worker thread does nothing; MicaFox debugs the main thread only"],
       connects: 0,
     });
   });
 
   it("logs an error and does not start without a connector", () => {
-    const { probex, binding, lines } = createDebugger();
+    const { micafox, binding, lines } = createDebugger();
 
-    probex.run();
+    micafox.run();
 
     expect({ lines, isConnected: binding.isConnected }).toEqual({
       lines: [{ level: "error", message: "connector is not set; not started" }],
@@ -166,10 +166,10 @@ describe("Debugger.run() refusals", () => {
   });
 
   it("logs an error and does not start with a connector that lacks a method", () => {
-    const { probex, messagesAt } = createDebugger();
-    probex.configure({ connector: { connect: () => undefined } as unknown as Connector });
+    const { micafox, messagesAt } = createDebugger();
+    micafox.configure({ connector: { connect: () => undefined } as unknown as Connector });
 
-    probex.run();
+    micafox.run();
 
     expect(messagesAt("error")).toEqual(["connector is not a Connector; not started"]);
   });
@@ -178,10 +178,10 @@ describe("Debugger.run() refusals", () => {
 describe("Debugger.run() starting", () => {
   it("subscribes, connects and opens the session without enabling the Debugger domain", () => {
     const connector = new FakeConnector();
-    const { probex, binding, messagesAt } = createDebugger();
-    probex.configure({ connector, logLevel: "info" });
+    const { micafox, binding, messagesAt } = createDebugger();
+    micafox.configure({ connector, logLevel: "info" });
 
-    probex.run();
+    micafox.run();
 
     expect({
       subscribers: connector.subscriberCount,
@@ -200,25 +200,25 @@ describe("Debugger.run() starting", () => {
 
   it("does nothing when called while running", () => {
     const connector = new FakeConnector();
-    const { probex, lines } = createDebugger();
-    probex.configure({ connector });
-    probex.run();
+    const { micafox, lines } = createDebugger();
+    micafox.configure({ connector });
+    micafox.run();
 
-    probex.run();
+    micafox.run();
 
     expect({ connects: connector.connectCount, lines }).toEqual({ connects: 1, lines: [] });
   });
 
   it("warns and does not start when called while stopping", async () => {
     const connector = new FakeConnector();
-    const { probex, messagesAt } = createDebugger();
-    probex.configure({ connector });
-    probex.run();
+    const { micafox, messagesAt } = createDebugger();
+    micafox.configure({ connector });
+    micafox.run();
     connector.onUnsubscribe = () => {
-      probex.run();
+      micafox.run();
     };
 
-    await probex.stop();
+    await micafox.stop();
 
     expect({ warnings: messagesAt("warn"), connects: connector.connectCount }).toEqual({
       warnings: [
@@ -236,10 +236,10 @@ describe("Debugger.run() failures", () => {
     connector.onConnect = () => {
       throw new Error("connect failed");
     };
-    const { probex, binding, messagesAt } = createDebugger();
-    probex.configure({ connector });
+    const { micafox, binding, messagesAt } = createDebugger();
+    micafox.configure({ connector });
 
-    probex.run();
+    micafox.run();
 
     expect({
       errors: messagesAt("error"),
@@ -250,10 +250,10 @@ describe("Debugger.run() failures", () => {
 
   it("logs an error and unsubscribes when the inspector session cannot connect", () => {
     const connector = new FakeConnector();
-    const { probex, messagesAt } = createDebugger({}, new FakeInspectorBinding(new Error("inspector unavailable")));
-    probex.configure({ connector });
+    const { micafox, messagesAt } = createDebugger({}, new FakeInspectorBinding(new Error("inspector unavailable")));
+    micafox.configure({ connector });
 
-    probex.run();
+    micafox.run();
 
     expect({ errors: messagesAt("error"), subscribers: connector.subscriberCount }).toEqual({
       errors: ["could not start; not started"],
@@ -267,12 +267,12 @@ describe("Debugger.run() failures", () => {
       throw new Error("connect failed");
     };
     const working = new FakeConnector();
-    const { probex, binding, messagesAt } = createDebugger();
-    probex.configure({ connector: failing });
-    probex.run();
+    const { micafox, binding, messagesAt } = createDebugger();
+    micafox.configure({ connector: failing });
+    micafox.run();
 
-    probex.configure({ connector: working });
-    probex.run();
+    micafox.configure({ connector: working });
+    micafox.run();
 
     expect({ warnings: messagesAt("warn"), connects: working.connectCount, isConnected: binding.isConnected }).toEqual({
       warnings: [],
@@ -286,10 +286,10 @@ describe("Debugger.run() failures", () => {
     connector.onConnect = () => {
       connector.reportStatus("closed");
     };
-    const { probex, binding, messagesAt } = createDebugger();
-    probex.configure({ connector, logLevel: "info" });
+    const { micafox, binding, messagesAt } = createDebugger();
+    micafox.configure({ connector, logLevel: "info" });
 
-    probex.run();
+    micafox.run();
 
     expect({ info: messagesAt("info"), isConnected: binding.isConnected }).toEqual({
       info: ["stopped"],
@@ -301,9 +301,9 @@ describe("Debugger.run() failures", () => {
 describe("Debugger while running", () => {
   it("warns and stops itself when a custom connector reports closed", () => {
     const connector = new FakeConnector();
-    const { probex, binding, messagesAt } = createDebugger();
-    probex.configure({ connector, logLevel: "info" });
-    probex.run();
+    const { micafox, binding, messagesAt } = createDebugger();
+    micafox.configure({ connector, logLevel: "info" });
+    micafox.run();
 
     connector.reportStatus("closed");
 
@@ -322,9 +322,9 @@ describe("Debugger while running", () => {
 
   it("keeps running when the connector reports any other status", () => {
     const connector = new FakeConnector();
-    const { probex, binding, lines } = createDebugger();
-    probex.configure({ connector });
-    probex.run();
+    const { micafox, binding, lines } = createDebugger();
+    micafox.configure({ connector });
+    micafox.run();
 
     connector.reportStatus("disconnected");
 
@@ -333,9 +333,9 @@ describe("Debugger while running", () => {
 
   it("logs an unexpected handler error and stops itself without throwing into the caller", () => {
     const connector = new FakeConnector();
-    const { probex, binding, messagesAt } = createDebugger();
-    probex.configure({ connector });
-    probex.run();
+    const { micafox, binding, messagesAt } = createDebugger();
+    micafox.configure({ connector });
+    micafox.run();
 
     connector.deliver(throwingMessage());
 
@@ -347,9 +347,9 @@ describe("Debugger while running", () => {
 
   it("logs a message it does not handle yet at debug", () => {
     const connector = new FakeConnector();
-    const { probex, messagesAt } = createDebugger();
-    probex.configure({ connector, logLevel: "debug" });
-    probex.run();
+    const { micafox, messagesAt } = createDebugger();
+    micafox.configure({ connector, logLevel: "debug" });
+    micafox.run();
 
     connector.deliver({ version: 1, type: "welcome" });
 
@@ -359,11 +359,11 @@ describe("Debugger while running", () => {
   it("ignores the handlers of an earlier run when the connector keeps them", async () => {
     const connector = new FakeConnector();
     connector.keepsHandlers = true;
-    const { probex, messagesAt } = createDebugger();
-    probex.configure({ connector });
-    probex.run();
-    await probex.stop();
-    probex.run();
+    const { micafox, messagesAt } = createDebugger();
+    micafox.configure({ connector });
+    micafox.run();
+    await micafox.stop();
+    micafox.run();
 
     connector.reportStatus("closed");
 
@@ -378,10 +378,10 @@ describe("Debugger.run() with an unusual connector", () => {
         throw new Error("getter failed");
       },
     });
-    const { probex, messagesAt } = createDebugger();
-    probex.configure({ connector });
+    const { micafox, messagesAt } = createDebugger();
+    micafox.configure({ connector });
 
-    probex.run();
+    micafox.run();
 
     expect(messagesAt("error")).toEqual(["connector is not a Connector; not started"]);
   });
@@ -391,10 +391,10 @@ describe("Debugger.run() with an unusual connector", () => {
     connector.onMessage = () => {
       throw new Error("subscribe failed");
     };
-    const { probex, binding, messagesAt } = createDebugger();
-    probex.configure({ connector });
+    const { micafox, binding, messagesAt } = createDebugger();
+    micafox.configure({ connector });
 
-    probex.run();
+    micafox.run();
 
     expect({
       errors: messagesAt("error"),
@@ -407,11 +407,11 @@ describe("Debugger.run() with an unusual connector", () => {
   it("stops cleanly when the connector returns no unsubscribe function", async () => {
     const connector = new FakeConnector();
     connector.onStatus = () => undefined as unknown as () => void;
-    const { probex, binding, messagesAt } = createDebugger();
-    probex.configure({ connector, logLevel: "info" });
-    probex.run();
+    const { micafox, binding, messagesAt } = createDebugger();
+    micafox.configure({ connector, logLevel: "info" });
+    micafox.run();
 
-    await probex.stop();
+    await micafox.stop();
 
     expect({ info: messagesAt("info"), isConnected: binding.isConnected }).toEqual({
       info: ["started with a custom connector and 15 redaction rules", "stopped"],
@@ -421,11 +421,11 @@ describe("Debugger.run() with an unusual connector", () => {
 
   it("starts and stops on the real inspector and main thread when no dependencies are passed", async () => {
     const lines: LoggedLine[] = [];
-    const probex = new Debugger({ env: {}, console: createRecordingLogger(lines) });
-    probex.configure({ connector: new FakeConnector(), logLevel: "info" });
-    probex.run();
+    const micafox = new Debugger({ env: {}, console: createRecordingLogger(lines) });
+    micafox.configure({ connector: new FakeConnector(), logLevel: "info" });
+    micafox.run();
 
-    await probex.stop();
+    await micafox.stop();
 
     expect(lines.map((line) => line.message)).toEqual([
       "started with a custom connector and 15 redaction rules",
@@ -439,9 +439,9 @@ describe("Debugger.run() with an async connector", () => {
     const connector = new FakeConnector();
     const rejection = Promise.reject(new Error("hub refused"));
     connector.connect = () => rejection as unknown as undefined;
-    const { probex, binding, messagesAt } = createDebugger();
-    probex.configure({ connector });
-    probex.run();
+    const { micafox, binding, messagesAt } = createDebugger();
+    micafox.configure({ connector });
+    micafox.run();
 
     await rejection.catch(() => undefined);
 
@@ -455,11 +455,11 @@ describe("Debugger.run() with an async connector", () => {
     const connector = new FakeConnector();
     const rejection = Promise.reject(new Error("already gone"));
     connector.onStatus = () => () => rejection as unknown as undefined;
-    const { probex, messagesAt } = createDebugger();
-    probex.configure({ connector });
-    probex.run();
+    const { micafox, messagesAt } = createDebugger();
+    micafox.configure({ connector });
+    micafox.run();
 
-    await probex.stop();
+    await micafox.stop();
     await rejection.catch(() => undefined);
 
     expect(messagesAt("error")).toEqual(["unsubscribing from the connector failed"]);

@@ -1,7 +1,7 @@
 // Reads a pause of the real V8 of the test process: a function with the given variables stops at a `debugger`
 // statement, and the capture runs inside the pause, as it does in the app.
 
-import type { CaptureLimits } from "@probex-platform/protocol";
+import type { CaptureLimits } from "@micafox/protocol";
 
 import {
   readPause,
@@ -53,7 +53,7 @@ export const readRealPause = (body: string, options: RealPauseOptions = {}): Rea
   const logged: LoggedLine[] = [];
   const logger = createLogger({
     component: "debugger",
-    env: envOf(["PROBEX_LOG_LEVEL", "debug"]),
+    env: envOf(["MICAFOX_LOG_LEVEL", "debug"]),
     console: createRecordingLogger(logged),
   });
   const session = new InspectorSession(logger, traced);

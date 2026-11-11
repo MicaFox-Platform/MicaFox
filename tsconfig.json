@@ -1,8 +1,8 @@
 {
-  "extends": "@probex-platform/configs/tsconfig/base.json",
+  "extends": "@micafox/configs/tsconfig/base.json",
   "compilerOptions": {
     "noEmit": true,
-    "customConditions": ["@probex-platform/source"]
+    "customConditions": ["@micafox/source"]
   },
   "include": [
     "*.ts",

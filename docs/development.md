@@ -1,6 +1,6 @@
 # Development
 
-How to build, test and change ProbeX. To use ProbeX in an app, read the [README](../README.md) instead.
+How to build, test and change MicaFox. To use MicaFox in an app, read the [README](../README.md) instead.
 
 Before you change anything, read the [architecture overview](architecture/overview.md): what the parts are, how a
 debugging session flows through them, and which [decisions](adr/) are already made.
@@ -17,7 +17,7 @@ table only, and packages import each other by package name, never by relative pa
 | `packages/sdk`        | `src/debugger/` and `src/connector/`, run inside the host app | protocol      |
 | `examples/node-basic` | demo app to try the SDK by hand                               | sdk, protocol |
 
-A package exports its `src/index.ts` under the `@probex-platform/source` condition, which `pnpm dev`, tests and
+A package exports its `src/index.ts` under the `@micafox/source` condition, which `pnpm dev`, tests and
 typecheck resolve: packages read each other's sources directly, so development needs no build step.
 
 ## Setup
@@ -25,8 +25,8 @@ typecheck resolve: packages read each other's sources directly, so development n
 Requires Node.js ≥ 22 and pnpm 10.
 
 ```sh
-git clone https://github.com/ProbeX-Platform/probex-platform.git
-cd probex-platform
+git clone https://github.com/MicaFox-Platform/MicaFox.git
+cd MicaFox
 pnpm install   # install and link workspace packages, turn on the git hooks
 pnpm verify    # everything must pass on a fresh clone
 ```
@@ -48,7 +48,7 @@ pnpm verify:brief → the same steps, one line per green step and the start of a
 pnpm verify:fix   → auto-fix lint and formatting
 ```
 
-One package: `pnpm --filter @probex-platform/sdk test`, `pnpm --filter @probex-platform/node-basic dev`. CI runs
+One package: `pnpm --filter @micafox/sdk test`, `pnpm --filter @micafox/node-basic dev`. CI runs
 the same scripts on every pull request: see [Checks](#checks).
 
 ## Testing
@@ -71,7 +71,7 @@ Full rules: [testing](../.claude/rules/testing.md).
 
 ## Code quality
 
-ProbeX runs inside other people's apps and is read by the developers who embed it, so the code is held to three
+MicaFox runs inside other people's apps and is read by the developers who embed it, so the code is held to three
 public guides. The rules distilled from them, with the parts that apply to an embedded Node.js library:
 
 | Guide                                                                                                  | Rules                                                                                          |
@@ -87,11 +87,11 @@ public guides. The rules distilled from them, with the parts that apply to an em
   an unused parameter, units in names (`timeoutMs`).
 - **Efficiency.** Know the complexity of what you write; every cache, queue and buffer is bounded; the hot path is
   O(1) or O(n).
-- **Where ProbeX differs from Google.** Arrow functions instead of function declarations, string-literal unions
+- **Where MicaFox differs from Google.** Arrow functions instead of function declarations, string-literal unions
   instead of enums, explicit return types on exports, `undefined` rather than `null`. Prettier owns formatting.
 
 ESLint enforces every rule it can, including limits on file and function size, nesting, complexity and
-parameters: see the [configs preset](api/configs.md#probex-platformconfigseslint). `pnpm lint` also runs
+parameters: see the [configs preset](api/configs.md#micafoxconfigseslint). `pnpm lint` also runs
 `.github/scripts/check-structure.sh` for the folder rules ESLint cannot check: files per folder, tests outside
 `__tests__/` and empty folders.
 

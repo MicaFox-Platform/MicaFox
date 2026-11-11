@@ -1,11 +1,11 @@
 {
-  "name": "@probex-platform/protocol",
+  "name": "@micafox/protocol",
   "version": "0.1.0",
-  "description": "ProbeX protocol: messages, protocol version and the Connector interface",
+  "description": "MicaFox protocol: messages, protocol version and the Connector interface",
   "type": "module",
   "exports": {
     ".": {
-      "@probex-platform/source": "./src/index.ts",
+      "@micafox/source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     }
@@ -25,6 +25,6 @@
     "node": ">=22"
   },
   "devDependencies": {
-    "@probex-platform/configs": "workspace:*"
+    "@micafox/configs": "workspace:*"
   }
 }

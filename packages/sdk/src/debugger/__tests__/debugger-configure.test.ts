@@ -21,11 +21,11 @@ const withThrowingUrl = (fields: DebuggerOptions): DebuggerOptions =>
 describe("Debugger.configure() while not running", () => {
   it("merges the fields of several calls", () => {
     const connector = new FakeConnector();
-    const { probex, messagesAt } = createDebugger();
-    probex.configure({ connector });
-    probex.configure({ logLevel: "info" });
+    const { micafox, messagesAt } = createDebugger();
+    micafox.configure({ connector });
+    micafox.configure({ logLevel: "info" });
 
-    probex.run();
+    micafox.run();
 
     expect(messagesAt("info")).toEqual(["started with a custom connector and 15 redaction rules"]);
   });
@@ -33,35 +33,35 @@ describe("Debugger.configure() while not running", () => {
   it("replaces an earlier object field whole", () => {
     const first = new FakeConnector();
     const second = new FakeConnector();
-    const { probex } = createDebugger();
-    probex.configure({ connector: first });
-    probex.configure({ connector: second });
+    const { micafox } = createDebugger();
+    micafox.configure({ connector: first });
+    micafox.configure({ connector: second });
 
-    probex.run();
+    micafox.run();
 
     expect([first.connectCount, second.connectCount]).toEqual([0, 1]);
   });
 
   it("ignores a field set to undefined", () => {
     const connector = new FakeConnector();
-    const { probex } = createDebugger();
-    probex.configure({ connector });
+    const { micafox } = createDebugger();
+    micafox.configure({ connector });
     // TypeScript with exactOptionalPropertyTypes rejects this; plain JavaScript, and spreads of optional fields, do not
     const unset: { connector?: FakeConnector | undefined } = { connector: undefined };
-    probex.configure(unset as DebuggerOptions);
+    micafox.configure(unset as DebuggerOptions);
 
-    probex.run();
+    micafox.run();
 
     expect(connector.connectCount).toBe(1);
   });
 
   it("warns and changes nothing when the options are not an object", () => {
     const connector = new FakeConnector();
-    const { probex, messagesAt } = createDebugger();
-    probex.configure({ connector });
+    const { micafox, messagesAt } = createDebugger();
+    micafox.configure({ connector });
 
-    probex.configure("enabled=false" as DebuggerOptions);
-    probex.run();
+    micafox.configure("enabled=false" as DebuggerOptions);
+    micafox.run();
 
     expect({ warnings: messagesAt("warn"), connects: connector.connectCount }).toEqual({
       warnings: ["options must be an object; nothing changed"],
@@ -71,10 +71,10 @@ describe("Debugger.configure() while not running", () => {
 
   it("skips a field whose getter throws with a warning and keeps the others", () => {
     const connector = new FakeConnector();
-    const { probex, messagesAt } = createDebugger();
+    const { micafox, messagesAt } = createDebugger();
 
-    probex.configure(withThrowingUrl({ connector }));
-    probex.run();
+    micafox.configure(withThrowingUrl({ connector }));
+    micafox.run();
 
     expect({ warnings: messagesAt("warn"), connects: connector.connectCount }).toEqual({
       warnings: ["url could not be read; it is ignored"],
@@ -84,27 +84,27 @@ describe("Debugger.configure() while not running", () => {
 });
 
 describe("Debugger logger before run()", () => {
-  it("writes to the console at warn when PROBEX_LOG_LEVEL is unset", () => {
-    const { probex, lines } = createDebugger();
+  it("writes to the console at warn when MICAFOX_LOG_LEVEL is unset", () => {
+    const { micafox, lines } = createDebugger();
 
-    probex.configure(42 as DebuggerOptions);
+    micafox.configure(42 as DebuggerOptions);
 
     expect(lines).toEqual([{ level: "warn", message: "options must be an object; nothing changed" }]);
   });
 
-  it("writes to the console at PROBEX_LOG_LEVEL", () => {
-    const { probex, lines } = createDebugger({ env: envOf(["PROBEX_LOG_LEVEL", "error"]) });
+  it("writes to the console at MICAFOX_LOG_LEVEL", () => {
+    const { micafox, lines } = createDebugger({ env: envOf(["MICAFOX_LOG_LEVEL", "error"]) });
 
-    probex.configure(42 as DebuggerOptions);
+    micafox.configure(42 as DebuggerOptions);
 
     expect(lines).toEqual([]);
   });
 
   it("sends the warnings of a configure() call to the logger set in that call", () => {
     const appLines: LoggedLine[] = [];
-    const { probex, lines } = createDebugger();
+    const { micafox, lines } = createDebugger();
 
-    probex.configure(withThrowingUrl({ logger: createRecordingLogger(appLines) }));
+    micafox.configure(withThrowingUrl({ logger: createRecordingLogger(appLines) }));
 
     expect({ app: appLines, console: lines }).toEqual({
       app: [{ level: "warn", message: "url could not be read; it is ignored" }],
@@ -113,9 +113,9 @@ describe("Debugger logger before run()", () => {
   });
 
   it("applies the logLevel set in a configure() call to that call's warnings", () => {
-    const { probex, lines } = createDebugger();
+    const { micafox, lines } = createDebugger();
 
-    probex.configure(withThrowingUrl({ logLevel: "error" }));
+    micafox.configure(withThrowingUrl({ logLevel: "error" }));
 
     expect(lines).toEqual([]);
   });
@@ -125,13 +125,13 @@ describe("Debugger.configure() while running or stopping", () => {
   it("warns and changes nothing while running", async () => {
     const first = new FakeConnector();
     const second = new FakeConnector();
-    const { probex, messagesAt } = createDebugger();
-    probex.configure({ connector: first });
-    probex.run();
+    const { micafox, messagesAt } = createDebugger();
+    micafox.configure({ connector: first });
+    micafox.run();
 
-    probex.configure({ connector: second });
-    await probex.stop();
-    probex.run();
+    micafox.configure({ connector: second });
+    await micafox.stop();
+    micafox.run();
 
     expect({ warnings: messagesAt("warn"), connects: [first.connectCount, second.connectCount] }).toEqual({
       warnings: ["configure() while the debugger is running changes nothing; call it before run()"],
@@ -142,16 +142,16 @@ describe("Debugger.configure() while running or stopping", () => {
   it("warns and changes nothing while stopping", async () => {
     const first = new FakeConnector();
     const second = new FakeConnector();
-    const { probex, messagesAt } = createDebugger();
-    probex.configure({ connector: first });
-    probex.run();
+    const { micafox, messagesAt } = createDebugger();
+    micafox.configure({ connector: first });
+    micafox.run();
     first.onUnsubscribe = () => {
-      probex.configure({ connector: second });
+      micafox.configure({ connector: second });
     };
 
-    await probex.stop();
+    await micafox.stop();
     first.onUnsubscribe = () => undefined;
-    probex.run();
+    micafox.run();
 
     expect({ warnings: messagesAt("warn"), connects: [first.connectCount, second.connectCount] }).toEqual({
       warnings: [

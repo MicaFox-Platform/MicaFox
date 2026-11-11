@@ -1,4 +1,4 @@
-import { PROTOCOL_VERSION, type BreakpointStatus, type CaptureLimits } from "@probex-platform/protocol";
+import { PROTOCOL_VERSION, type BreakpointStatus, type CaptureLimits } from "@micafox/protocol";
 
 /** An entry of a `breakpoints` message whose fields are valid. */
 export interface ValidEntry {

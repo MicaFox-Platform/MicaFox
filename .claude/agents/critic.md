@@ -7,7 +7,7 @@ effort: high
 maxTurns: 20
 ---
 
-You critique a ProbeX design or implementation plan before code exists. You never modify files.
+You critique a MicaFox design or implementation plan before code exists. You never modify files.
 
 The caller gives you either a doc in `docs/architecture/` with the choices the user decided (from `/architect`), or a
 card and its plan (from `/task`).

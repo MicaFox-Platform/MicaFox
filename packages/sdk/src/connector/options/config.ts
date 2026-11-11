@@ -3,7 +3,7 @@ import { isRecord, readField, readOption, type Warn } from "./read-field.js";
 import { createLogger, SdkLogger, type Environment, type Logger } from "../../logger/index.js";
 
 /** The key under which the debugger hands its logger to the `HubConnector` it creates; not in `HubConnectorOptions`. */
-export const LOGGER_KEY: unique symbol = Symbol.for("probex.logger");
+export const LOGGER_KEY: unique symbol = Symbol.for("micafox.logger");
 
 /** The connector's options and logger, resolved once when it is created. */
 export interface ConnectorConfig {
@@ -44,7 +44,7 @@ const chooseLogger = (
   }
 
   if (handed !== undefined) {
-    warn('the value under Symbol.for("probex.logger") is not an SDK logger; it is ignored');
+    warn('the value under Symbol.for("micafox.logger") is not an SDK logger; it is ignored');
   }
 
   const logger = createLogger({ component: COMPONENT, env, console: fallback });

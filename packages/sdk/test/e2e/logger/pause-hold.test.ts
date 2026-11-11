@@ -6,7 +6,7 @@ const lineRoute = (message: string): string => logRoute({ level: "warn", message
 
 const recorded = (message: string): StdoutRecord => ({
   level: "warn",
-  message: `[probex] e2e: ${message}`,
+  message: `[micafox] e2e: ${message}`,
   context: { component: "e2e" },
 });
 

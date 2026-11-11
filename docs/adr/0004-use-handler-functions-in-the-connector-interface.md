@@ -6,7 +6,7 @@ Accepted · 2026-10-21
 
 ## Context
 
-`Connector` lives in `@probex-platform/protocol`, which holds types and constants only and no Node-only APIs, and is
+`Connector` lives in `@micafox/protocol`, which holds types and constants only and no Node-only APIs, and is
 implemented by the default connector and by custom ones. The SDK and users subscribe to incoming messages and to
 connection status. A connector runs inside the host app, so it must never throw into it or hold up its startup
 while the hub is unreachable.

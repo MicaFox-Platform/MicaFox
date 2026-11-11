@@ -1,4 +1,4 @@
-import type { Message } from "@probex-platform/protocol";
+import type { Message } from "@micafox/protocol";
 import { describe, expect, it } from "vitest";
 
 import { E2E_TEST_TIMEOUT_MS, runApp } from "./run-app.js";

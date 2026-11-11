@@ -1,4 +1,4 @@
-import { PROTOCOL_VERSION } from "@probex-platform/protocol";
+import { PROTOCOL_VERSION } from "@micafox/protocol";
 
 import { Fifo } from "./fifo.js";
 

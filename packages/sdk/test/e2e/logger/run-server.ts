@@ -19,7 +19,7 @@ export interface ServerOptions {
   logger?: AppLoggerName;
   /** Passed as the `logLevel` option (`E2E_LOG_LEVEL`). */
   logLevel?: string;
-  /** `PROBEX_LOG_LEVEL`. */
+  /** `MICAFOX_LOG_LEVEL`. */
   envLogLevel?: string;
 }
 
@@ -85,16 +85,16 @@ const request = async (port: number, route: string): Promise<void> => {
 
 const toEnvironment = ({ logger, logLevel, envLogLevel }: ServerOptions): NodeJS.ProcessEnv => {
   const env: NodeJS.ProcessEnv = { ...process.env };
-  // Spawn leaves a variable whose value is `undefined` out, so a PROBEX_LOG_LEVEL of the shell never leaks in
+  // Spawn leaves a variable whose value is `undefined` out, so a MICAFOX_LOG_LEVEL of the shell never leaks in
   env.E2E_LOGGER = logger;
   env.E2E_LOG_LEVEL = logLevel;
-  env.PROBEX_LOG_LEVEL = envLogLevel;
+  env.MICAFOX_LOG_LEVEL = envLogLevel;
   return env;
 };
 
 const startServer = (options: ServerOptions): ChildProcess =>
   // The source condition, as in tests and `pnpm dev`: no build runs before the tests
-  spawn(process.execPath, ["--conditions=@probex-platform/source", "--import", "tsx", SERVER_FILE], {
+  spawn(process.execPath, ["--conditions=@micafox/source", "--import", "tsx", SERVER_FILE], {
     cwd: import.meta.dirname,
     env: toEnvironment(options),
     stdio: ["ignore", "pipe", "pipe", "ipc"],
@@ -144,7 +144,8 @@ export const parseRecords = (stdout: readonly string[]): StdoutRecord[] =>
   stdout.map((line) => JSON.parse(line) as StdoutRecord); // the server writes only these two shapes
 
 /** Keeps the lines the SDK wrote to the console; Node and tsx may write their own warnings to the same streams. */
-export const probexLines = (lines: readonly string[]): string[] => lines.filter((line) => line.startsWith("[probex]"));
+export const micafoxLines = (lines: readonly string[]): string[] =>
+  lines.filter((line) => line.startsWith("[micafox]"));
 
 /** Builds a `/log` route from its query parameters. */
 export const logRoute = (params: Readonly<Record<string, string>>): string =>

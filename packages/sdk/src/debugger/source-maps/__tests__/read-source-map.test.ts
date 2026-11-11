@@ -13,7 +13,7 @@ const SCRIPT_URL = "file:///app/dist/checkout.js";
 let dir: string;
 
 beforeEach(() => {
-  dir = realpathSync(mkdtempSync(path.join(tmpdir(), "probex-maps-")));
+  dir = realpathSync(mkdtempSync(path.join(tmpdir(), "micafox-maps-")));
 });
 
 afterEach(() => {

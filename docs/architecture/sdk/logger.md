@@ -52,18 +52,18 @@ the host app. It does not ship the app's own logs. How to use it: [API](../../ap
 
 The logger lives in `packages/sdk/src/logger/`. The debugger keeps one logger for its lifetime; `configure()` and
 `run()` change its target and level. It passes that logger to the `HubConnector` it creates, in the constructor
-options under the key `Symbol.for("probex.logger")`, which is not part of `HubConnectorOptions`, so one logger
+options under the key `Symbol.for("micafox.logger")`, which is not part of `HubConnectorOptions`, so one logger
 serves both. A `HubConnector` the app creates, also one passed as `connector`, builds its own logger from its
 options.
 
 Levels:
 
-- `error` — ProbeX cannot do its job until something outside it changes, or a bug in the SDK or the hub: an invalid
+- `error` — MicaFox cannot do its job until something outside it changes, or a bug in the SDK or the hub: an invalid
   URL, a rejected token, an unserializable message, an oversize frame, the debugger stopping itself.
-- `warn` — a problem ProbeX recovers from, or one that loses data: a reconnect, dropped messages, an invalid option
+- `warn` — a problem MicaFox recovers from, or one that loses data: a reconnect, dropped messages, an invalid option
   replaced by its default.
-- `info` — the lifecycle: started, stopped, turned off by `PROBEX_ENABLED`.
-- `debug` — details for diagnosing ProbeX itself: an unknown message type, how a breakpoint was resolved.
+- `info` — the lifecycle: started, stopped, turned off by `MICAFOX_ENABLED`.
+- `debug` — details for diagnosing MicaFox itself: an unknown message type, how a breakpoint was resolved.
 
 ## Layout
 
@@ -83,19 +83,19 @@ packages/sdk/src/logger/
 
 ### Resolving the logger
 
-1. Before `run()`, the debugger's logger writes to `console`. Its level is read from `PROBEX_LOG_LEVEL` when the
+1. Before `run()`, the debugger's logger writes to `console`. Its level is read from `MICAFOX_LOG_LEVEL` when the
    first line is written, or is `warn`. A `configure()` call that sets `logger` or `logLevel` applies them first,
    so its own warnings already use them.
-2. `run()` resolves both like every option: the value from `configure()`, then `PROBEX_LOG_LEVEL`, then `warn`. See
+2. `run()` resolves both like every option: the value from `configure()`, then `MICAFOX_LOG_LEVEL`, then `warn`. See
    [ADR 0003](../../adr/0003-configure-the-sdk-from-options-then-env.md) and, for `configure()` at other
-   times, [calls in any order](../../api/sdk/debugger.md#probex).
+   times, [calls in any order](../../api/sdk/debugger.md#micafox).
 3. `new HubConnector(options)` resolves them the same way in its constructor, unless it got the debugger's logger.
-4. An invalid `logLevel` or `PROBEX_LOG_LEVEL` logs a warning and `warn` is used. A `logger` that is not an object
+4. An invalid `logLevel` or `MICAFOX_LOG_LEVEL` logs a warning and `warn` is used. A `logger` that is not an object
    with the four methods logs a warning to `console`, and `console` is used. The warnings carry the component of the
    caller that set the options: `debugger` for `configure()` and `run()`, `connector` for `new HubConnector()`.
-   Before any options are set, the warning about `PROBEX_LOG_LEVEL` carries the logger's owner and goes to
+   Before any options are set, the warning about `MICAFOX_LOG_LEVEL` carries the logger's owner and goes to
    `console`. Like every line, these warnings are written only when the resolved level lets `warn` through.
-5. `PROBEX_LOG_LEVEL` takes the level names exactly; an empty value counts as unset. An invalid value is reported
+5. `MICAFOX_LOG_LEVEL` takes the level names exactly; an empty value counts as unset. An invalid value is reported
    once per logger, however often the options are set.
 
 ### Writing a line
@@ -103,7 +103,7 @@ packages/sdk/src/logger/
 1. A call site passes the level, a message and the fields it has, among them a fixed `key` naming the problem.
 2. A line below the level is dropped at once.
 3. A repeat inside an open collapse window is counted and dropped, see [Collapsing repeats](#collapsing-repeats).
-4. The message becomes `[probex] <component>: <message>`. Text from outside the SDK, such as error messages and URL
+4. The message becomes `[micafox] <component>: <message>`. Text from outside the SDK, such as error messages and URL
    paths, is passed as it is.
 5. The context always has `component`, and all its values are plain and serializable. An `Error` becomes
    `{ name, message, code, stack }`, because JSON output turns an `Error` into `{}`; a thrown value that is not an
@@ -131,7 +131,7 @@ packages/sdk/src/logger/
 1. The debugger calls `hold()` when its `Debugger.paused` handler starts and `release()` in its `finally`, so the
    thread is never paused while the app's logger runs, also when the debugger stops itself during the pause.
 2. The hold is one flag for the whole process, kept in a record on `globalThis` under
-   `Symbol.for("probex.logger.hold")`: `hold()` on any logger makes every logger queue its lines, also one from
+   `Symbol.for("micafox.logger.hold")`: `hold()` on any logger makes every logger queue its lines, also one from
    another copy or version of the SDK. A second `hold()` does nothing, one `release()` ends it, and `release()`
    without `hold()` does nothing. A copy reads the record defensively and adds what an older one left out.
 3. Each logger keeps its own queue, of lines that passed the level filter and collapsing, summaries included. At 100,
@@ -144,7 +144,7 @@ packages/sdk/src/logger/
 
 ### Flushing
 
-1. `probex.stop()` and `HubConnector.close()` flush the logger before they resolve: its queued lines and the dropped
+1. `micafox.stop()` and `HubConnector.close()` flush the logger before they resolve: its queued lines and the dropped
    lines warning, then the summaries of open windows, are written, and the timer stops. The pending `setImmediate`
    of `release()` is cancelled unless another logger's queue still waits for it.
 2. While held, `flush()` writes no queued line and leaves the queue for `release()`; the summaries of the closed

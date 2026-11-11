@@ -1,4 +1,4 @@
-import { PROTOCOL_VERSION, type Hello } from "@probex-platform/protocol";
+import { PROTOCOL_VERSION, type Hello } from "@micafox/protocol";
 import { hostname } from "node:os";
 
 import { SDK_VERSION } from "./version.js";
@@ -11,7 +11,7 @@ export interface HelloFields {
   labels: Labels;
 }
 
-const SDK_NAME = "@probex-platform/sdk";
+const SDK_NAME = "@micafox/sdk";
 
 const readHostname = (): string => {
   try {

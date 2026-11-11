@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`@probex-platform/protocol` is the contract between the SDK, custom connectors, the hub and custom hubs: the
+`@micafox/protocol` is the contract between the SDK, custom connectors, the hub and custom hubs: the
 messages they exchange, the protocol version and the `Connector` interface. Each side builds against it without
 depending on the others.
 
@@ -23,19 +23,19 @@ depending on the others.
   - Types and constants only: no runtime logic, no side effects, no dependencies, no Node-only APIs.
   - Built as ES modules and CommonJS, like the SDK:
     [ADR 0013](../adr/0013-publish-the-packages-as-es-modules-and-commonjs.md).
-  - Every export is public API of ProbeX and is documented in `docs/api/`.
+  - Every export is public API of MicaFox and is documented in `docs/api/`.
   - Changes are backward-compatible or bump `PROTOCOL_VERSION`.
 
 ## Interactions
 
 ```text
 ┌──────────────────────┐
-│ @probex-platform/sdk │──┐
+│     @micafox/sdk     │──┐
 └──────────────────────┘  │
 ┌──────────────────────┐  │
 │   Custom connector   │──┤
 └──────────────────────┘  │  types, constants  ┌───────────────────────────┐
-┌──────────────────────┐  ├───────────────────▶│ @probex-platform/protocol │
+┌──────────────────────┐  ├───────────────────▶│     @micafox/protocol     │
 │         Hub          │──┤                    └───────────────────────────┘
 └──────────────────────┘  │
 ┌──────────────────────┐  │
@@ -43,15 +43,15 @@ depending on the others.
 └──────────────────────┘
 ```
 
-`@probex-platform/sdk` (its debugger and default connector), custom connectors, the hub and custom hubs written by
-users import `@probex-platform/protocol`. None of them imports another to get a protocol type or constant.
+`@micafox/sdk` (its debugger and default connector), custom connectors, the hub and custom hubs written by
+users import `@micafox/protocol`. None of them imports another to get a protocol type or constant.
 
 ## Key flows
 
 ### Adding a type or constant
 
 1. Check whether both ends have to agree on it: the SDK and a hub, or the SDK and a custom connector.
-2. If they do, it goes into `@probex-platform/protocol`. If not, it stays in the package that owns it, however many
+2. If they do, it goes into `@micafox/protocol`. If not, it stays in the package that owns it, however many
    packages use it.
 
 ### Opening a session

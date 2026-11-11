@@ -86,7 +86,7 @@ describe("HubConnector logs", () => {
     const request = await hub.nextRequest();
 
     expect({ url: request.url, authorization: request.headers.authorization }).toEqual({
-      url: `/probex?key=${QUERY}`,
+      url: `/micafox?key=${QUERY}`,
       authorization: `Bearer ${TOKEN}`,
     });
   });

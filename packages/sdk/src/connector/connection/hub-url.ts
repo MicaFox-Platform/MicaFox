@@ -36,7 +36,7 @@ const parse = (url: string): URL | undefined => {
  */
 export const checkHubTarget = (url: string | undefined, token: string | undefined): HubTargetCheck => {
   if (url === undefined) {
-    return { ok: false, reason: "no hub URL is set; pass url or set PROBEX_HUB_URL" };
+    return { ok: false, reason: "no hub URL is set; pass url or set MICAFOX_HUB_URL" };
   }
 
   const parsed = parse(url);

@@ -6,7 +6,7 @@ export type Labels = Readonly<Record<string, string>>;
 
 const NO_LABELS = "labels must be an object of strings; using no labels";
 
-// PROBEX_LABELS: `key=value` pairs separated by commas, each trimmed and split at the first `=`.
+// MICAFOX_LABELS: `key=value` pairs separated by commas, each trimmed and split at the first `=`.
 // Warnings name an entry by position, never by its text, which may hold a value the app keeps private.
 const parseLabels = (text: string, warn: Warn): Labels => {
   // A Map keeps the later value of a repeated key; Object.fromEntries makes even `__proto__` an own property
@@ -22,7 +22,7 @@ const parseLabels = (text: string, warn: Warn): Labels => {
     const key = separator === -1 ? "" : entry.slice(0, separator).trim();
     if (key === "") {
       const problem = separator === -1 ? 'has no "="' : "has an empty key";
-      warn(`PROBEX_LABELS entry ${String(index + 1)} ${problem}; skipped`);
+      warn(`MICAFOX_LABELS entry ${String(index + 1)} ${problem}; skipped`);
       continue;
     }
 
@@ -73,12 +73,12 @@ const copyLabels = (value: unknown, warn: Warn): Labels => {
   return Object.fromEntries(labels);
 };
 
-/** Resolves `labels`: a passed value replaces `PROBEX_LABELS`; no labels by default. */
+/** Resolves `labels`: a passed value replaces `MICAFOX_LABELS`; no labels by default. */
 export const resolveLabels = (passed: unknown, env: Environment, warn: Warn): Labels => {
   if (passed !== undefined) {
     return copyLabels(passed, warn);
   }
 
-  const text = readEnv(env, "PROBEX_LABELS");
+  const text = readEnv(env, "MICAFOX_LABELS");
   return text === undefined ? {} : parseLabels(text, warn);
 };

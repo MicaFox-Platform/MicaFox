@@ -5,7 +5,7 @@ paths:
 
 # Code quality
 
-ProbeX is read by the developers who embed it: the code is part of the product. Every change leaves the code at least
+MicaFox is read by the developers who embed it: the code is part of the product. Every change leaves the code at least
 as clear and as fast as it found it. Limits marked (ESLint) are enforced by `packages/configs/eslint`.
 
 ## Structure
@@ -47,7 +47,7 @@ A reader finds a file from the folder names alone. The tree of a component is de
 
 - Case: `UpperCamelCase` for types and type parameters, `lowerCamelCase` for values and members, `CONSTANT_CASE`
   only for module-level and static readonly constants (`PROTOCOL_VERSION`), quoted wire names as the wire spells
-  them (`"Authorization"`, `PROBEX_TOKEN`). ESLint checks the shapes but allows `CONSTANT_CASE` on any `const`.
+  them (`"Authorization"`, `MICAFOX_TOKEN`). ESLint checks the shapes but allows `CONSTANT_CASE` on any `const`.
 - Acronyms are words: `instanceId`, `hubUrl`, `parseJson`. No `I` prefix, no `_` prefix or suffix except an unused
   parameter, no type in the name (`breakpointList`). (Google § Naming)
 - Descriptive over short: one letter only in a scope of ≤ 10 lines; only well-known abbreviations (`id`, `url`).

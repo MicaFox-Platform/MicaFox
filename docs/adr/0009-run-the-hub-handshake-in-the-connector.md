@@ -29,8 +29,8 @@ hub replies `welcome`.
 ## Consequences
 
 - `connected` means the hub has accepted the session, not just that a socket is open.
-- Service and labels are connector options with `PROBEX_SERVICE` and `PROBEX_LABELS`; both are public API.
-- A custom connector that talks to a ProbeX hub implements the same handshake, described in the protocol API.
+- Service and labels are connector options with `MICAFOX_SERVICE` and `MICAFOX_LABELS`; both are public API.
+- A custom connector that talks to a MicaFox hub implements the same handshake, described in the protocol API.
 - Neither side sends anything else before `welcome`; any other frame first closes the session with
   `protocolError`.
 - A hub that has no types for the `hello`'s version closes with `incompatibleVersion`; the connector logs an error

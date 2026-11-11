@@ -1,4 +1,4 @@
-import { CLOSE_CODES } from "@probex-platform/protocol";
+import { CLOSE_CODES } from "@micafox/protocol";
 
 import { readErrorCode } from "../../logger/index.js";
 
@@ -43,7 +43,7 @@ export const describeClose = (code: number): AttemptFailure => {
 export const describeStatus = (statusCode: number | undefined): AttemptFailure => {
   const status = String(statusCode);
   if (statusCode === 401 || statusCode === 403) {
-    const message = `the hub rejected the token (HTTP ${status}); check PROBEX_TOKEN`;
+    const message = `the hub rejected the token (HTTP ${status}); check MICAFOX_TOKEN`;
     return { level: "error", message, key: "hub-unauthorized", isRejection: true };
   }
 

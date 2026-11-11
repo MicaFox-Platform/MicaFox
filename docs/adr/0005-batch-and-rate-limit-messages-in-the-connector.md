@@ -8,7 +8,7 @@ Accepted · 2026-10-21
 
 The debugger can produce bursts of messages, for example a breakpoint in a hot loop. One frame per message wastes
 the network and loads the hub; one frame with thousands of messages stalls the socket and the hub. The host app's
-network must not be saturated by ProbeX. Custom connectors use other transports, which frame messages their own
+network must not be saturated by MicaFox. Custom connectors use other transports, which frame messages their own
 way. Every hub, including custom ones, has to read whatever framing the SDK sends.
 
 ## Decision

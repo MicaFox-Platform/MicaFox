@@ -1,4 +1,4 @@
-import type { Value, Variable } from "@probex-platform/protocol";
+import type { Value, Variable } from "@micafox/protocol";
 import { describe, expect, it } from "vitest";
 
 import {

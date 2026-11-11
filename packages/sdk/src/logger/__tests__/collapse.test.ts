@@ -72,7 +72,7 @@ describe("first occurrence and repeats", () => {
     logger.log("warn", "hub unreachable", { component: "connector", key: "reconnect" });
     logger.log("warn", "hub unreachable", { component: "connector", key: "reconnect" });
 
-    expect(app.calls).toEqual([["warn", "[probex] connector: hub unreachable", { component: "connector" }]]);
+    expect(app.calls).toEqual([["warn", "[micafox] connector: hub unreachable", { component: "connector" }]]);
   });
 
   it("writes a line with a different key in full", () => {
@@ -81,7 +81,10 @@ describe("first occurrence and repeats", () => {
     logger.log("warn", "hub unreachable", { component: "connector", key: "reconnect" });
     logger.log("warn", "message dropped", { component: "connector", key: "drop" });
 
-    expect(messages(app.calls)).toEqual(["[probex] connector: hub unreachable", "[probex] connector: message dropped"]);
+    expect(messages(app.calls)).toEqual([
+      "[micafox] connector: hub unreachable",
+      "[micafox] connector: message dropped",
+    ]);
   });
 
   it("writes a line with a different breakpointId in full", () => {
@@ -132,8 +135,8 @@ describe("first occurrence and repeats", () => {
     vi.advanceTimersByTime(60_000);
 
     expect(messages(app.calls)).toEqual([
-      "[probex] connector: hub unreachable, retrying in 1 s",
-      "[probex] connector: hub unreachable, retrying in 1 s (repeated 1 times in 60 s)",
+      "[micafox] connector: hub unreachable, retrying in 1 s",
+      "[micafox] connector: hub unreachable, retrying in 1 s (repeated 1 times in 60 s)",
     ]);
   });
 
@@ -169,7 +172,7 @@ describe("summary", () => {
     expect(app.calls.slice(1)).toEqual([
       [
         "warn",
-        "[probex] debugger: snapshot failed (repeated 2 times in 60 s)",
+        "[micafox] debugger: snapshot failed (repeated 2 times in 60 s)",
         {
           component: "debugger",
           breakpointId: "bp-1",
@@ -197,7 +200,7 @@ describe("summary", () => {
 
     vi.advanceTimersByTime(60_000);
 
-    expect(app.calls[1]?.[1]).toBe("[probex] connector: bad path /a%s (repeated 1 times in 60 s)");
+    expect(app.calls[1]?.[1]).toBe("[micafox] connector: bad path /a%s (repeated 1 times in 60 s)");
   });
 
   it("writes the summary as the message only to the default console", () => {
@@ -208,7 +211,7 @@ describe("summary", () => {
 
     vi.advanceTimersByTime(60_000);
 
-    expect(fallback.calls[1]).toEqual(["warn", "[probex] connector: bad path /a%s (repeated 1 times in 60 s)"]);
+    expect(fallback.calls[1]).toEqual(["warn", "[micafox] connector: bad path /a%s (repeated 1 times in 60 s)"]);
   });
 
   it("keeps the first line's context when the caller changes its error afterwards", () => {
@@ -234,7 +237,10 @@ describe("summary", () => {
     vi.advanceTimersByTime(60_000);
     logger.log("warn", "hub unreachable", { component: "connector", key: "reconnect" });
 
-    expect(messages(app.calls)).toEqual(["[probex] connector: hub unreachable", "[probex] connector: hub unreachable"]);
+    expect(messages(app.calls)).toEqual([
+      "[micafox] connector: hub unreachable",
+      "[micafox] connector: hub unreachable",
+    ]);
   });
 
   it("opens a new window after the summary", () => {
@@ -248,10 +254,10 @@ describe("summary", () => {
     vi.advanceTimersByTime(60_000);
 
     expect(messages(app.calls)).toEqual([
-      "[probex] connector: hub unreachable",
-      "[probex] connector: hub unreachable (repeated 1 times in 60 s)",
-      "[probex] connector: hub unreachable",
-      "[probex] connector: hub unreachable (repeated 1 times in 60 s)",
+      "[micafox] connector: hub unreachable",
+      "[micafox] connector: hub unreachable (repeated 1 times in 60 s)",
+      "[micafox] connector: hub unreachable",
+      "[micafox] connector: hub unreachable (repeated 1 times in 60 s)",
     ]);
   });
 
@@ -264,9 +270,9 @@ describe("summary", () => {
     logger.log("warn", "hub unreachable", { component: "connector", key: "reconnect" });
 
     expect(messages(app.calls)).toEqual([
-      "[probex] connector: hub unreachable",
-      "[probex] connector: hub unreachable (repeated 1 times in 61 s)",
-      "[probex] connector: hub unreachable",
+      "[micafox] connector: hub unreachable",
+      "[micafox] connector: hub unreachable (repeated 1 times in 61 s)",
+      "[micafox] connector: hub unreachable",
     ]);
   });
 
@@ -292,7 +298,7 @@ describe("level", () => {
     logger.log("debug", "details", { component: "connector", key: "detail" });
     vi.advanceTimersByTime(60_000);
 
-    expect(app.calls).toEqual([["debug", "[probex] connector: details", { component: "connector" }]]);
+    expect(app.calls).toEqual([["debug", "[micafox] connector: details", { component: "connector" }]]);
   });
 
   it("starts no timer for a line below the level", () => {
@@ -316,10 +322,10 @@ describe("window cap", () => {
     expect(app.calls.slice(written)).toEqual([
       [
         "warn",
-        "[probex] debugger: snapshot failed (repeated 1 times in 5 s)",
+        "[micafox] debugger: snapshot failed (repeated 1 times in 5 s)",
         { component: "debugger", breakpointId: "bp-0", count: 1 },
       ],
-      ["warn", "[probex] debugger: snapshot failed", { component: "debugger", breakpointId: "bp-100" }],
+      ["warn", "[micafox] debugger: snapshot failed", { component: "debugger", breakpointId: "bp-100" }],
     ]);
   });
 
@@ -410,9 +416,9 @@ describe("timer", () => {
     vi.advanceTimersByTime(50_000);
 
     expect(messages(app.calls)).toEqual([
-      "[probex] connector: hub unreachable",
-      "[probex] connector: message dropped",
-      "[probex] connector: hub unreachable (repeated 1 times in 60 s)",
+      "[micafox] connector: hub unreachable",
+      "[micafox] connector: message dropped",
+      "[micafox] connector: hub unreachable (repeated 1 times in 60 s)",
     ]);
   });
 
@@ -439,7 +445,7 @@ describe("timer", () => {
 
     vi.advanceTimersByTime(60_000);
 
-    expect(messages(app.calls).at(-1)).toBe("[probex] connector: hub unreachable (repeated 1 times in 60 s)");
+    expect(messages(app.calls).at(-1)).toBe("[micafox] connector: hub unreachable (repeated 1 times in 60 s)");
   });
 
   it("stops when no window is open", () => {
@@ -466,9 +472,9 @@ describe("flush", () => {
     vi.advanceTimersByTime(60_000);
 
     expect(messages(app.calls)).toEqual([
-      "[probex] connector: hub unreachable",
-      "[probex] connector: message dropped",
-      "[probex] connector: hub unreachable (repeated 2 times in 7 s)",
+      "[micafox] connector: hub unreachable",
+      "[micafox] connector: message dropped",
+      "[micafox] connector: hub unreachable (repeated 2 times in 7 s)",
     ]);
   });
 
@@ -489,7 +495,7 @@ describe("flush", () => {
 
     logger.log("warn", "hub unreachable", { component: "connector", key: "reconnect" });
 
-    expect(messages(app.calls).at(-1)).toBe("[probex] connector: hub unreachable");
+    expect(messages(app.calls).at(-1)).toBe("[micafox] connector: hub unreachable");
   });
 
   it("writes nothing and starts no timer when no window is open", () => {

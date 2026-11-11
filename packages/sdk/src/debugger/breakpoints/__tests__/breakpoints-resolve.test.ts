@@ -1,4 +1,4 @@
-import type { BreakpointStatus } from "@probex-platform/protocol";
+import type { BreakpointStatus } from "@micafox/protocol";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
