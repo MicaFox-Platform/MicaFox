@@ -2,7 +2,7 @@
 Trello card format, used by /task-design (writes) and /task (reads).
 Card title: `<type>: <summary>`, ≤ 60 chars; type is feat, fix, chore, docs, refactor, test or perf.
 Labels, only from the board, never new ones: every area the card touches (Debugger, Connector, Logger, CLI, MCP,
-Basic Hub, Paid Hub) and every kind that applies (Docs, CI/CD, Claude). Research and Feature planning are the user's.
+Basic Hub, Hub) and every kind that applies (Docs, CI/CD, Claude). Research and Feature planning are the user's.
 The sections below are the card description. Keep every section; write "none" when empty.
 -->
 
