@@ -1,6 +1,6 @@
 ---
 description: Turn a doc in docs/architecture into the decided design, or change an existing one; record interface changes in docs/api and the reasoning in an ADR.
-argument-hint: <docs/architecture/file.md> [what to discuss or change]
+argument-hint: <docs/architecture/file.md> [what to discuss or change] | <card link>
 disable-model-invocation: true
 model: opus
 effort: high
@@ -17,11 +17,18 @@ The input is a path to a file in `docs/architecture/`, optionally followed by a 
 - **Path + focus** — the file is decided design; the focus says what to discuss or change. Goal: change only that
   and keep the rest of the file consistent with it.
 
+The input may also be, or include, a link to a card on the Trello board https://trello.com/b/hzrnwdVz/micafox. A
+card link alone takes the path and focus from the `/architect` command in the card's description. Read the card
+and its comments. Take it only if it is in **Planned**, or in **In Progress** with your own `Started by Claude`
+comment; anything else → stop and say why, and never move or edit it. The card's "Depends on" lists a card that is
+not in **Done** → name it and ask whether to go on, since design may run ahead of the code it depends on.
+
 No path, a path outside `docs/architecture/` or a missing file → stop and ask for one; to start a new component,
 the user copies the template first.
 
 1. **Branch.** `git switch staging && git pull --ff-only`, then create `docs/<kebab-topic>` from it. An uncommitted
-   draft comes along with the switch.
+   draft comes along with the switch. With a card, move it to **In Progress** and comment
+   `Started by Claude · branch <name>`.
 2. **Ground it.** Read the file, `docs/vision.md`, the overviews (`docs/architecture/overview.md`,
    `docs/api/overview.md`), the docs it links or touches in `docs/architecture/` and `docs/api/`, and the ADRs whose
    titles touch the topic. Use the Explore agent for code facts.
@@ -47,5 +54,6 @@ the user copies the template first.
      `debugger.start()` becomes `debugger.run()`), per `.claude/rules/docs.md`; a new package's file from
      `.claude/templates/api.md`.
    - What is still undecided is not written down: it becomes a follow-up.
-8. **Hand over and ship** per the Workflow section of `CLAUDE.md`. Then list the follow-up work and offer
-   `/task-design` for it.
+8. **Hand over and ship** per the Workflow section of `CLAUDE.md`; the PR body links the card, if there is one. With
+   a card, once the PR is created, move the card to **In Review** and comment the PR link. Then list the follow-up
+   work and offer `/task-design` for it.
