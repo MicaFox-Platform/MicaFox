@@ -1,8 +1,8 @@
 import type { CaptureLimits } from "@micafox/protocol";
 
 import type { ListedEntry } from "./entry.js";
-import { toSegments } from "./script-registry.js";
 import { isRecord } from "../../connector/index.js";
+import { toSegments } from "../location/index.js";
 
 /** Entries beyond these are ignored, then get `error`; the protocol API states both limits. */
 const MAX_READ_ENTRIES = 200;

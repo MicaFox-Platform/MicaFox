@@ -10,7 +10,9 @@ import {
   type BreakpointsUnderTest,
 } from "../../../../test/debugger/real-v8.js";
 import { createLogger } from "../../../logger/index.js";
-import { Breakpoints } from "../index.js";
+import { Breakpoints } from "../../breakpoints/index.js";
+import { RateLimiter } from "../../rate-limiter/index.js";
+import { Pauses } from "../index.js";
 
 let test: BreakpointsUnderTest;
 
@@ -31,7 +33,7 @@ const runImmediates = (): void => {
 
 const PAUSE_NOT_CAUSED = "resumed a pause that none of the breakpoints caused";
 
-describe("Breakpoints pausing", () => {
+describe("Pauses resuming", () => {
   it("resumes the pause of one of its breakpoints and does not log it as foreign", () => {
     const module = test.fixtures.loadCheckout(test.fixtures.write("orders/checkout.cjs", CHECKOUT_SOURCE));
     test.apply({ id: "bp-1", file: test.fixtures.file("orders/checkout.cjs"), line: 6 });
@@ -95,36 +97,32 @@ describe("Breakpoints pausing", () => {
   });
 });
 
-// A scriptParsed whose url getter throws: an unexpected error inside the handler
-const throwingScript = (): object =>
-  Object.defineProperty({}, "url", {
-    get: () => {
-      throw new Error("url getter failed");
-    },
-  });
-
-describe("Breakpoints reading inspector events", () => {
+describe("Pauses reading odd pause events", () => {
   const createOnFake = () => {
     const inspector = new FakeBreakpointsInspector();
     const lines: LoggedLine[] = [];
     const logger = createLogger({ component: "debugger", env: {}, console: createRecordingLogger(lines) });
     logger.set({ logLevel: "debug" }, "debugger");
-    const failures: unknown[] = [];
-    const sent: unknown[] = [];
-    const breakpoints: Breakpoints = new Breakpoints({
+    const limiter = new RateLimiter(() => Date.now());
+    const fail = (): void => undefined;
+    const breakpoints = new Breakpoints({
       session: inspector,
       logger,
-      send: (status) => {
-        sent.push(status);
-      },
-      // As the debugger does: an unexpected error stops it
-      fail: (error) => {
-        failures.push(error);
-        breakpoints.stop();
-      },
+      send: () => undefined,
+      fail,
+      onRemoved: () => undefined,
     });
-    breakpoints.start();
-    return { inspector, lines, failures, sent, breakpoints };
+    const pauses = new Pauses({
+      session: inspector,
+      logger,
+      breakpoints,
+      limiter,
+      isSecret: () => false,
+      send: () => undefined,
+      fail,
+    });
+    pauses.start();
+    return { inspector, lines };
   };
 
   it.each([
@@ -142,26 +140,5 @@ describe("Breakpoints reading inspector events", () => {
       posted: ["Debugger.resume"],
       lines: [{ level: "debug", message: PAUSE_NOT_CAUSED }],
     });
-  });
-
-  it("reports an unexpected error in a scriptParsed handler instead of throwing into the inspector", () => {
-    const { inspector, failures } = createOnFake();
-
-    inspector.emit("Debugger.scriptParsed", throwingScript());
-
-    expect(failures.map((failure) => (failure as Error).message)).toEqual(["url getter failed"]);
-  });
-
-  it("sets nothing and sends no status when a scriptParsed handler stops it while the domain turns on", () => {
-    const { inspector, sent, breakpoints } = createOnFake();
-    inspector.onPost = (method) => {
-      if (method === "Debugger.enable") {
-        inspector.emit("Debugger.scriptParsed", throwingScript());
-      }
-    };
-
-    breakpoints.apply({ version: 1, type: "breakpoints", breakpoints: [{ id: "bp-1", file: "a.js", line: 1 }] });
-
-    expect({ posted: inspector.posted, sent }).toEqual({ posted: ["Debugger.enable"], sent: [] });
   });
 });

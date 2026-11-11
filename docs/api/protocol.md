@@ -300,8 +300,8 @@ and whenever it changes.
 - `pending` — no loaded file matches `file` yet, or its source map is still being read; the breakpoint is set
   when one loads or the read ends.
 - `active` — set; every hit captures a snapshot within the rate limit.
-- `rateLimited` — it hit its own or the process's rate limit and is off until the limit refills, then `active`
-  again.
+- `rateLimited` — it ran out of its own rate limit, or the process ran out of its rate limit or pause time, which
+  turns every breakpoint off; it is off until the limit refills, then `active` again.
 - `error` — it cannot be set. `message` is always set for `error` and says why, for example: invalid fields, `file`
   matches several loaded files, no code at or after `line`, the source map cannot be read, or more than 100
   breakpoints.

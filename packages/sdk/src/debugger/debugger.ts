@@ -1,5 +1,6 @@
 import type { Connector, ConnectorStatus, Message } from "@micafox/protocol";
 import { Session, url as readInspectorUrl } from "node:inspector";
+import { performance } from "node:perf_hooks";
 import { isMainThread } from "node:worker_threads";
 
 import { Breakpoints } from "./breakpoints/index.js";
@@ -13,7 +14,9 @@ import {
   type ConfiguredOptions,
   type DebuggerOptions,
 } from "./options.js";
-import { resolveRedaction } from "./redaction/index.js";
+import { Pauses } from "./pauses/index.js";
+import { RateLimiter } from "./rate-limiter/index.js";
+import { resolveRedaction, type RedactionRules } from "./redaction/index.js";
 import type { Warn } from "../connector/index.js";
 import { createLogger, type Environment, type Logger, type SdkLogger } from "../logger/index.js";
 
@@ -40,6 +43,7 @@ interface Running {
   readonly link: ConnectorLink;
   readonly session: InspectorSession;
   readonly breakpoints: Breakpoints;
+  readonly pauses: Pauses;
 }
 
 type State = { kind: "notRunning" } | { kind: "running"; running: Running } | { kind: "stopping"; done: Promise<void> };
@@ -171,9 +175,9 @@ export class Debugger {
       this.warn(`${ignored.join(", ")} ignored: a custom connector is set`);
     }
 
-    // Resolved once per run(); the capture gets the rules when pauses are wired to it
+    // Resolved once per run()
     const redaction = resolveRedaction(options.redact, this.env, this.warn);
-    this.startWith(connector, redaction.count);
+    this.startWith(connector, redaction);
   }
 
   private findRefusal(): string | undefined {
@@ -189,23 +193,39 @@ export class Debugger {
     return undefined;
   }
 
-  private startWith(connector: Connector, redactionRules: number): void {
+  // The parts of one run(); `fail` stops the debugger only while this run is the current one
+  private createRunning(connector: Connector, redaction: RedactionRules, fail: (error: unknown) => void): Running {
     const link = new ConnectorLink(connector, this.logger);
     const session = new InspectorSession(this.logger, this.createInspectorBinding());
-    const running: Running = {
-      link,
-      session,
-      breakpoints: new Breakpoints({
-        session,
-        logger: this.logger,
-        send: (status) => {
-          link.send(status);
-        },
-        fail: (error) => {
-          this.failRunning(running, error);
-        },
-      }),
+    const limiter = new RateLimiter(() => performance.now());
+    const send = (message: Message): void => {
+      link.send(message);
     };
+    const breakpoints = new Breakpoints({
+      session,
+      logger: this.logger,
+      send,
+      fail,
+      onRemoved: (id) => {
+        limiter.forget(id);
+      },
+    });
+    const pauses = new Pauses({
+      session,
+      logger: this.logger,
+      breakpoints,
+      limiter,
+      isSecret: (name) => redaction.isSecret(name),
+      send,
+      fail,
+    });
+    return { link, session, breakpoints, pauses };
+  }
+
+  private startWith(connector: Connector, redaction: RedactionRules): void {
+    const running = this.createRunning(connector, redaction, (error) => {
+      this.failRunning(running, error);
+    });
     this.state = { kind: "running", running };
     const isCurrent = (): boolean => this.isCurrent(running);
 
@@ -236,13 +256,14 @@ export class Debugger {
       }
 
       running.breakpoints.start();
+      running.pauses.start();
     } catch (error) {
       this.logger.log("error", "could not start; not started", { component: COMPONENT, error });
       void this.tearDown(running);
       return;
     }
 
-    this.logStarted(redactionRules);
+    this.logStarted(redaction.count);
   }
 
   private logStarted(redactionRules: number): void {
@@ -308,6 +329,7 @@ export class Debugger {
 
     try {
       running.breakpoints.stop();
+      running.pauses.stop();
       running.session.disconnect();
       running.link.unsubscribe();
       finish();

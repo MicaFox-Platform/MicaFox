@@ -1,9 +1,18 @@
-import type { ValidEntry } from "./entry.js";
 import { matchPath, type PathCandidate } from "./match-path.js";
 import { toBaseName, type MappedRecord, type ScriptRecord } from "./script-registry.js";
-import type { ScriptPosition } from "./v8-breakpoints.js";
 import type { SourceMapIndex } from "../source-map-decoder/index.js";
 import type { MapView } from "../source-maps/index.js";
+
+/** A position in a script: 0-based line and column, as V8 and source maps count. */
+export interface ScriptPosition {
+  line: number;
+  column: number;
+}
+
+/** What finding a location reads of an entry: its 1-based line; its file comes split into segments. */
+export interface LocatedEntry {
+  line: number;
+}
 
 /**
  * Where an entry's breakpoint goes, or why it cannot be set yet: `reads` are the maps it waits for, and a retryable
@@ -46,7 +55,7 @@ export const mayResolveTo = (fileName: string | undefined, script: ScriptRecord)
 
 const NOTHING_TO_READ: Location = { kind: "pending", reads: [] };
 
-const toNoCode = (entry: ValidEntry): Location => ({
+const toNoCode = (entry: LocatedEntry): Location => ({
   kind: "error",
   message: `no code at or after line ${String(entry.line)}`,
 });
@@ -90,7 +99,7 @@ const collectMapped = (fileName: string, context: LocationContext): MappedCandid
 };
 
 // The hub counts lines from 1; V8 and source maps from 0
-const toScriptLocation = (entry: ValidEntry, candidate: Candidate): Location => {
+const toScriptLocation = (entry: LocatedEntry, candidate: Candidate): Location => {
   const { mapping } = candidate;
   if (mapping === undefined) {
     return { kind: "script", url: candidate.script.url, position: { line: entry.line - 1, column: 0 } };
@@ -112,7 +121,7 @@ const toScriptLocation = (entry: ValidEntry, candidate: Candidate): Location => 
  * the sources of the maps of scripts with the same base name, the one whose path ends with the most segments of
  * `file`. While a map it may need is unread, the entry waits for it. O(candidate scripts × their sources).
  */
-export const findLocation = (entry: ValidEntry, segments: readonly string[], context: LocationContext): Location => {
+export const findLocation = (entry: LocatedEntry, segments: readonly string[], context: LocationContext): Location => {
   const fileName = segments.at(-1);
   if (fileName === undefined) {
     return NOTHING_TO_READ;

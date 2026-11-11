@@ -3,8 +3,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { createSourceMapText, encodeMappings } from "../../../../test/source-maps/encode-mappings.js";
 import { decodeSourceMap, type SourceMapIndex } from "../../source-map-decoder/index.js";
 import type { MapView } from "../../source-maps/index.js";
-import type { ValidEntry } from "../entry.js";
-import { findLocation, mayResolveTo } from "../find-location.js";
+import { findLocation, mayResolveTo, type LocatedEntry } from "../find-location.js";
 import { ScriptRegistry, toSegments, type MappedRecord, type ScriptRecord } from "../script-registry.js";
 
 // checkout.ts line 7 (0-based) maps to generated line 6, column 8; nothing after line 9 has code
@@ -33,7 +32,7 @@ beforeAll(async () => {
   index = decoded.map;
 });
 
-const entry = (line: number, file = "src/checkout.ts"): ValidEntry => ({ kind: "valid", id: "bp-1", file, line });
+const entry = (line: number): LocatedEntry => ({ line });
 
 /** A registry with the scripts and a view of each mapped one by URL; an unlisted mapped script is unread. */
 const createContext = (
@@ -131,7 +130,7 @@ describe("findLocation", () => {
       [MAPPED.url]: read("/app/src/checkout.ts"),
     });
 
-    expect(findLocation(entry(8, "src/orders/checkout.ts"), toSegments("src/orders/checkout.ts"), context)).toEqual({
+    expect(findLocation(entry(8), toSegments("src/orders/checkout.ts"), context)).toEqual({
       kind: "script",
       url: "file:///app/src/orders/checkout.ts",
       position: { line: 7, column: 0 },
@@ -179,7 +178,7 @@ describe("findLocation", () => {
   it("stays pending for an entry without a file name", () => {
     const { context } = createContext([MAPPED], {});
 
-    expect(findLocation(entry(8, "/"), toSegments("/"), context)).toEqual({ kind: "pending", reads: [] });
+    expect(findLocation(entry(8), toSegments("/"), context)).toEqual({ kind: "pending", reads: [] });
   });
 });
 
