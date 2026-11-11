@@ -19,8 +19,10 @@ There is one per process, shared by every import of the SDK, even when two copie
 Call `configure()` if you need to, then `run()` once at startup, and `stop()` on shutdown. It keeps the process
 alive only while `stop()` sends buffered snapshots.
 
-Each breakpoint captures at most 10 snapshots per second and the process at most 50; past that, a breakpoint has
-status `rateLimited` until its budget refills. Capturing stops after 10 ms per pause and at 64 KiB per snapshot;
+Each breakpoint captures at most 10 snapshots per second and the process at most 50, and the app spends at most
+20 ms per second paused. A breakpoint past its own limit has status `rateLimited` until its budget refills; past the
+process's limit or the pause time, every breakpoint is `rateLimited` until those limits and their own refill, then `active` again.
+Capturing stops after 10 ms per pause and at 64 KiB per snapshot;
 a snapshot cut by either limit is `truncated`. An array, `Set` or `Map` with more children than `maxItems` is captured
 with its size only. Details: [capturing a snapshot](../../architecture/sdk/debugger.md#capturing-a-snapshot).
 

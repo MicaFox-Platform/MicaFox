@@ -8,14 +8,22 @@ import {
   toStatus,
   type ListedEntry,
   type Outcome,
+  type Placed,
   type ValidEntry,
 } from "./entry.js";
-import { findLocation, mayResolveTo, type Location } from "./find-location.js";
+import { placeAgain, placeEntry, releaseEntry, type PlaceContext } from "./place-entry.js";
 import { readBreakpointList } from "./read-list.js";
-import { ScriptRegistry, isMapped, toSegments, type MappedRecord, type ScriptRecord } from "./script-registry.js";
 import { V8Breakpoints, type V8Inspector } from "./v8-breakpoints.js";
 import type { SdkLogger } from "../../logger/index.js";
-import type { PausedLocation } from "../capture/index.js";
+import type { PausedLocation, SnapshotTarget } from "../capture/index.js";
+import {
+  ScriptRegistry,
+  isMapped,
+  mayResolveTo,
+  toSegments,
+  type MappedRecord,
+  type ScriptRecord,
+} from "../location/index.js";
 import { SourceMaps, locateFrame, type FrameLocation, type MapView } from "../source-maps/index.js";
 
 const COMPONENT = "debugger";
@@ -34,6 +42,8 @@ export interface BreakpointsDependencies {
   send: (status: BreakpointStatus) => void;
   /** Reports an unexpected error from an inspector event: the debugger stops itself. */
   fail: (error: unknown) => void;
+  /** Called with the id of an entry the latest list no longer has. */
+  onRemoved: (id: string) => void;
 }
 
 /** The inspector refused a command the breakpoints cannot work without. */
@@ -49,22 +59,29 @@ interface Applied {
   outcome: Outcome;
 }
 
-const PENDING: Outcome = { status: "pending" };
 const UNREAD: MapView = { kind: "unread" };
 
 /**
  * The breakpoints the hub listed, set in V8 in the loaded scripts, through their source maps where they have one.
- * Holds the latest list, the status of each entry, and resumes every pause. Time and memory are bounded by the 100
- * entries it holds and the scripts the app loads while any is set.
+ * Holds the latest list and the status of each entry, tells which entries a pause hit, and takes entries off and
+ * sets them again for the rate limits. Time and memory are bounded by the 100 entries it holds and the scripts the
+ * app loads while any is set.
  */
 export class Breakpoints {
   private readonly applied = new Map<string, Applied>();
   private readonly scripts = new ScriptRegistry();
   private readonly v8: V8Breakpoints;
   private readonly sourceMaps: SourceMaps<MappedRecord>;
+  private readonly placing: PlaceContext;
   private readonly unsubscribes: Array<() => void> = [];
   private isDomainOn = false;
   private isStopped = false;
+  /**
+   * Every breakpoint is off in V8 for the process's rate limit, so a newly set entry is `rateLimited`. The domain
+   * going off does not end it: V8 keeps `setBreakpointsActive(false)` across `Debugger.disable` and `enable`, so
+   * only `restore(..., "all")` does, once the throttle turned the breakpoints on again.
+   */
+  private areAllRateLimited = false;
 
   constructor(private readonly dependencies: BreakpointsDependencies) {
     this.v8 = new V8Breakpoints(dependencies.session, dependencies.logger);
@@ -77,6 +94,12 @@ export class Breakpoints {
       },
       fail: dependencies.fail,
     });
+    this.placing = {
+      scripts: this.scripts,
+      sourceMaps: this.sourceMaps,
+      v8: this.v8,
+      logger: dependencies.logger,
+    };
   }
 
   /** Listens to the inspector's events; none arrives while the `Debugger` domain is off. */
@@ -87,9 +110,6 @@ export class Breakpoints {
         this.guard(() => {
           this.onScriptParsed(params);
         });
-      }),
-      this.dependencies.session.on("Debugger.paused", (params) => {
-        this.onPaused(params);
       }),
     );
   }
@@ -127,6 +147,70 @@ export class Breakpoints {
     return locateFrame(script?.url, view, { line: frame.lineNumber, column: frame.columnNumber });
   }
 
+  /** The active entries on the V8 breakpoints of a `Debugger.paused` event, with their limits; empty for a foreign one. */
+  hitEntries(params: unknown): SnapshotTarget[] {
+    return this.v8.ownersHit(params).flatMap((id) => {
+      const current = this.applied.get(id);
+      if (current?.entry.kind !== "valid" || current.outcome.status !== "active") {
+        return [];
+      }
+
+      const { limits } = current.entry;
+      return [limits === undefined ? { breakpointId: id } : { breakpointId: id, limits }];
+    });
+  }
+
+  /** Takes active entries off their V8 breakpoints, removed with the last of them, and sends `rateLimited`. */
+  rateLimit(ids: readonly string[]): void {
+    this.setRateLimited(ids, (id, outcome) => {
+      this.v8.release(id, outcome.place);
+    });
+  }
+
+  /** Marks every active entry `rateLimited`, also those set later; their V8 breakpoints stay, turned off in V8. */
+  rateLimitAll(): void {
+    this.areAllRateLimited = true;
+    this.setRateLimited([...this.applied.keys()], () => undefined);
+  }
+
+  /** Whether every breakpoint is off for the process's rate limit. */
+  isAllRateLimited(): boolean {
+    return this.areAllRateLimited;
+  }
+
+  /** The entries with status `rateLimited`. */
+  rateLimitedIds(): string[] {
+    return [...this.applied].flatMap(([id, current]) => (current.outcome.status === "rateLimited" ? [id] : []));
+  }
+
+  /**
+   * Sets `rateLimited` entries again where they were and sends their status; `all` ends `rateLimitAll()`. Returns
+   * the entries that are `active` again; one whose line has no code any more gets `error`.
+   */
+  restore(ids: readonly string[], scope: "entries" | "all"): string[] {
+    this.areAllRateLimited &&= scope !== "all";
+
+    const restored: string[] = [];
+    for (const id of ids) {
+      const current = this.applied.get(id);
+      if (current?.outcome.status === "rateLimited") {
+        this.applied.set(id, { ...current, outcome: placeAgain(this.placing, id, current.outcome) });
+        restored.push(id);
+      }
+    }
+
+    this.report(restored);
+    return restored.filter((id) => this.applied.get(id)?.outcome.status === "active");
+  }
+
+  /** Forgets the V8 breakpoints and scripts after `Debugger.disable` turned the domain off from outside. */
+  forgetDomain(): void {
+    this.v8.forgetAll();
+    this.scripts.clear();
+    this.sourceMaps.clear();
+    this.isDomainOn = false;
+  }
+
   /** Removes every breakpoint from V8 and turns the `Debugger` domain off; the debugger is stopping. */
   stop(): void {
     this.isStopped = true;
@@ -147,6 +231,11 @@ export class Breakpoints {
       const replacement = next.get(id);
       if (replacement === undefined || !isSameEntry(current.entry, replacement)) {
         this.drop(id, current);
+      }
+
+      // A changed entry keeps its rate limit, so sending the list again does not reset it
+      if (replacement === undefined) {
+        this.dependencies.onRemoved(id);
       }
     }
 
@@ -173,13 +262,7 @@ export class Breakpoints {
   }
 
   private drop(id: string, current: Applied): void {
-    if (current.outcome.status === "active") {
-      this.v8.release(id, current.outcome.place);
-      if (current.outcome.mapUrl !== undefined) {
-        this.sourceMaps.release(current.outcome.mapUrl, id);
-      }
-    }
-
+    releaseEntry(this.placing, id, current.outcome);
     this.applied.delete(id);
   }
 
@@ -192,51 +275,23 @@ export class Breakpoints {
     return { entry, segments, outcome: this.locate(entry, segments) };
   }
 
-  // docs/architecture/sdk/debugger.md#loading-a-source-map: an entry waiting for a map is pending until it is read
   private locate(entry: ValidEntry, segments: readonly string[]): Outcome {
-    const location = findLocation(entry, segments, {
-      findCandidates: (fileName) => this.scripts.findCandidates(fileName),
-      findMapped: (baseName) => this.scripts.findMapped(baseName),
-      viewMap: (script) => this.sourceMaps.view(script),
-    });
-
-    switch (location.kind) {
-      case "pending":
-        for (const script of location.reads) {
-          this.sourceMaps.load(script);
-        }
-
-        return PENDING;
-      case "error":
-        return location.isRetryable === true
-          ? { status: "error", message: location.message, isRetryable: true }
-          : { status: "error", message: location.message };
-      case "script":
-        return this.setBreakpoint(entry, location);
-    }
+    const status = this.areAllRateLimited ? "rateLimited" : "active";
+    return placeEntry(this.placing, { entry, segments, status });
   }
 
-  private setBreakpoint(entry: ValidEntry, location: Extract<Location, { kind: "script" }>): Outcome {
-    const acquired = this.v8.acquire(entry.id, location.url, location.position);
-    if (!acquired.ok) {
-      const message =
-        acquired.reason === "noCode"
-          ? `no code at or after line ${String(entry.line)}`
-          : "the inspector could not set the breakpoint";
-      return { status: "error", message };
+  private setRateLimited(ids: readonly string[], takeOff: (id: string, outcome: Placed) => void): void {
+    const limited: string[] = [];
+    for (const id of ids) {
+      const current = this.applied.get(id);
+      if (current?.outcome.status === "active") {
+        takeOff(id, current.outcome);
+        this.applied.set(id, { ...current, outcome: { ...current.outcome, status: "rateLimited" } });
+        limited.push(id);
+      }
     }
 
-    const placed = acquired.location;
-    this.log(
-      "debug",
-      `${entry.id} ${entry.file}:${String(entry.line)} → ${placed.url}:${String(placed.line)}:${String(placed.column)}`,
-    );
-    if (location.mapped === undefined) {
-      return { status: "active", place: acquired.place };
-    }
-
-    this.sourceMaps.hold(location.mapped, entry.id);
-    return { status: "active", place: acquired.place, mapUrl: location.mapped.url };
+    this.report(limited);
   }
 
   // A pending entry is resolved again when a script it may resolve to loads; the new status is sent
@@ -276,40 +331,6 @@ export class Breakpoints {
     }
 
     this.report(changed);
-  }
-
-  // Held lines are written after the pause, and the thread is resumed whatever happens; if resuming fails,
-  // disabling the domain resumes it and the debugger stops itself
-  private onPaused(params: unknown): void {
-    try {
-      this.dependencies.logger.hold();
-      if (!this.v8.ownsPause(params)) {
-        this.log("debug", "resumed a pause that none of the breakpoints caused");
-      }
-    } catch (error) {
-      this.dependencies.fail(error);
-    } finally {
-      try {
-        this.resume();
-      } finally {
-        this.dependencies.logger.release();
-      }
-    }
-  }
-
-  // Disabling the domain resumes the thread and drops every V8 breakpoint, so stopping has nothing left to remove
-  private resume(): void {
-    const resumed = this.dependencies.session.post("Debugger.resume");
-    if (resumed.ok) {
-      return;
-    }
-
-    this.dependencies.session.post("Debugger.disable");
-    this.v8.forgetAll();
-    this.scripts.clear();
-    this.sourceMaps.clear();
-    this.isDomainOn = false;
-    this.dependencies.fail(resumed.error);
   }
 
   private turnOn(): void {

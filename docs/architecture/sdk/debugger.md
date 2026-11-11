@@ -70,11 +70,11 @@ limits, redacts secrets and sends them to the hub through a connector. How to us
                                apply │    │ statuses, snapshots
                                      ▼    │
         ┌────────────────────────────┴────┴────────────────────────┐
-        │                       Breakpoints                        │
+        │  Breakpoints ◀── hit entries, limit, restore ── Pauses   │
         └─────┬──────────────────┬─────────────────┬────────┬───┬──┘
               │                  │                 │        │   ▲
               │ read map, sources│ allow hit?      │ capture│   │
-              │                  │                 │        │   │ set, remove, resume ▼
+              │                  │                 │        │   │ set, remove, resume, all on/off ▼
               ▼                  ▼                 ▼        │   │
         ┌────────────┐    ┌─────────────┐     ┌─────────┐   │   │ ▲ scriptParsed, paused
         │ SourceMaps │    │ RateLimiter │     │ Capture │   │   │
@@ -94,12 +94,18 @@ The parts live in `packages/sdk/src/debugger/`:
 - `Debugger` — the `micafox` object. Resolves the options and the redaction rules, creates the logger, the connector
   and the parts below, hands `breakpoints` messages to `Breakpoints` and sends what they produce. It is not running,
   running or stopping.
-- `Breakpoints` — holds the latest list from the hub, the V8 breakpoint of each entry and its status, and handles
-  every pause.
+- `Breakpoints` — holds the latest list from the hub, the V8 breakpoint of each entry and its status. Tells which
+  active entries a pause hit, and takes entries off and sets them again for the rate limits.
+- `Pauses` — handles every `Debugger.paused`: asks `RateLimiter` which hit entries may capture, has `Capture` read
+  the pause once, resumes the thread, charges the pause to the budget and sends one snapshot per allowed entry. Its
+  `Throttle` takes breakpoints off when a limit runs out and sets them again, with one unref'd timer.
 - `SourceMaps` — reads the maps of loaded scripts, one at a time, and keeps their resolved sources and, while a
   breakpoint is set through one, its index from original line to generated position and back. `Breakpoints` finds
   an entry's script and position with them.
-- `RateLimiter` — token buckets per breakpoint and per process, and the pause budget.
+- `Location` — the loaded scripts, one per URL, and `findLocation`, which picks the script and position an entry
+  resolves to from them and from what `SourceMaps` knows. Pure; `Breakpoints` sets what it finds.
+- `RateLimiter` — token buckets per breakpoint and per process, and the pause budget. Pure: time comes from a
+  monotonic clock it is given.
 - `Capture` — reads the stack and variables of a paused frame into one read, and cuts that read to the limits of
   each breakpoint as a [`Snapshot`](../../api/protocol.md#snapshot). It asks `Breakpoints` where a frame is shown,
   and redacts secrets by name as it goes.
@@ -115,14 +121,12 @@ packages/sdk/src/debugger/
 ├── options.ts                  DebuggerOptions: the fields of a configure() call, enabled, the custom connector check
 ├── connector-link.ts           ConnectorLink: subscribes to, connects and sends to a connector; catches its rejections
 ├── inspector-session.ts        InspectorSession: node:inspector calls that answer synchronously and never throw
-├── breakpoints/                Breakpoints: the hub's list as V8 breakpoints, their statuses and every pause
+├── breakpoints/                Breakpoints: the hub's list as V8 breakpoints and their statuses
 │   ├── index.ts                the sub-component's only entry: Breakpoints
-│   ├── breakpoints.ts          Breakpoints: applies a list, resolves pending entries, resumes every pause, stops
-│   ├── entry.ts                ValidEntry, InvalidEntry, the comparison of two entries and the status of an outcome
+│   ├── breakpoints.ts          Breakpoints: applies a list, resolves pending entries, rate-limits and restores, stops
+│   ├── entry.ts                ValidEntry, InvalidEntry, Outcome and Placed, the comparison of two entries, a status
 │   ├── read-list.ts            reads and validates the entries of a breakpoints message, with the limits on the list
-│   ├── script-registry.ts      ScriptRegistry: the loaded scripts, one per URL, by file name, by base name and by id
-│   ├── find-location.ts        findLocation: an entry's script and position, or the maps it waits for
-│   ├── match-path.ts           picks the candidate whose path ends with the most segments of an entry's file
+│   ├── place-entry.ts          placeEntry, placeAgain, releaseEntry: an entry's V8 breakpoint and the map it holds
 │   └── v8-breakpoints.ts       V8Breakpoints: Debugger.setBreakpointByUrl and removeBreakpoint, shared by position
 ├── capture/                    Capture: one pause read into values within the limits, then cut per breakpoint
 │   ├── index.ts                the sub-component's only entry: readPause, cutSnapshot and their types
@@ -133,6 +137,19 @@ packages/sdk/src/debugger/
 │   ├── limits.ts               ResolvedLimits: defaults, caps and the largest of several, and truncateText
 │   ├── budget.ts               CaptureBudget: the 10 ms and 64 KiB of a capture, and the size of a value
 │   └── cut-snapshot.ts         cutSnapshot: a read cut to one breakpoint's limits as a Snapshot, with no V8 call
+├── location/                   Location: the loaded scripts and the script and position an entry resolves to
+│   ├── index.ts                the sub-component's only entry: findLocation, ScriptRegistry and their types
+│   ├── find-location.ts        findLocation: an entry's script and position, or the maps it waits for
+│   ├── match-path.ts           picks the candidate whose path ends with the most segments of an entry's file
+│   └── script-registry.ts      ScriptRegistry: the loaded scripts, one per URL, by file name, by base name and by id
+├── pauses/                     Pauses: every Debugger.paused, from the rate limits to the snapshots
+│   ├── index.ts                the sub-component's only entry: Pauses
+│   ├── pauses.ts               Pauses: admits, captures once, resumes, charges the budget, sends the snapshots
+│   └── throttle.ts             Throttle: entries off and all breakpoints off, and the one timer that sets them again
+├── rate-limiter/               RateLimiter: the token buckets and the pause budget, on a clock it is given
+│   ├── index.ts                the sub-component's only entry: RateLimiter
+│   ├── rate-limiter.ts         RateLimiter: a bucket per entry, the process's bucket and the budget; admit and charge
+│   └── token-bucket.ts         TokenBucket: refilled continuously, may go into debt, how long until it is full
 ├── redaction/                  RedactionRules: the names whose values are redacted, resolved once at run()
 │   ├── index.ts                the sub-component's only entry: resolveRedaction and RedactionRules
 │   ├── redaction-rules.ts      RedactionRules: the built-in names, normalizeName and the match by containment
@@ -154,9 +171,11 @@ packages/sdk/src/debugger/
     └── source-map-error.ts     SourceMapError: the fixed reason of a map that cannot be decoded
 ```
 
-`RateLimiter` gets its own sub-component folder when it is built. `Breakpoints` uses `source-maps/`, which uses
-`source-map-decoder/`; `Capture` uses `source-maps/` only for the type of a frame's position, which it gets from
-`Breakpoints.locateFrame`. `Debugger` uses `redaction/`; `Capture` gets only its `isSecret`.
+`Breakpoints` uses `location/` and `source-maps/`, which both use `source-map-decoder/`, and `location/` uses
+`source-maps/` for what is known of a map; `Capture` uses `source-maps/` only for the type
+of a frame's position, which it gets from `Breakpoints.locateFrame`. `Pauses` uses `capture/` and `rate-limiter/`,
+and `Breakpoints` through an interface it declares, so the two do not import each other. `Debugger` creates the
+`RateLimiter` it gives to `Pauses`, and uses `redaction/`; `Capture` gets only its `isSecret`.
 
 ## Key flows
 
@@ -232,15 +251,20 @@ packages/sdk/src/debugger/
 
 1. V8 reaches a breakpoint and pauses the thread; `Debugger.paused` reaches the session synchronously. The
    [logger holds](logger.md#holding-lines-during-a-pause) every line until the handler returns.
-2. A pause without one of our breakpoints in `hitBreakpoints` is resumed at once.
-3. The rate limiter checks each entry on the hit V8 breakpoint. Each entry's bucket holds 10 tokens and the
-   process bucket 50, refilled continuously at that many per second; the pause budget is 20 ms per second. An
-   entry is allowed if it has a token, the process has one and the budget is not spent; each allowed entry takes
-   one of each. With no entry allowed the thread resumes.
-4. An entry out of tokens gets status `rateLimited`; once every entry on a V8 breakpoint is out of tokens, the V8
-   breakpoint is removed. When the process bucket or the budget is empty, `Debugger.setBreakpointsActive(false)`
-   turns every breakpoint off and the affected entries get `rateLimited`. One unref'd timer restores breakpoints
-   and sends `active` when the buckets and the budget are full again, so a hot line stops pausing.
+2. A pause without one of our active entries in `hitBreakpoints` is resumed at once.
+3. The rate limiter checks each active entry on the hit V8 breakpoint. Each entry's bucket holds 10 tokens and the
+   process bucket 50, refilled continuously at that many per second; the pause budget is a bucket of 20 ms refilled
+   at 20 ms per second. An entry is allowed if it has a token, the process has one and the budget is not spent; each
+   allowed entry takes one of each. With no entry allowed the thread resumes. Buckets are kept per entry `id` while
+   it is listed, also when the list changes it, so sending the list again does not reset a limit.
+4. An entry out of tokens gets status `rateLimited` and leaves its V8 breakpoint, which is removed with the last
+   entry on it; entries on it that still have tokens keep capturing. When, after a pause, the process bucket or the
+   budget is empty, `Debugger.setBreakpointsActive(false)` turns every breakpoint off, so the next hit does not pause,
+   and every active entry gets `rateLimited`, also one set while they are off. One unref'd timer, set to the nearest
+   wait, restores what is due and sends `active`: an entry limited by its own bucket when that bucket is full, and
+   all of them, with `setBreakpointsActive(true)`, when the process bucket, the budget and their buckets are full.
+   V8 keeps breakpoints off across `Debugger.disable`, so only that timer turns them on again. If the inspector
+   refuses either call, the debugger stops itself.
 5. `Capture` reads up to 20 frames of the stack, then `this` and the scopes of the innermost frame with synchronous
    `Runtime.getProperties` calls, depth first, within the largest limits of the allowed entries. V8 names the script
    of a frame by id, so `Breakpoints` finds its URL by id and gives the position: the original one where the script's
@@ -254,10 +278,12 @@ packages/sdk/src/debugger/
    reason, the rest is left out (an object is `truncated`, an array, `Set` or `Map` loses its children) and the
    snapshot is `truncated`. A name that matches the redaction rules, see [Redacting secrets](#redacting-secrets),
    gets the value `redacted` and its children are not read.
-6. The thread resumes, and the pause time, from the start of the handler, is charged to the budget, also for a
-   pause resumed at once. One pause serves every entry on the breakpoint.
+6. The thread resumes, also when the capture threw, and the pause time, from the start of the handler, is charged
+   to the budget, also for a pause resumed at once; a budget can go into debt and refills from there. One pause
+   serves every entry on the breakpoint. A capture that threw then stops the debugger.
 7. For each allowed entry, the capture is cut to that entry's own limits, without V8 calls, and sent as a
-   [`snapshot`](../../api/protocol.md#snapshot) through the connector as a data message.
+   [`snapshot`](../../api/protocol.md#snapshot) through the connector as a data message. With `debug` on, each logs
+   its `breakpointId`, the pause time, its size in bytes and `truncated`, never a value.
 
 ### Redacting secrets
 
@@ -285,8 +311,9 @@ packages/sdk/src/debugger/
 
 ### Stopping
 
-1. `stop()` removes every V8 breakpoint, turns the `Debugger` domain off, disconnects the inspector session and
-   unsubscribes from the connector. Source map reads still running are ignored when they end.
+1. `stop()` removes every V8 breakpoint, turns the `Debugger` domain off, clears the rate limits' timer,
+   disconnects the inspector session and unsubscribes from the connector. Source map reads still running are
+   ignored when they end.
 2. It closes the connector it created, which sends buffered snapshots for up to `closeTimeoutMs`; a custom
    connector is left open.
 3. It [flushes the logger](logger.md#flushing). The debugger is not running; `run()` can start it again.

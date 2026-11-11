@@ -1,7 +1,7 @@
 // Helpers for tests that run against the real V8 inspector of the test process: fixture modules loaded from disk
 // and a session that records what crosses the boundary.
 
-import type { BreakpointStatus } from "@micafox/protocol";
+import type { BreakpointStatus, Snapshot } from "@micafox/protocol";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { Session } from "node:inspector";
@@ -13,7 +13,9 @@ import { pathToFileURL } from "node:url";
 import { createRecordingLogger, type LoggedLine } from "./fakes.js";
 import { Breakpoints } from "../../src/debugger/breakpoints/index.js";
 import { InspectorSession, type InspectorBinding } from "../../src/debugger/index.js";
-import { createLogger } from "../../src/logger/index.js";
+import { Pauses } from "../../src/debugger/pauses/index.js";
+import { RateLimiter } from "../../src/debugger/rate-limiter/index.js";
+import { createLogger, type SdkLogger } from "../../src/logger/index.js";
 
 /**
  * A module with a loop; its lines are what the tests set breakpoints on:
@@ -175,12 +177,17 @@ export class TracedSession implements InspectorBinding {
   }
 }
 
-/** A `Breakpoints` on a real inspector session, with the statuses it sent and the failures it reported. */
+/**
+ * A `Breakpoints` and its `Pauses` on a real inspector session, with the statuses and snapshots they sent and the
+ * failures they reported. The rate limits run on `Date.now()`, which fake timers control.
+ */
 export interface BreakpointsUnderTest {
   breakpoints: Breakpoints;
+  pauses: Pauses;
   session: TracedSession;
   fixtures: Fixtures;
   sent: BreakpointStatus[];
+  snapshots: Snapshot[];
   failures: unknown[];
   lines: LoggedLine[];
   /** Delivers a `breakpoints` message with `entries`. */
@@ -215,7 +222,44 @@ const createLineWaiters = (): {
   };
 };
 
-export const createBreakpoints = (): BreakpointsUnderTest => {
+// Breakpoints and Pauses wired as the debugger wires them, recording what they send and report
+const createParts = (inspector: InspectorSession, logger: SdkLogger, isSecret: (name: string) => boolean) => {
+  const sent: BreakpointStatus[] = [];
+  const snapshots: Snapshot[] = [];
+  const failures: unknown[] = [];
+  const fail = (error: unknown): void => {
+    failures.push(error);
+  };
+  const now = (): number => Date.now();
+  const limiter = new RateLimiter(now);
+  const breakpoints = new Breakpoints({
+    session: inspector,
+    logger,
+    send: (status) => {
+      sent.push(status);
+    },
+    fail,
+    onRemoved: (id) => {
+      limiter.forget(id);
+    },
+  });
+  const pauses = new Pauses({
+    session: inspector,
+    logger,
+    breakpoints,
+    limiter,
+    isSecret,
+    send: (snapshot) => {
+      snapshots.push(snapshot);
+    },
+    fail,
+    now,
+  });
+  return { sent, snapshots, failures, breakpoints, pauses };
+};
+
+/** `isSecret` defaults to redacting `password`; one that throws makes the capture fail. */
+export const createBreakpoints = (options: { isSecret?: (name: string) => boolean } = {}): BreakpointsUnderTest => {
   const lines: LoggedLine[] = [];
   const { onLine, waitForLine } = createLineWaiters();
   const logger = createLogger({ component: "debugger", env: {}, console: createRecordingLogger(lines, onLine) });
@@ -223,26 +267,22 @@ export const createBreakpoints = (): BreakpointsUnderTest => {
   const traced = new TracedSession();
   const inspector = new InspectorSession(logger, traced);
   inspector.connect();
-  const sent: BreakpointStatus[] = [];
-  const failures: unknown[] = [];
-  const breakpoints = new Breakpoints({
-    session: inspector,
+  const { sent, snapshots, failures, breakpoints, pauses } = createParts(
+    inspector,
     logger,
-    send: (status) => {
-      sent.push(status);
-    },
-    fail: (error) => {
-      failures.push(error);
-    },
-  });
+    options.isSecret ?? ((name) => name === "password"),
+  );
   breakpoints.start();
+  pauses.start();
   const fixtures = new Fixtures();
 
   return {
     breakpoints,
+    pauses,
     session: traced,
     fixtures,
     sent,
+    snapshots,
     failures,
     lines,
     apply: (...entries) => {
@@ -252,6 +292,7 @@ export const createBreakpoints = (): BreakpointsUnderTest => {
     waitForLine,
     dispose: () => {
       breakpoints.stop();
+      pauses.stop();
       inspector.disconnect();
       fixtures.remove();
     },

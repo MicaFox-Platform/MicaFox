@@ -1,5 +1,7 @@
 import { PROTOCOL_VERSION, type BreakpointStatus, type CaptureLimits } from "@micafox/protocol";
 
+import type { ScriptPosition } from "../location/index.js";
+
 /** An entry of a `breakpoints` message whose fields are valid. */
 export interface ValidEntry {
   kind: "valid";
@@ -20,14 +22,39 @@ export interface InvalidEntry {
 export type ListedEntry = ValidEntry | InvalidEntry;
 
 /**
- * What became of an entry. `place` names its V8 breakpoint, and `mapUrl` the URL of the script whose map placed it,
- * which holds that map. A retryable error came from a map that could not be used and is resolved again like a
+ * Where an entry is set: `place` names its V8 breakpoint, set at `position` of the script at `url`, and `mapUrl` the
+ * URL of the script whose map placed it, which holds that map.
+ */
+export interface Placed {
+  place: string;
+  url: string;
+  position: ScriptPosition;
+  mapUrl?: string;
+}
+
+/** A set entry that captures. */
+export interface ActiveOutcome extends Placed {
+  status: "active";
+}
+
+/** A set entry off until its rate limit refills; it is set again where it was. */
+export interface RateLimitedOutcome extends Placed {
+  status: "rateLimited";
+}
+
+/**
+ * What became of an entry. A retryable error came from a map that could not be used and is resolved again like a
  * pending entry.
  */
 export type Outcome =
   | { status: "pending" }
-  | { status: "active"; place: string; mapUrl?: string }
+  | ActiveOutcome
+  | RateLimitedOutcome
   | { status: "error"; message: string; isRetryable?: boolean };
+
+/** Whether the entry holds its place and the map that placed it. */
+export const isPlaced = (outcome: Outcome): outcome is ActiveOutcome | RateLimitedOutcome =>
+  outcome.status === "active" || outcome.status === "rateLimited";
 
 /** Whether a later script may still change the outcome: it is pending, or an error that is retried. */
 export const isUnresolved = (outcome: Outcome): boolean =>
@@ -38,14 +65,18 @@ export const isSameStatus = (first: Outcome, second: Outcome): boolean =>
   first.status === second.status &&
   (first.status !== "error" || (second.status === "error" && first.message === second.message));
 
-/** How many of `outcomes` have each status, such as `1 active, 2 pending, 0 error`. */
+/**
+ * How many of `outcomes` have each status, such as `1 active, 2 pending, 0 error`; rate limited ones are added only
+ * when there are any, which happens while every breakpoint is off.
+ */
 export const summarizeOutcomes = (outcomes: readonly Outcome[]): string => {
-  const counts = { active: 0, pending: 0, error: 0 };
+  const counts = { active: 0, pending: 0, rateLimited: 0, error: 0 };
   for (const outcome of outcomes) {
     counts[outcome.status] += 1;
   }
 
-  return `${String(counts.active)} active, ${String(counts.pending)} pending, ${String(counts.error)} error`;
+  const summary = `${String(counts.active)} active, ${String(counts.pending)} pending, ${String(counts.error)} error`;
+  return counts.rateLimited === 0 ? summary : `${summary}, ${String(counts.rateLimited)} rate limited`;
 };
 
 /** The `breakpointStatus` message of an entry's outcome. */

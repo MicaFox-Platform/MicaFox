@@ -1,5 +1,6 @@
 import { isRecord } from "../../connector/index.js";
 import type { SdkLogger } from "../../logger/index.js";
+import type { ScriptPosition } from "../location/index.js";
 
 const COMPONENT = "debugger";
 
@@ -11,12 +12,6 @@ export interface V8Inspector {
 /** Where V8 put a breakpoint: 1-based line and column, as editors count. */
 export interface V8Location {
   url: string;
-  line: number;
-  column: number;
-}
-
-/** A position in a script: 0-based line and column, as V8 and source maps count. */
-export interface ScriptPosition {
   line: number;
   column: number;
 }
@@ -108,9 +103,13 @@ export class V8Breakpoints {
     }
   }
 
-  /** Tells whether one of the `hitBreakpoints` of a `Debugger.paused` event is one of these breakpoints. */
-  ownsPause(params: unknown): boolean {
-    return readHitBreakpoints(params).some((v8Id) => this.placeByV8Id.has(v8Id));
+  /** The owners of the breakpoints in the `hitBreakpoints` of a `Debugger.paused` event; empty for a foreign pause. */
+  ownersHit(params: unknown): string[] {
+    return readHitBreakpoints(params).flatMap((v8Id) => {
+      const place = this.placeByV8Id.get(v8Id);
+      const owners = place === undefined ? undefined : this.places.get(place)?.owners;
+      return owners === undefined ? [] : [...owners];
+    });
   }
 
   /** Forgets every breakpoint without a V8 call, after disabling the domain removed them. */

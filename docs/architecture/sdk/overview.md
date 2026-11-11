@@ -6,8 +6,8 @@
 ┌───────────────────────────────── @micafox/sdk ──────────────────────────────────┐
 │ ┌───────── Debugger ─────────┐    send(message)    ┌────── HubConnector ──────┐ │  hello, messages (wss)   ┌─────┐
 │ │ Breakpoints · SourceMaps   │────────────────────▶│ session · control queue  │─┼─────────────────────────▶│ Hub │
-│ │ RateLimiter · Capture      │◀────────────────────│ data buffer · batcher    │◀┼──────────────────────────│     │
-│ │ InspectorSession           │ onMessage, onStatus │ rate limit · reconnect   │ │  welcome, breakpoints    └─────┘
+│ │ Pauses · RateLimiter       │◀────────────────────│ data buffer · batcher    │◀┼──────────────────────────│     │
+│ │ Capture · InspectorSession │ onMessage, onStatus │ rate limit · reconnect   │ │  welcome, breakpoints    └─────┘
 │ └───┬─────────┬─────────────┬┘                     └────────────┬─────────────┘ │
 │     │         │             ▲                                   │               │
 │     │         │ log lines   │                     ┌────────┐    │ log lines     │
