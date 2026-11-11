@@ -1,7 +1,16 @@
 import type { Connector, ConnectorStatus, Message } from "@micafox/protocol";
 import { assertType, describe, expectTypeOf, it } from "vitest";
 
-import { HubConnector, type HubConnectorOptions, type LogContext, type Logger, type LogLevel } from "../index.js";
+import {
+  HubConnector,
+  micafox,
+  type Debugger,
+  type DebuggerOptions,
+  type HubConnectorOptions,
+  type LogContext,
+  type Logger,
+  type LogLevel,
+} from "../index.js";
 
 type Write = (message: string, context: LogContext) => void;
 
@@ -102,5 +111,48 @@ describe("connector types", () => {
 
   it("makes HubConnector a Connector", () => {
     expectTypeOf<HubConnector>().toExtend<Connector>();
+  });
+});
+
+// The signature blocks of docs/api/sdk/debugger.md; its examples are compiled from test/docs/debugger-*.test-d.ts
+describe("debugger types", () => {
+  it("defines DebuggerOptions as in docs/api/sdk/debugger.md", () => {
+    expectTypeOf<DebuggerOptions>().toEqualTypeOf<{
+      enabled?: boolean;
+      url?: string;
+      token?: string;
+      service?: string;
+      labels?: Record<string, string>;
+      redact?: string[];
+      logger?: Logger;
+      logLevel?: LogLevel;
+      hubConnector?: Pick<HubConnectorOptions, "buffer" | "batch" | "rateLimit" | "reconnect" | "closeTimeoutMs">;
+      connector?: Connector;
+    }>();
+  });
+
+  it("gives Debugger the methods of docs/api/sdk/debugger.md and no others", () => {
+    expectTypeOf<keyof Debugger>().toEqualTypeOf<"configure" | "run" | "stop">();
+    expectTypeOf<Debugger["configure"]>().toEqualTypeOf<(options?: DebuggerOptions) => void>();
+    expectTypeOf<Debugger["run"]>().toEqualTypeOf<() => void>();
+    expectTypeOf<Debugger["stop"]>().toEqualTypeOf<() => Promise<void>>();
+  });
+
+  it("lets an app write its own Debugger, such as a test double", () => {
+    assertType<Debugger>({ configure: () => undefined, run: () => undefined, stop: () => Promise.resolve() });
+  });
+
+  it("types micafox as Debugger", () => {
+    expectTypeOf(micafox).toEqualTypeOf<Debugger>();
+  });
+
+  it("rejects an option the debugger does not have", () => {
+    // @ts-expect-error there is no `endpoint` option
+    assertType<DebuggerOptions>({ endpoint: "wss://hub.example.com/micafox" });
+  });
+
+  it("rejects hubConnector tuning of the hub's address", () => {
+    // @ts-expect-error url is an option of its own, not of hubConnector
+    assertType<DebuggerOptions>({ hubConnector: { url: "wss://hub.example.com/micafox" } });
   });
 });

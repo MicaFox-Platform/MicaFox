@@ -1,4 +1,4 @@
-export { resolveConnectorConfig } from "./config.js";
+export { LOGGER_KEY, resolveConnectorConfig } from "./config.js";
 export type { Labels } from "./labels.js";
-export type { HubConnectorOptions, ResolvedConnectorOptions } from "./options.js";
+export { resolveOptions, type HubConnectorOptions, type ResolvedConnectorOptions } from "./options.js";
 export { isRecord, readEnv, readField, readOption, type Warn } from "./read-field.js";

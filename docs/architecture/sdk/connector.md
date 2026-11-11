@@ -68,7 +68,8 @@ JSON protocol message or a [`Batch`](../../api/protocol.md#batch) of them.
 
 ```text
 packages/sdk/src/connector/
-├── index.ts                the connector's only entry: HubConnector, HubConnectorOptions, the read helpers
+├── index.ts                the connector's only entry: HubConnector, HubConnectorOptions, the read helpers,
+│                           resolveOptions and checkHubTarget, which the debugger uses before it creates one
 ├── hub-connector/          the class the app sees: lifecycle, status, reconnects
 │   ├── hub-connector.ts    HubConnector: connect, send, close, handlers; drives attempts and the batcher
 │   ├── handlers.ts         the onMessage and onStatus handler lists; a throwing handler is logged

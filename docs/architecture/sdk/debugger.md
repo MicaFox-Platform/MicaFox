@@ -41,7 +41,11 @@ limits, redacts secrets and sends them to the hub through a connector. How to us
     Only the host app sets the redaction rules; the hub cannot change them.
   - One debugger per process: the first copy of the SDK loaded stores its `Debugger` on `globalThis` under
     `Symbol.for("micafox.debugger")`, and every later copy, an ES module or CommonJS build or another install,
-    exports that object. A copy of another major version logs a warning and exports it too.
+    exports that object. The first copy also stores its major version, the constant `SDK_MAJOR`, beside it under
+    `Symbol.for("micafox.debugger.major")`, so the `Debugger` type has no member for it. A copy of another major
+    version, or of one that stored none, logs a warning and exports the stored debugger too. A value under the key
+    that is not a debugger is replaced; a `globalThis` that cannot be read or written gives the copy its own
+    debugger and a warning.
   - Debugs the main thread only; worker threads are not debugged.
   - Does not start when the inspector is already open at `run()`, by `--inspect` or `inspector.open()`.
   - Resumes every pause it did not cause, including `debugger` statements, so another debugger attached to the
@@ -91,7 +95,7 @@ limits, redacts secrets and sends them to the hub through a connector. How to us
 
 The parts live in `packages/sdk/src/debugger/`:
 
-- `Debugger` — the `micafox` object. Resolves the options and the redaction rules, creates the logger, the connector
+- `Debugger` — the `micafox` object, a `MicafoxDebugger`; the public type `Debugger` has only its three methods. Resolves the options and the redaction rules, creates the logger, the connector
   and the parts below, hands `breakpoints` messages to `Breakpoints` and sends what they produce. It is not running,
   running or stopping.
 - `Breakpoints` — holds the latest list from the hub, the V8 breakpoint of each entry and its status. Tells which
@@ -116,9 +120,11 @@ The parts live in `packages/sdk/src/debugger/`:
 
 ```text
 packages/sdk/src/debugger/
-├── index.ts                    the debugger's only entry: Debugger, InspectorSession and their types
-├── debugger.ts                 Debugger: configure(), run(), stop(), and the not running, running and stopping states
+├── index.ts                    the debugger's only entry: micafox, Debugger, InspectorSession and their types
+├── debugger.ts                 Debugger, the public type, and MicafoxDebugger: configure(), run(), stop() and the states
+├── micafox.ts                  micafox: the one Debugger of the process, shared through globalThis, and SDK_MAJOR
 ├── options.ts                  DebuggerOptions: the fields of a configure() call, enabled, the custom connector check
+├── connector-choice.ts         chooseConnector: the custom connector, or a HubConnector built from the options
 ├── connector-link.ts           ConnectorLink: subscribes to, connects and sends to a connector; catches its rejections
 ├── inspector-session.ts        InspectorSession: node:inspector calls that answer synchronously and never throw
 ├── breakpoints/                Breakpoints: the hub's list as V8 breakpoints and their statuses
@@ -183,14 +189,18 @@ and `Breakpoints` through an interface it declares, so the two do not import eac
 
 1. `run()` with `enabled` false logs one info line and does nothing. When `inspector.url()` returns a URL, another
    debugger may be attached: it logs a warning and does nothing.
-2. It resolves the options: the value from `configure()`, then the environment, then the default. Without a hub URL
-   and without a custom connector it logs an error and does not start.
+2. It resolves the options: the value from `configure()`, then the environment, then the default. Without a custom
+   connector it resolves the hub URL and token as `HubConnector` does and checks them with the connector's own
+   `checkHubTarget`; without a URL, or with one the connector would refuse, it logs an error and does not start.
 3. It resolves the [redaction rules](#redacting-secrets), once. It creates a `HubConnector` or takes the custom one,
-   subscribes to its messages and status, and calls `connect()`. When a custom connector reports `closed`, the
-   debugger logs a warning and stops itself.
+   subscribes to its messages and status, and calls `connect()`. The `HubConnector` gets `url`, `token`, `service`,
+   `labels` and the tuning of `hubConnector`, and the debugger's logger under `Symbol.for("micafox.logger")`. A
+   custom connector with hub fields set logs one warning and the fields are ignored. When a connector reports
+   `closed`, the debugger logs a warning and stops itself.
 4. It connects the inspector session; the `Debugger` domain stays off until there are breakpoints.
 5. If any step fails, an error is logged, what was started is stopped and the debugger is not running.
-6. It logs one info line, `started`, with the number of redaction rules.
+6. It logs one info line, `started`, with the service and the host of the hub URL (or `a custom connector`) and the
+   number of redaction rules. Never the token, and not the user info, path or query of the URL.
 
 ### Applying breakpoints
 
