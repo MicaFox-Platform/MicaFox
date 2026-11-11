@@ -69,6 +69,7 @@ install, shares [one debugger per process](debugger.md#boundaries).
 - [0003. Configure the SDK from options, then env](../../adr/0003-configure-the-sdk-from-options-then-env.md)
 - [0008. Use WebSocket for the hub connection](../../adr/0008-use-websocket-for-the-hub-connection.md)
 - [0013. Publish the packages as ES modules and CommonJS](../../adr/0013-publish-the-packages-as-es-modules-and-commonjs.md)
+- [0017. Tag messages with their module and agree on modules](../../adr/0017-tag-messages-with-their-module-and-agree-on-modules.md)
 
 Decisions of one component: [debugger](debugger.md#decisions), [connector](connector.md#decisions),
 [logger](logger.md#decisions).

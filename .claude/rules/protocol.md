@@ -17,8 +17,11 @@ including the messages they exchange (the protocol), and the public types end us
   `Map`, `Set`, `bigint`, `undefined` values or class instances.
 - The SDK, custom connectors and the hub may run different versions: every message carries the protocol
   version.
-- Backward-compatible: add optional fields; never rename, remove or retype. A breaking change bumps the protocol
-  version.
+- Every message of an SDK module carries `module`; `hello`, `welcome` and `batch` are session frames without one,
+  and no module uses their type names. Type names are unique within a module only.
+- Backward-compatible: add optional fields, a new module, a new message type, or a new value of an enumerated field
+  with a documented fallback for readers; never rename, remove or retype. A breaking change bumps the protocol
+  version. Until the first npm release, version 1 changes in place.
 - Each protocol version's messages and data types live in `src/v<N>.ts` and fix `version` to the literal `<N>`, so a
   bump never retypes an older version. `src/index.ts` holds `PROTOCOL_VERSION`, `CLOSE_CODES` and `Connector`, which
   is typed by the current version's `Message`, and re-exports the current version's types.
@@ -33,6 +36,7 @@ export interface Snapshot {
 // Good (src/v1.ts)
 export interface Snapshot {
   version: 1;
+  module: "debugger";
   capturedAt: string; // ISO 8601
   frames: Frame[];
   tags?: string[]; // added later, optional for old clients

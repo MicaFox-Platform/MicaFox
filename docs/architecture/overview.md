@@ -21,7 +21,8 @@
 
 The [SDK](sdk/overview.md) runs inside the host app as a set of modules over one
 [connector](sdk/connector.md), `HubConnector` by default, which carries every module's messages to and from the hub
-over one WebSocket. The [debugger](sdk/debugger.md) is the SDK's only module: it sets breakpoints through the V8
+over one WebSocket; every module message names its module, and the handshake agrees on which modules a session
+carries. The [debugger](sdk/debugger.md) is the SDK's only module: it sets breakpoints through the V8
 inspector and captures snapshots of variables without stopping the app. The [logger](sdk/logger.md) writes the SDK's
 own problems to the app's logger or `console`. The hub decides which breakpoints exist and receives the snapshots;
 it is not part of this repository yet, and any server that speaks the [protocol](protocol.md) can act as one. Every
@@ -32,7 +33,8 @@ What the host app can rely on:
 - The SDK never throws into or crashes the app. An internal error turns MicaFox off; a lost hub connection is
   retried.
 - Without breakpoints V8 runs the app as if MicaFox were not there; with them, pauses are short and capped per
-  second.
+  second. Every breakpoint expires after the time the hub gives it, at most 24 h, even while the hub is
+  unreachable.
 - Memory and traffic are bounded, and the process is kept alive only while `stop()` sends what is left, and
   briefly while the connector connects or closes a connection.
 - Secrets are redacted by name inside the app; the hub cannot turn this off.
@@ -60,9 +62,10 @@ One debugging session, end to end:
 1. [Starting](sdk/debugger.md#starting) — `micafox.run()` resolves the options and creates the default connector,
    unless one is passed.
 2. [Connecting](sdk/connector.md#connecting) — the connector opens the WebSocket and
-   [opens a session](protocol.md#opening-a-session) with `hello` → `welcome`.
+   [opens a session](protocol.md#opening-a-session) with `hello` → `welcome`, which agree on the modules.
 3. [Applying breakpoints](sdk/debugger.md#applying-breakpoints) — the hub sends the full breakpoint set; the
-   debugger maps repository lines to loaded scripts and reports each breakpoint's status.
+   debugger maps repository lines to loaded scripts and reports each breakpoint's status;
+   [each expires](sdk/debugger.md#expiring-a-breakpoint) when its time runs out.
 4. [Capturing a snapshot](sdk/debugger.md#capturing-a-snapshot) — a hit pauses the thread briefly, the variables
    are read within limits, [secrets are redacted](sdk/debugger.md#redacting-secrets) and the snapshot goes to the
    connector.
@@ -95,3 +98,6 @@ Changing the contract between peers: [changing the protocol](protocol.md#changin
 - [0014. Pass SDK logs as a full message and a context](../adr/0014-pass-sdk-logs-as-a-full-message-and-a-context.md)
 - [0015. Filter SDK logs by level before the app's logger](../adr/0015-filter-sdk-logs-by-level-before-the-apps-logger.md)
 - [0016. Use the hello's protocol version for the session](../adr/0016-use-the-hellos-protocol-version-for-the-session.md)
+- [0017. Tag messages with their module and agree on modules](../adr/0017-tag-messages-with-their-module-and-agree-on-modules.md)
+- [0018. Expire breakpoints in the SDK by a time left from the hub](../adr/0018-expire-breakpoints-in-the-sdk-by-a-time-left-from-the-hub.md)
+- [0019. Report the deployed commit in hello](../adr/0019-report-the-deployed-commit-in-hello.md)

@@ -23,6 +23,8 @@ alive only while `stop()` sends buffered snapshots.
 Each breakpoint captures at most 10 snapshots per second and the process at most 50, and the app spends at most
 20 ms per second paused. A breakpoint past its own limit has status `rateLimited` until its budget refills; past the
 process's limit or the pause time, every breakpoint is `rateLimited` until those limits and their own refill, then `active` again.
+Every breakpoint expires after the time the hub gives it, at most 24 h, even while the hub is unreachable; it is
+then removed and has status `expired`, see [`Breakpoint`](../protocol.md#breakpoint).
 Capturing stops after 10 ms per pause and at 64 KiB per snapshot;
 a snapshot cut by either limit is `truncated`. An array, `Set` or `Map` with more children than `maxItems` is captured
 with its size only. Details: [capturing a snapshot](../../architecture/sdk/debugger.md#capturing-a-snapshot).
@@ -118,6 +120,7 @@ interface DebuggerOptions {
   url?: string;
   token?: string;
   service?: string;
+  commit?: string;
   labels?: Record<string, string>;
   redact?: string[];
   logger?: Logger;
@@ -133,7 +136,7 @@ The options of [`micafox.configure()`](#micafox). Every field is optional.
 
 - `enabled` — `boolean`, env `MICAFOX_ENABLED` as `true` or `false`. When `false`, `run()` logs one info line and
   does nothing, so a deployment can switch MicaFox off without a code change. Default `true`.
-- `url`, `token`, `service`, `labels` — passed to the default connector, with the same environment variables,
+- `url`, `token`, `service`, `commit`, `labels` — passed to the default connector, with the same environment variables,
   defaults and rules as in [`HubConnector`](connector.md#hubconnector).
 - `redact` — `string[]`, env `MICAFOX_REDACT` as names separated by commas, such as `iban,ssn,clientKey`. Names
   whose values are replaced with `redacted` in snapshots, added to the built-in ones (`password`, `secret`,
@@ -152,7 +155,8 @@ The options of [`micafox.configure()`](#micafox). Every field is optional.
   as in [`HubConnectorOptions`](connector.md#hubconnectoroptions).
 - `connector` — a custom [`Connector`](../protocol.md#connector) used instead of `HubConnector`. `run()` calls its
   `connect()`; the debugger never closes it, so close it yourself after `stop()` resolves. When it is set, `url`,
-  `token`, `service`, `labels` and `hubConnector` passed to `configure()` are ignored with a warning.
+  `token`, `service`, `commit`, `labels` and `hubConnector` passed to `configure()` are ignored with a warning. It
+  sends its own [`hello`](../protocol.md#hello), with the modules `["debugger"]`.
 
 ```ts
 import { micafox } from "@micafox/sdk";

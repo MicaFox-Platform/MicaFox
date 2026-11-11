@@ -41,7 +41,7 @@ Protocol types, such as [`Connector`](../protocol.md#connector), come from
 `MICAFOX_ENABLED`, `MICAFOX_REDACT` and `MICAFOX_LOG_LEVEL` are settings of the whole SDK, not of the debugger
 alone. Each option is resolved once, at `micafox.run()`: the value passed to `configure()`, then the environment
 variable, then the default. A `HubConnector` you create resolves its own in its constructor. With a custom
-`connector`, `url`, `token`, `service` and `labels` are ignored.
+`connector`, `url`, `token`, `service`, `commit` and `labels` are ignored.
 
 | Variable            | Option     | Default                                                      |
 | ------------------- | ---------- | ------------------------------------------------------------ |
@@ -49,6 +49,7 @@ variable, then the default. A `HubConnector` you create resolves its own in its 
 | `MICAFOX_HUB_URL`   | `url`      | none; required unless a `connector` is set                   |
 | `MICAFOX_TOKEN`     | `token`    | none                                                         |
 | `MICAFOX_SERVICE`   | `service`  | none                                                         |
+| `MICAFOX_COMMIT`    | `commit`   | none; a commit hash of 7 to 64 hexadecimal characters        |
 | `MICAFOX_LABELS`    | `labels`   | no labels; format `team=payments,region=eu`                  |
 | `MICAFOX_REDACT`    | `redact`   | built-in names only; format `iban,ssn`                       |
 | `MICAFOX_LOG_LEVEL` | `logLevel` | `warn`; exactly `debug`, `info`, `warn`, `error` or `silent` |

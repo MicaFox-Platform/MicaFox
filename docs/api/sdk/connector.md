@@ -39,10 +39,14 @@ integer of at least 1, and `reconnect.minDelayMs` must not exceed `reconnect.max
   fragment in it are not sent. No default.
   Certificates are always verified; add a custom CA with `NODE_EXTRA_CA_CERTS`. HTTP(S) proxies and redirects are
   not followed: the hub must be reachable directly.
-- `options.token` — `string`, env `MICAFOX_TOKEN`. Sent as `Authorization: Bearer <token>` when connecting; never
-  logged. With a token, `ws://` is allowed only to `localhost`, `127.0.0.0/8` and `[::1]`. No default. See
+- `options.token` — `string`, env `MICAFOX_TOKEN`. The project key your hub issued, sent as
+  `Authorization: Bearer <token>` when connecting; never logged. With a token, `ws://` is allowed only to `localhost`, `127.0.0.0/8` and `[::1]`. No default. See
   [ADR 0006](../../adr/0006-authenticate-to-the-hub-with-a-bearer-token.md).
 - `options.service` — `string`, env `MICAFOX_SERVICE`. The service name the hub targets breakpoints by. No default.
+- `options.commit` — `string`, env `MICAFOX_COMMIT`. The commit hash the app runs, 7 to 64 hexadecimal characters,
+  sent lowercased in [`hello`](../protocol.md#hello) so the hub shows the matching source. A value that is not a
+  commit hash is left out with a warning. No default. See
+  [ADR 0019](../../adr/0019-report-the-deployed-commit-in-hello.md).
 - `options.labels` — `Record<string, string>`, env `MICAFOX_LABELS` as `key=value` pairs separated by commas, such
   as `team=payments,region=eu`. Labels the hub can target breakpoints by. A passed object, even `{}`, replaces the
   env value; an entry whose value is not a string or whose key is empty is skipped with a warning, and one whose
@@ -74,7 +78,7 @@ integer of at least 1, and `reconnect.minDelayMs` must not exceed `reconnect.max
 **Methods**
 
 - `connect()` — starts connecting in the background and returns at once. On every connection it sends
-  [`hello`](../protocol.md#hello) first; the status becomes `connected` once the hub replies
+  [`hello`](../protocol.md#hello) first, with the modules `["debugger"]` when you create the connector yourself; the status becomes `connected` once the hub replies
   [`welcome`](../protocol.md#welcome). Reconnects after every disconnect until `close()`. A second call does
   nothing.
 - `send(message)` — serializes `message` and queues it, and returns; it goes to the hub later in a batch, control
@@ -84,7 +88,7 @@ integer of at least 1, and `reconnect.minDelayMs` must not exceed `reconnect.max
   [ADR 0007](../../adr/0007-deliver-messages-to-the-hub-at-most-once.md).
 - `onMessage(handler)` — calls `handler` with every message from the hub after `welcome`, such as
   `breakpoints`. Handlers run in the order they subscribed. `welcome` itself and ignored frames (see Errors) never
-  reach a handler, and nothing does once `close()` is called. Only `version` and `type` are checked: the message
+  reach a handler, and nothing does once `close()` is called. Only `version`, `module` and `type` are checked: the message
   comes from the network, so a handler checks the other fields before it trusts them. Returns a function that
   removes it.
 - `onStatus(handler)` — calls `handler` with the new [`ConnectorStatus`](../protocol.md#connectorstatus) on every
@@ -123,9 +127,13 @@ repeated within 60 s is logged once in full, then as one summary line with a cou
   `undefined`: an error is logged and the message is dropped.
 - A control message dropped because 200 are waiting or because it is over 4 KiB, or a data message larger than
   `buffer.maxBytes`: a warning is logged.
-- A binary frame, a frame that is not valid JSON, has no numeric `version` or no string `type`, or a message type
-  only the SDK sends: a warning is logged and it is ignored. A message with an unknown `type` is logged at `debug`
-  and ignored.
+- A binary frame, a frame that is not valid JSON, has no numeric `version` or no string `type`, a message without a
+  string `module`, or a message type only the SDK sends: a warning is logged and it is ignored. A message of a
+  module the session did not agree on or that the SDK does not know, or with an unknown `type`, is logged at
+  `debug` and ignored.
+- The hub's `welcome` leaves out a module the connector listed in `hello`: one warning per session, and that
+  module's messages are dropped while the session lasts. A `welcome` without a `modules` array is treated like a
+  `welcome` of another protocol version.
 - A handler throws: the error is caught and logged; other handlers still run. The logger throws or rejects: the
   error is ignored.
 - `close()` drops messages it could not send: one warning with their count.
@@ -150,6 +158,7 @@ interface HubConnectorOptions {
   url?: string;
   token?: string;
   service?: string;
+  commit?: string;
   labels?: Record<string, string>;
   logger?: Logger;
   logLevel?: LogLevel;

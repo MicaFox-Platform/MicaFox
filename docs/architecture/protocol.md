@@ -11,6 +11,7 @@ depending on the others.
 - Owns:
   - the message types the SDK and a hub exchange through a connector, including the `hello` → `welcome` handshake
     and the `batch` frame;
+  - the SDK module names and the rule that tags every module message with its module;
   - `PROTOCOL_VERSION`, `CLOSE_CODES` and the other constants both ends of the wire must agree on;
   - the `Connector` interface that the default connector and custom connectors implement;
   - the public data types carried in messages, such as breakpoints and snapshots.
@@ -56,16 +57,30 @@ users import `@micafox/protocol`. None of them imports another to get a protocol
 
 ### Opening a session
 
-1. The connector authenticates on the upgrade and sends `hello`; the hub replies `welcome` or closes the session,
-   then sends the full breakpoint state. Steps, timeouts and wire rules: [handshake](../api/protocol.md#hello).
+1. The connector authenticates on the upgrade with the project key the hub issued, and sends `hello` with the SDK
+   modules it carries and, when set, the deployed commit.
+2. The hub replies `welcome` with the modules it accepts, or closes the session. When both lists hold `debugger`,
+   it then sends the full breakpoint state. Steps, timeouts and wire rules: [handshake](../api/protocol.md#hello).
+
+### Routing a message
+
+1. `hello`, `welcome` and `batch` are session frames: they carry no `module`, and no module uses their type names.
+2. Every other message carries its `module`, and a peer routes it by `module`, then `type`; type names are unique
+   within a module only. Why: [ADR 0017](../adr/0017-tag-messages-with-their-module-and-agree-on-modules.md).
+3. A message of a module the session did not agree on, or that the peer does not know, is ignored; so is an unknown
+   type within a known module. Exact rules: [`Message`](../api/protocol.md#message).
 
 ### Changing the protocol
 
 1. Whether a change keeps or bumps the version, and how sessions pick one:
-   [`PROTOCOL_VERSION`](../api/protocol.md#protocol_version).
+   [`PROTOCOL_VERSION`](../api/protocol.md#protocol_version). A new module, a new message type and a new value of an
+   enumerated field with a documented fallback for readers are compatible additions.
 2. Each version's messages and data types live in their own module, `src/v<N>.ts`, with `version` fixed to `<N>`; a
    bump adds `src/v<N+1>.ts` and leaves the older modules as they are, so a hub can keep accepting old sessions.
-3. Either change updates `docs/api/protocol.md` in the same pull request.
+   Compatible additions go into the current `src/v<N>.ts`.
+3. Until the first release of the packages on npm, version 1 changes in place; from that release on, it follows the
+   rules above.
+4. Either change updates `docs/api/protocol.md` in the same pull request.
 
 ## Decisions
 
@@ -81,3 +96,6 @@ users import `@micafox/protocol`. None of them imports another to get a protocol
 - [0012. Redact secrets by name inside the SDK](../adr/0012-redact-secrets-by-name-inside-the-sdk.md)
 - [0013. Publish the packages as ES modules and CommonJS](../adr/0013-publish-the-packages-as-es-modules-and-commonjs.md)
 - [0016. Use the hello's protocol version for the session](../adr/0016-use-the-hellos-protocol-version-for-the-session.md)
+- [0017. Tag messages with their module and agree on modules](../adr/0017-tag-messages-with-their-module-and-agree-on-modules.md)
+- [0018. Expire breakpoints in the SDK by a time left from the hub](../adr/0018-expire-breakpoints-in-the-sdk-by-a-time-left-from-the-hub.md)
+- [0019. Report the deployed commit in hello](../adr/0019-report-the-deployed-commit-in-hello.md)

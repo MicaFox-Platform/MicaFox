@@ -18,7 +18,8 @@ How the packages fit together: [architecture overview](../architecture/overview.
   and call `micafox.run()` at startup: [SDK usage](sdk/overview.md#usage).
 - **Use another transport** — implement [`Connector`](protocol.md#connector) and pass it to the SDK as
   [`connector`](sdk/debugger.md#debuggeroptions).
-- **Write a hub** — answer [`hello`](protocol.md#hello) with [`welcome`](protocol.md#welcome), send
+- **Write a hub** — check the project key, answer [`hello`](protocol.md#hello) with a
+  [`welcome`](protocol.md#welcome) that lists the modules you accept, send
   [`breakpoints`](protocol.md#breakpoints), and receive [`batch`](protocol.md#batch), [`snapshot`](protocol.md#snapshot)
   and [`breakpointStatus`](protocol.md#breakpointstatus) messages.
 

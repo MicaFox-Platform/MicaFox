@@ -15,7 +15,7 @@ limits, redacts secrets and sends them to the hub through a connector. How to us
   - matching repository paths and TypeScript lines to loaded scripts through source maps;
   - capturing snapshots and cutting values to [`CaptureLimits`](../../api/protocol.md#capturelimits);
   - redacting secrets by name before a value is read;
-  - rate limits, the pause budget and the status of each breakpoint.
+  - rate limits, the pause budget, the expiry and the status of each breakpoint.
 - Does not own:
   - moving messages, buffering and reconnects: the [connector](connector.md);
   - message types: the [protocol](../protocol.md);
@@ -98,8 +98,9 @@ The parts live in `packages/sdk/src/debugger/`:
 - `Debugger` — the `micafox` object, a `MicafoxDebugger`; the public type `Debugger` has only its three methods. Resolves the options and the redaction rules, creates the logger, the connector
   and the parts below, hands `breakpoints` messages to `Breakpoints` and sends what they produce. It is not running,
   running or stopping.
-- `Breakpoints` — holds the latest list from the hub, the V8 breakpoint of each entry and its status. Tells which
-  active entries a pause hit, and takes entries off and sets them again for the rate limits.
+- `Breakpoints` — holds the latest list from the hub, the V8 breakpoint of each entry, its status and its
+  deadline, with the one unref'd timer that expires entries. Tells which active entries a pause hit, and takes
+  entries off and sets them again for the rate limits, never an expired one.
 - `Pauses` — handles every `Debugger.paused`: asks `RateLimiter` which hit entries may capture, has `Capture` read
   the pause once, resumes the thread, charges the pause to the budget and sends one snapshot per allowed entry. Its
   `Throttle` takes breakpoints off when a limit runs out and sets them again, with one unref'd timer.
@@ -194,8 +195,9 @@ and `Breakpoints` through an interface it declares, so the two do not import eac
    `checkHubTarget`; without a URL, or with one the connector would refuse, it logs an error and does not start.
 3. It resolves the [redaction rules](#redacting-secrets), once. It creates a `HubConnector` or takes the custom one,
    subscribes to its messages and status, and calls `connect()`. The `HubConnector` gets `url`, `token`, `service`,
-   `labels` and the tuning of `hubConnector`, and the debugger's logger under `Symbol.for("micafox.logger")`. A
-   custom connector with hub fields set logs one warning and the fields are ignored. When a connector reports
+   `labels`, `commit` and the tuning of `hubConnector`, the debugger's logger under `Symbol.for("micafox.logger")`
+   and the modules the SDK runs, `["debugger"]`, under `Symbol.for("micafox.modules")`. A custom connector with hub
+   fields set logs one warning and the fields are ignored. When a connector reports
    `closed`, the debugger logs a warning and stops itself.
 4. It connects the inspector session; the `Debugger` domain stays off until there are breakpoints.
 5. If any step fails, an error is logged, what was started is stopped and the debugger is not running.
@@ -204,15 +206,18 @@ and `Breakpoints` through an interface it declares, so the two do not import eac
 
 ### Applying breakpoints
 
-1. A [`breakpoints`](../../api/protocol.md#breakpoints) message arrives. Only its first 200 entries are read; the
-   rest are ignored with one warning. An entry without a string `id` is skipped with a warning. An invalid entry,
-   such as a limit that is not a positive integer, and those after the 100th get status `error`. When an `id`
-   appears more than once, the first entry is used and the others are ignored with a warning.
+1. A [`breakpoints`](../../api/protocol.md#breakpoints) message arrives; the debugger's handler takes only messages
+   whose `module` is `debugger`. Only its first 200 entries are read; the rest are ignored with one warning. An
+   entry without a string `id` is skipped with a warning. An invalid entry, such as a limit that is not a positive
+   integer or an `expiresInMs` that is not an integer of at least `0`, and those after the 100th get status
+   `error`. When an `id` appears more than once, the first entry is used and the others are ignored with a warning.
 2. Entries are compared by `id` with the current ones. An entry with the same `file`, `line` and `limits` is left
-   as it is, with no V8 calls. Removed and changed entries lose their V8 breakpoint; new and changed entries are
-   resolved.
-3. The first list with a valid entry turns the `Debugger` domain on: V8 reports every loaded script with
-   `scriptParsed`, and later ones as they load. A list without one, such as an empty list, turns it off.
+   as it is, with no V8 calls; its time left is set from `expiresInMs`, see
+   [Expiring a breakpoint](#expiring-a-breakpoint). Removed and changed entries lose their V8 breakpoint; new and
+   changed entries are resolved. An `id` that expired and is still listed stays expired, whatever its fields.
+3. The first list with a valid entry that has not expired turns the `Debugger` domain on: V8 reports every loaded
+   script with `scriptParsed`, and later ones as they load. A list without one, such as an empty list, turns it
+   off.
 4. Resolving: script URLs are turned from `file://` into paths, map sources are resolved against the map's
    `sourceRoot` and URL, and all paths use `/`. Candidates are the sources of the maps of scripts whose file name
    without its extension equals the entry's, such as `dist/checkout.js` for `src/checkout.ts`, that end in the
@@ -271,7 +276,7 @@ and `Breakpoints` through an interface it declares, so the two do not import eac
    entry on it; entries on it that still have tokens keep capturing. When, after a pause, the process bucket or the
    budget is empty, `Debugger.setBreakpointsActive(false)` turns every breakpoint off, so the next hit does not pause,
    and every active entry gets `rateLimited`, also one set while they are off. One unref'd timer, set to the nearest
-   wait, restores what is due and sends `active`: an entry limited by its own bucket when that bucket is full, and
+   wait, restores what is due, never an expired entry, and sends `active`: an entry limited by its own bucket when that bucket is full, and
    all of them, with `setBreakpointsActive(true)`, when the process bucket, the budget and their buckets are full.
    V8 keeps breakpoints off across `Debugger.disable`, so only that timer turns them on again. If the inspector
    refuses either call, the debugger stops itself.
@@ -314,10 +319,28 @@ and `Breakpoints` through an interface it declares, so the two do not import eac
 7. String contents are not scanned: a secret inside a value under a harmless name, such as a URL with a password,
    is captured as is.
 
+### Expiring a breakpoint
+
+1. Every valid entry has a deadline on the monotonic clock: when its list arrived plus its `expiresInMs`, lowered
+   to 24 h. Each later list that holds the `id` sets the deadline again from its own `expiresInMs`, so the hub can
+   extend or shorten it; this costs no V8 call. `0` expires the entry at once.
+2. One unref'd timer is set to the nearest deadline. When it fires, every entry past its deadline expires: it loses
+   its V8 breakpoint, removed with the last entry on it, and the source map index it held, and gets status
+   `expired`, sent as a control message.
+3. An expired entry is final while it is listed: the rate limits never restore it, it is never resolved again on
+   `scriptParsed` or when a map read ends, and it does not keep the `Debugger` domain on. When no valid entry that
+   has not expired is left, the domain goes off, so V8 runs the app as if MicaFox were not there.
+4. Every reply to a list holds `expired` for each listed `id` that has expired. An `id` missing from a list is
+   forgotten, and so is every expired `id` on `stop()`.
+5. Expiry runs whether or not the hub is reachable. Why:
+   [ADR 0018](../../adr/0018-expire-breakpoints-in-the-sdk-by-a-time-left-from-the-hub.md).
+
 ### Losing the connection
 
-1. Breakpoints stay set and snapshots wait in the connector's data buffer, which drops the oldest when full.
-2. After the reconnect the hub sends the full list again, and it is applied like any other.
+1. Breakpoints stay set until they expire, and snapshots wait in the connector's data buffer, which drops the oldest
+   when full.
+2. After the reconnect the hub sends the full list again, with the time each breakpoint has left, and it is applied
+   like any other.
 
 ### Stopping
 
@@ -338,3 +361,5 @@ and `Breakpoints` through an interface it declares, so the two do not import eac
 - [0011. Encode snapshot values as a nested tree](../../adr/0011-encode-snapshot-values-as-a-nested-tree.md)
 - [0012. Redact secrets by name inside the SDK](../../adr/0012-redact-secrets-by-name-inside-the-sdk.md)
 - [0013. Publish the packages as ES modules and CommonJS](../../adr/0013-publish-the-packages-as-es-modules-and-commonjs.md)
+- [0017. Tag messages with their module and agree on modules](../../adr/0017-tag-messages-with-their-module-and-agree-on-modules.md)
+- [0018. Expire breakpoints in the SDK by a time left from the hub](../../adr/0018-expire-breakpoints-in-the-sdk-by-a-time-left-from-the-hub.md)
