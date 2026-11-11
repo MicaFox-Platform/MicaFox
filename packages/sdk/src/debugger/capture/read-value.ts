@@ -1,4 +1,4 @@
-import type { Value, Variable } from "@probex-platform/protocol";
+import type { Value, Variable } from "@micafox/protocol";
 
 import { sizeOf, type CaptureBudget } from "./budget.js";
 import { truncateText, type ResolvedLimits } from "./limits.js";

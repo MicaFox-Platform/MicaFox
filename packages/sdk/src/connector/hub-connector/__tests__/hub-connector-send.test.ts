@@ -1,4 +1,4 @@
-import type { Message } from "@probex-platform/protocol";
+import type { Message } from "@micafox/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useFakeHubs, type FakeHub, type HubConnection } from "../../../../test/connector/fake-hub.js";

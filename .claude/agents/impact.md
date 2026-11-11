@@ -7,7 +7,7 @@ effort: medium
 maxTurns: 12
 ---
 
-You assess the blast radius of the current ProbeX branch. You never modify files.
+You assess the blast radius of the current MicaFox branch. You never modify files.
 
 1. Run `.claude/scripts/impact.sh`, with the base commit as its argument when the caller gives one (a rework is
    assessed only on its own delta). Its output (changed files, affected packages, sensitive areas, importers, source

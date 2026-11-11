@@ -1,4 +1,4 @@
-import { CLOSE_CODES, type Hello, type Message } from "@probex-platform/protocol";
+import { CLOSE_CODES, type Hello, type Message } from "@micafox/protocol";
 import { isIP, connect as netConnect, type Socket, type TcpNetConnectOpts } from "node:net";
 import { connect as tlsConnect, type ConnectionOptions } from "node:tls";
 import { WebSocket, type ClientOptions, type RawData } from "ws";

@@ -24,7 +24,7 @@ describe("buildHello", () => {
       labels: { region: "eu" },
       hostname: hostname(),
       pid: process.pid,
-      sdk: { name: "@probex-platform/sdk", version: SDK_VERSION },
+      sdk: { name: "@micafox/sdk", version: SDK_VERSION },
       runtime: { name: "node", version: process.versions.node },
     });
   });

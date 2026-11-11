@@ -27,5 +27,5 @@ version it still has types for and closes with `incompatibleVersion` otherwise, 
 ## Consequences
 
 - Apps and hubs upgrade independently as long as the hub keeps the app's version.
-- A hub keeps one module per version it accepts, `src/v<N>.ts` in `@probex-platform/protocol`.
+- A hub keeps one module per version it accepts, `src/v<N>.ts` in `@micafox/protocol`.
 - A message with another version than its session is a protocol error.

@@ -1,18 +1,18 @@
 // Fakes for the debugger's boundaries: the connector, node:inspector and the console its logger writes to.
 
-import type { Connector, ConnectorStatus, Message } from "@probex-platform/protocol";
+import type { Connector, ConnectorStatus, Message } from "@micafox/protocol";
 import { EventEmitter } from "node:events";
 
 import { Debugger, type DebuggerDependencies, type InspectorBinding } from "../../src/debugger/index.js";
 import type { Logger } from "../../src/logger/index.js";
 
-/** One line the debugger wrote, without the `[probex] debugger: ` prefix. */
+/** One line the debugger wrote, without the `[micafox] debugger: ` prefix. */
 export interface LoggedLine {
   level: keyof Logger;
   message: string;
 }
 
-const PREFIX = "[probex] debugger: ";
+const PREFIX = "[micafox] debugger: ";
 
 /** A logger that records every line; `onLine` runs inside the call, as an app logger would. */
 export const createRecordingLogger = (
@@ -153,7 +153,7 @@ export class FakeBreakpointsInspector {
 
 /** A debugger under test, with the lines it wrote to its default console and its fake inspector session. */
 export interface DebuggerUnderTest {
-  probex: Debugger;
+  micafox: Debugger;
   lines: LoggedLine[];
   binding: FakeInspectorBinding;
   /** The messages written at `level`. */
@@ -166,7 +166,7 @@ export const createDebugger = (
   binding = new FakeInspectorBinding(),
 ): DebuggerUnderTest => {
   const lines: LoggedLine[] = [];
-  const probex = new Debugger({
+  const micafox = new Debugger({
     env: {},
     console: createRecordingLogger(lines),
     inspectorUrl: () => undefined,
@@ -176,7 +176,7 @@ export const createDebugger = (
   });
   const messagesAt = (level: keyof Logger): string[] =>
     lines.filter((line) => line.level === level).map((line) => line.message);
-  return { probex, lines, binding, messagesAt };
+  return { micafox, lines, binding, messagesAt };
 };
 
 /** Builds an environment; variable names are wire names, which object literal keys cannot spell under the naming rules. */

@@ -1,14 +1,14 @@
 // The Usage example of docs/api/sdk/connector.md, word for word below this comment: connector.test.ts fails
 // when the two differ, and `pnpm typecheck` compiles it through the package's own exports.
 
-import { PROTOCOL_VERSION } from "@probex-platform/protocol";
-import { HubConnector } from "@probex-platform/sdk";
+import { PROTOCOL_VERSION } from "@micafox/protocol";
+import { HubConnector } from "@micafox/sdk";
 
-// url falls back to PROBEX_HUB_URL
+// url falls back to MICAFOX_HUB_URL
 const connector = new HubConnector({ batch: { flushIntervalMs: 250 } });
 
 connector.onStatus((status) => {
-  console.info("probex hub:", status);
+  console.info("micafox hub:", status);
 });
 connector.onMessage((message) => {
   console.info("from the hub:", message.type);

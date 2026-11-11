@@ -1,4 +1,4 @@
-import type { Message } from "@probex-platform/protocol";
+import type { Message } from "@micafox/protocol";
 import { Buffer } from "node:buffer";
 
 import { SendQueues, type AddOutcome, type QueueLimits } from "./queues.js";

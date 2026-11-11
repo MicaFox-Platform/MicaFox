@@ -40,6 +40,6 @@ messages in text frames both ways. We implement it with the `ws` package and unr
 - A hub must accept WebSocket upgrades, and load balancers in front of it must allow them with an idle timeout
   longer than the 15 s ping interval.
 - One runtime dependency in the host app: `ws`, which has no dependencies of its own. Its versions are pinned to a
-  range and updated through dependency review; a vulnerability in `ws` is a vulnerability in ProbeX.
+  range and updated through dependency review; a vulnerability in `ws` is a vulnerability in MicaFox.
 - The connector controls headers, pings, payload limits and compression, and turns compression off.
-- Follow-up: add `ws` and `@types/ws` to `@probex-platform/sdk`.
+- Follow-up: add `ws` and `@types/ws` to `@micafox/sdk`.

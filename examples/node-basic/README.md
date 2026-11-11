@@ -1,6 +1,6 @@
 # node-basic
 
-A demo app for the ProbeX SDK: a Fastify server with a `HubConnector` beside it, configured by the `PROBEX_*`
+A demo app for the MicaFox SDK: a Fastify server with a `HubConnector` beside it, configured by the `MICAFOX_*`
 environment variables. Until the debugger exists, the app stands in for it: it reports every breakpoint the hub sends
 as `active`, and `POST /demo/snapshot` sends a sample snapshot.
 
@@ -11,15 +11,15 @@ A fake hub in `src/hub/fake-hub.ts` plays the hub, so you can watch the connecto
 From the repository root, after `pnpm install`, start the fake hub in one terminal:
 
 ```sh
-pnpm --filter @probex-platform/node-basic dev:hub
+pnpm --filter @micafox/node-basic dev:hub
 # listening on port 8787
 ```
 
 Then the app in another:
 
 ```sh
-PROBEX_HUB_URL=ws://127.0.0.1:8787/probex PROBEX_SERVICE=demo PROBEX_LABELS=team=demo \
-  pnpm --filter @probex-platform/node-basic dev
+MICAFOX_HUB_URL=ws://127.0.0.1:8787/micafox MICAFOX_SERVICE=demo MICAFOX_LABELS=team=demo \
+  pnpm --filter @micafox/node-basic dev
 # listening on port 3000
 # connector status: connecting
 # connector status: connected
@@ -39,15 +39,15 @@ the app: it sends what is still buffered, then exits.
 
 App:
 
-| Variable         | Meaning                                                     |
-| ---------------- | ----------------------------------------------------------- |
-| `PORT`           | HTTP port, default `3000`; `0` picks a free one             |
-| `PROBEX_HUB_URL` | the hub's WebSocket URL; unset → the app runs without a hub |
-| `PROBEX_TOKEN`   | sent as `Authorization: Bearer <token>`                     |
-| `PROBEX_SERVICE` | service name in the `hello`                                 |
-| `PROBEX_LABELS`  | labels in the `hello`, such as `team=payments,region=eu`    |
+| Variable          | Meaning                                                     |
+| ----------------- | ----------------------------------------------------------- |
+| `PORT`            | HTTP port, default `3000`; `0` picks a free one             |
+| `MICAFOX_HUB_URL` | the hub's WebSocket URL; unset → the app runs without a hub |
+| `MICAFOX_TOKEN`   | sent as `Authorization: Bearer <token>`                     |
+| `MICAFOX_SERVICE` | service name in the `hello`                                 |
+| `MICAFOX_LABELS`  | labels in the `hello`, such as `team=payments,region=eu`    |
 
-All `PROBEX_*` variables: [SDK API](../../docs/api/sdk/connector.md#hubconnector). The app always uses a reconnect
+All `MICAFOX_*` variables: [SDK API](../../docs/api/sdk/connector.md#hubconnector). The app always uses a reconnect
 delay of 100 ms to 1 s, a demo choice that lets a restarted hub see it again quickly.
 
 Fake hub:
@@ -62,4 +62,4 @@ Fake hub:
 
 `tests/` starts the fake hub and the app as real processes and checks the connector's main flows: the handshake,
 snapshots, a hub restart, a rejected token and shutdown. They run in `pnpm verify`, or alone with
-`pnpm --filter @probex-platform/node-basic test`.
+`pnpm --filter @micafox/node-basic test`.

@@ -12,7 +12,7 @@ const RANKS: Readonly<Record<LogLevel, number>> = {
   silent: Number.POSITIVE_INFINITY,
 };
 
-/** The level used when neither the option nor `PROBEX_LOG_LEVEL` gives a valid one. */
+/** The level used when neither the option nor `MICAFOX_LOG_LEVEL` gives a valid one. */
 export const DEFAULT_LOG_LEVEL: LogLevel = "warn";
 
 /** The methods every `Logger` has, one per line level. */

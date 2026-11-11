@@ -3,7 +3,7 @@
 // rejecting or misbehaving hub. useFakeHubs() also fails a test that leaves an uncaught exception or an unhandled
 // rejection behind, which is how the SDK would crash its host app.
 
-import { PROTOCOL_VERSION } from "@probex-platform/protocol";
+import { PROTOCOL_VERSION } from "@micafox/protocol";
 import { createHash } from "node:crypto";
 import { once } from "node:events";
 import { readFileSync } from "node:fs";
@@ -43,7 +43,7 @@ export interface HubConnection {
 
 /** A running fake hub. */
 export interface FakeHub {
-  /** `ws://` or `wss://` with host 127.0.0.1 and path `/probex`. */
+  /** `ws://` or `wss://` with host 127.0.0.1 and path `/micafox`. */
   readonly url: string;
   readonly port: number;
   /** Every upgrade request so far. */
@@ -236,7 +236,7 @@ const startHub = async ({ isSecure = false, autoPong = true }: FakeHubOptions): 
 
   const port = await listen(server);
   const hub: FakeHub = {
-    url: `${isSecure ? "wss" : "ws"}://127.0.0.1:${String(port)}/probex`,
+    url: `${isSecure ? "wss" : "ws"}://127.0.0.1:${String(port)}/micafox`,
     port,
     requests,
     reply: { kind: "accept" },

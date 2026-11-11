@@ -1,10 +1,10 @@
-import type { Message, Snapshot } from "@probex-platform/protocol";
+import type { Message, Snapshot } from "@micafox/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createLogger, type Logger } from "../../../logger/index.js";
 import { Batcher, type BatchTarget, type BatcherSettings } from "../batcher.js";
 
-const PREFIX = "[probex] connector: ";
+const PREFIX = "[micafox] connector: ";
 
 /** A socket stand-in: records each frame with the fake time it was written, and finishes writes on demand. */
 interface FakeTarget extends BatchTarget {

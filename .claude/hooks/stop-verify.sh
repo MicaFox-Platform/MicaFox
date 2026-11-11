@@ -16,7 +16,7 @@ changed=$({
 } | sort -u)
 [[ -z $changed ]] && exit 0
 
-cache=node_modules/.cache/probex/verify-green
+cache=node_modules/.cache/micafox/verify-green
 key=$({
   git rev-parse HEAD
   git diff HEAD --binary

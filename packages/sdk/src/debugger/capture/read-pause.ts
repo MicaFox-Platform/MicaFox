@@ -1,4 +1,4 @@
-import type { CaptureLimits, StackFrame, Variable } from "@probex-platform/protocol";
+import type { CaptureLimits, StackFrame, Variable } from "@micafox/protocol";
 import { performance } from "node:perf_hooks";
 
 import { CaptureBudget, DEFAULT_BUDGET, type BudgetLimits } from "./budget.js";

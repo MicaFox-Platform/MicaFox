@@ -5,7 +5,7 @@ import { E2E_TEST_TIMEOUT_MS, startApp, startHub, toAppUrl, useProcesses } from 
 describe("app startup", { timeout: E2E_TEST_TIMEOUT_MS }, () => {
   useProcesses();
 
-  it("serves HTTP when PROBEX_HUB_URL is not set", async () => {
+  it("serves HTTP when MICAFOX_HUB_URL is not set", async () => {
     const app = await startApp();
 
     const response = await fetch(toAppUrl(app.port, "/health"));

@@ -3,7 +3,7 @@
 ## Components
 
 ```text
-┌───────────────────────────── @probex-platform/sdk ──────────────────────────────┐
+┌───────────────────────────────── @micafox/sdk ──────────────────────────────────┐
 │ ┌───────── Debugger ─────────┐    send(message)    ┌────── HubConnector ──────┐ │  hello, messages (wss)   ┌─────┐
 │ │ Breakpoints · SourceMaps   │────────────────────▶│ session · control queue  │─┼─────────────────────────▶│ Hub │
 │ │ RateLimiter · Capture      │◀────────────────────│ data buffer · batcher    │◀┼──────────────────────────│     │
@@ -21,14 +21,17 @@
   └─────────────────────────────────┘               └───────────────────────┘
 ```
 
-- [Debugger](debugger.md) — the [`probex`](../../api/sdk/debugger.md#probex) object. Turns the hub's breakpoint
-  list into V8 breakpoints through an in-process inspector session and captures snapshots within strict time, size
-  and rate limits, with secrets redacted by name.
+- [Debugger](debugger.md) — the SDK's only module, the [`micafox`](../../api/sdk/debugger.md#micafox) object.
+  Turns the hub's breakpoint list into V8 breakpoints through an in-process inspector session and captures
+  snapshots within strict time, size and rate limits, with secrets redacted by name.
 - [Connector](connector.md) — `HubConnector`, the default transport: the `hello` → `welcome` handshake, queues,
   batching, the rate limit and reconnects. A custom [`Connector`](../../api/protocol.md#connector) can replace it;
   the debugger sees only that interface.
 - [Logger](logger.md) — the wrapper both write their problems through: the level filter, collapsing of repeats,
   holding lines during a pause, and safe calls into the app's [`Logger`](../../api/sdk/logger.md#logger).
+
+`MICAFOX_ENABLED`, `MICAFOX_REDACT` and `MICAFOX_LOG_LEVEL` are settings of the whole SDK, not of the debugger
+alone, even though the debugger resolves them today: [SDK API](../../api/sdk/overview.md#usage).
 
 All three follow the same rules for the host app: no method throws, nothing waits on I/O, every timer and socket
 is unref'd except the connector's `closeTimeoutMs` timer while it flushes on close (with the short holds in
@@ -37,7 +40,7 @@ is unref'd except the connector's `closeTimeoutMs` timer while it flushes on clo
 
 ## Packages
 
-`@probex-platform/sdk` depends on `@probex-platform/protocol` and `ws` only. The parts live in
+`@micafox/sdk` depends on `@micafox/protocol` and `ws` only. The parts live in
 `packages/sdk/src/debugger/`, `packages/sdk/src/connector/` and `packages/sdk/src/logger/`. Inside the SDK the
 debugger imports the connector and the logger, the connector imports only the logger, and the logger imports no SDK
 module, so the connector and the logger can move out together.

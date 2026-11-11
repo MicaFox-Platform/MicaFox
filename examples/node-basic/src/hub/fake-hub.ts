@@ -3,7 +3,7 @@
 // JSON line, the messages of a batch one by one. Set HUB_TOKEN to accept only `Authorization: Bearer <HUB_TOKEN>`;
 // PORT=0 picks a free port. It never prints headers or the token.
 
-import { CLOSE_CODES, PROTOCOL_VERSION, type Breakpoint } from "@probex-platform/protocol";
+import { CLOSE_CODES, PROTOCOL_VERSION, type Breakpoint } from "@micafox/protocol";
 import { createServer, type IncomingMessage } from "node:http";
 import type { AddressInfo, Socket } from "node:net";
 import { WebSocketServer, type RawData, type WebSocket } from "ws";

@@ -2,7 +2,7 @@ import { createRedactionRules, normalizeName, type RedactionRules } from "./reda
 import { isRecord, readEnv, type Warn } from "../../connector/index.js";
 import type { Environment } from "../../logger/index.js";
 
-/** The most names `redact` and `PROBEX_REDACT` add together, so `run()` and every match in a pause stay cheap. */
+/** The most names `redact` and `MICAFOX_REDACT` add together, so `run()` and every match in a pause stay cheap. */
 const MAX_ADDED_NAMES = 100;
 
 const NOT_AN_ARRAY = "redact must be an array of names; it is ignored";
@@ -58,19 +58,19 @@ const readOptionNames = (option: unknown, warn: Warn): string[] => {
 };
 
 const readEnvNames = (env: Environment, warn: Warn): string[] => {
-  const value = readEnv(env, "PROBEX_REDACT");
-  return value === undefined ? [] : keepUsable(value.split(",", MAX_ADDED_NAMES + 1), "PROBEX_REDACT", warn);
+  const value = readEnv(env, "MICAFOX_REDACT");
+  return value === undefined ? [] : keepUsable(value.split(",", MAX_ADDED_NAMES + 1), "MICAFOX_REDACT", warn);
 };
 
 /**
- * Resolves the rules of one `run()`: the built-in names, plus the `redact` option and `PROBEX_REDACT` (names separated
+ * Resolves the rules of one `run()`: the built-in names, plus the `redact` option and `MICAFOX_REDACT` (names separated
  * by commas, trimmed), which both apply, at most 100 names together. An entry empty after normalizing, not a string
  * or not readable is skipped with a warning. Never throws.
  */
 export const resolveRedaction = (option: unknown, env: Environment, warn: Warn): RedactionRules => {
   const added = [...readOptionNames(option, warn), ...readEnvNames(env, warn)];
   if (added.length > MAX_ADDED_NAMES) {
-    warn(`redact and PROBEX_REDACT add at most ${String(MAX_ADDED_NAMES)} names; the rest are ignored`);
+    warn(`redact and MICAFOX_REDACT add at most ${String(MAX_ADDED_NAMES)} names; the rest are ignored`);
   }
 
   return createRedactionRules(added.slice(0, MAX_ADDED_NAMES));

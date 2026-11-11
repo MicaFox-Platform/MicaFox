@@ -15,20 +15,20 @@ still understand each other.
 ## Decision
 
 We keep the message types, `PROTOCOL_VERSION`, `CLOSE_CODES`, the `Connector` interface and the data types carried
-in messages in `@probex-platform/protocol`, a package of types and constants with no runtime logic and no
+in messages in `@micafox/protocol`, a package of types and constants with no runtime logic and no
 dependencies that every side depends on. It holds only what both ends of the wire must agree on.
 
 ## Alternatives
 
-- **Types in `@probex-platform/sdk`** — the hub and custom connectors would install the debugger runtime to get the
+- **Types in `@micafox/sdk`** — the hub and custom connectors would install the debugger runtime to get the
   message types and the `Connector` interface, and every SDK release would look like a protocol change.
-- **A general `@probex-platform/shared` for anything two packages use** — helpers and internal types would pile up
+- **A general `@micafox/shared` for anything two packages use** — helpers and internal types would pile up
   next to the protocol, every change would touch all packages, it would be unclear which changes break
   compatibility, and all of it would become public API.
 
 ## Consequences
 
-- The SDK, custom connectors and the hub import `@probex-platform/protocol` and never each other for protocol types.
+- The SDK, custom connectors and the hub import `@micafox/protocol` and never each other for protocol types.
 - A protocol change is a change to this one small package, and it either keeps `PROTOCOL_VERSION` or adds the next
   version's module next to the old ones.
 - Small helpers used by several packages are duplicated or kept in their owner instead of being shared here.

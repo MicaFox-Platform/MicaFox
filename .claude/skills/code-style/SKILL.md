@@ -8,7 +8,7 @@ model: sonnet
 Request: $ARGUMENTS
 
 1. **Where rules live.** Style is enforced by `packages/configs/eslint/index.js` and `packages/configs/prettier/index.js`;
-   the root configs only re-export them. `@probex-platform/configs` is shared with other projects, so every change applies
+   the root configs only re-export them. `@micafox/configs` is shared with other projects, so every change applies
    there too: say so when the rule is opinionated or breaks existing code.
 2. **Find the rule.** Pick the built-in ESLint, typescript-eslint, plugin rule or Prettier option that enforces the
    request. Prefer what the bundled plugins already offer; ask before adding a plugin. If no rule can enforce it,

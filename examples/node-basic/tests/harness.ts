@@ -2,7 +2,7 @@
 // their output line by line. Every wait ends on a line a process prints, or fails at once when the process exits
 // first; nothing sleeps. useProcesses() kills and awaits every process a test started, so none outlives it.
 
-import type { Message } from "@probex-platform/protocol";
+import type { Message } from "@micafox/protocol";
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { createInterface } from "node:readline";
@@ -39,7 +39,7 @@ export class ChildProcessRun {
     env: Record<string, string>,
   ) {
     // The source condition, as `pnpm dev` runs the app; tsx as an import, so no wrapper process can be orphaned
-    const args = ["--conditions=@probex-platform/source", "--import", "tsx", file];
+    const args = ["--conditions=@micafox/source", "--import", "tsx", file];
     const child = spawn(process.execPath, args, { cwd: EXAMPLE_DIR, env, stdio: ["ignore", "pipe", "pipe"] });
     this.kill = (signal) => child.kill(signal);
     for (const stream of [child.stdout, child.stderr]) {
@@ -143,11 +143,11 @@ const readType = (line: string): string | undefined => {
   }
 };
 
-// The developer's own PROBEX_*, HUB_* and PORT variables never reach the processes: each test sets its own
+// The developer's own MICAFOX_*, HUB_* and PORT variables never reach the processes: each test sets its own
 const createEnvironment = (): Record<string, string> => {
   const inherited = Object.entries(process.env).filter(
     (entry): entry is [string, string] =>
-      entry[1] !== undefined && !/^(PROBEX_|HUB_)/.test(entry[0]) && entry[0] !== "PORT",
+      entry[1] !== undefined && !/^(MICAFOX_|HUB_)/.test(entry[0]) && entry[0] !== "PORT",
   );
   const environment = Object.fromEntries(inherited);
   environment.PORT = "0";
@@ -198,13 +198,13 @@ export const startHub = (options: HubOptions = {}): Promise<ListeningRun> => {
 export interface AppOptions {
   /** `PORT`; a free port by default. */
   port?: number;
-  /** `PROBEX_HUB_URL` for the fake hub on this port. */
+  /** `MICAFOX_HUB_URL` for the fake hub on this port. */
   hubPort?: number;
-  /** `PROBEX_TOKEN`. */
+  /** `MICAFOX_TOKEN`. */
   token?: string;
-  /** `PROBEX_SERVICE`. */
+  /** `MICAFOX_SERVICE`. */
   service?: string;
-  /** `PROBEX_LABELS`, such as `team=payments,region=eu`. */
+  /** `MICAFOX_LABELS`, such as `team=payments,region=eu`. */
   labels?: string;
 }
 
@@ -215,16 +215,16 @@ export const startApp = (options: AppOptions = {}): Promise<ListeningRun> => {
     env.PORT = String(options.port);
   }
   if (options.hubPort !== undefined) {
-    env.PROBEX_HUB_URL = `ws://127.0.0.1:${String(options.hubPort)}/probex`;
+    env.MICAFOX_HUB_URL = `ws://127.0.0.1:${String(options.hubPort)}/micafox`;
   }
   if (options.token !== undefined) {
-    env.PROBEX_TOKEN = options.token;
+    env.MICAFOX_TOKEN = options.token;
   }
   if (options.service !== undefined) {
-    env.PROBEX_SERVICE = options.service;
+    env.MICAFOX_SERVICE = options.service;
   }
   if (options.labels !== undefined) {
-    env.PROBEX_LABELS = options.labels;
+    env.MICAFOX_LABELS = options.labels;
   }
   return start("app", APP_FILE, env);
 };

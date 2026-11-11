@@ -2,9 +2,9 @@
 
 ## Purpose
 
-`@probex-platform/configs` holds shared presets for development tools (TypeScript, ESLint, Prettier and Vitest), so
+`@micafox/configs` holds shared presets for development tools (TypeScript, ESLint, Prettier and Vitest), so
 every consumer configures them the same way instead of copying config. Today the consumers are the root,
-`packages/*` and `examples/*` of this monorepo. The presets are general and contain nothing specific to ProbeX, so
+`packages/*` and `examples/*` of this monorepo. The presets are general and contain nothing specific to MicaFox, so
 the package can also serve any TS/Node project that installs it from npm.
 
 ## Boundaries
@@ -13,10 +13,10 @@ the package can also serve any TS/Node project that installs it from npm.
   and the ESLint plugins they need, bundled as dependencies.
 - Does not own: repo-level orchestration and gates, such as the Vitest projects list, the coverage thresholds and the
   root `tsconfig.json` include list. Each repo keeps them in its own root config. It also does not own repo
-  conventions such as the `@probex-platform/source` condition name, which the consumer passes in.
+  conventions such as the `@micafox/source` condition name, which the consumer passes in.
 - Constraints:
   - Dev-time only: never a runtime dependency of the SDK or the host app.
-  - Depends on no other ProbeX package.
+  - Depends on no other MicaFox package.
   - `typescript`, `eslint`, `prettier` and `vitest` are optional peer dependencies, so a consumer installs only the
     tools it uses; what each preset needs is listed in the [API](../api/configs.md#installation).
   - A tool gets a preset once its config is shared by two or more consumers, inside or outside the monorepo.
@@ -24,7 +24,7 @@ the package can also serve any TS/Node project that installs it from npm.
 ## Interactions
 
 ```text
-@probex-platform/configs ──┬── presets ─────────────▶ Repo root configs
+@micafox/configs ──────────┬── presets ─────────────▶ Repo root configs
                            ├── presets ─────────────▶ Workspace packages and examples
                            └─ ─ presets, from npm ─ ▶ Other TS/Node projects
 ```
@@ -44,8 +44,8 @@ Signatures and examples: [`docs/api/configs.md`](../api/configs.md).
 
 ### Running tests against sources
 
-1. A workspace package exports the `@probex-platform/source` condition pointing at `src/index.ts`.
-2. Its `vitest.config.ts` calls `createVitestConfig({ sourceCondition: "@probex-platform/source" })`.
+1. A workspace package exports the `@micafox/source` condition pointing at `src/index.ts`.
+2. Its `vitest.config.ts` calls `createVitestConfig({ sourceCondition: "@micafox/source" })`.
 3. Vitest resolves imports of workspace packages to their sources, so tests run without a build. A package without
    the condition resolves through its `default` export condition as usual.
 4. The root `tsconfig.json` sets the same condition in `customConditions` and includes the tests, type tests and
@@ -65,4 +65,4 @@ Signatures and examples: [`docs/api/configs.md`](../api/configs.md).
 
 - Presets are plain JavaScript with hand-written `.d.ts` files, and JSON for `tsconfig`. Tools load them directly,
   so lint, tests and typecheck need no build step, and the workspace uses the same files that npm ships.
-- The source condition is a parameter of the Vitest preset, so no ProbeX name is baked into a published preset.
+- The source condition is a parameter of the Vitest preset, so no MicaFox name is baked into a published preset.

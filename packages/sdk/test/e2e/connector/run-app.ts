@@ -1,4 +1,4 @@
-import type { Message } from "@probex-platform/protocol";
+import type { Message } from "@micafox/protocol";
 import { spawn, type ChildProcess } from "node:child_process";
 import path from "node:path";
 
@@ -54,7 +54,7 @@ const waitForClose = (child: ChildProcess): Promise<number | undefined> =>
 
 /** How one app run is configured. */
 export interface AppOptions {
-  /** `PROBEX_HUB_URL`. */
+  /** `MICAFOX_HUB_URL`. */
   hubUrl: string;
   /** `NODE_EXTRA_CA_CERTS`. */
   extraCaCerts?: string;
@@ -73,10 +73,10 @@ const toJson = (value: unknown): string | undefined => (value === undefined ? un
 const toEnvironment = (options: AppOptions): NodeJS.ProcessEnv => {
   const { hubUrl, extraCaCerts, holdUntil, send, shouldClose, connectorOptions } = options;
   const env: NodeJS.ProcessEnv = { ...process.env };
-  // Spawn leaves a variable whose value is `undefined` out, so the shell's PROBEX_* variables never leak in
-  env.PROBEX_TOKEN = undefined;
-  env.PROBEX_LOG_LEVEL = undefined;
-  env.PROBEX_HUB_URL = hubUrl;
+  // Spawn leaves a variable whose value is `undefined` out, so the shell's MICAFOX_* variables never leak in
+  env.MICAFOX_TOKEN = undefined;
+  env.MICAFOX_LOG_LEVEL = undefined;
+  env.MICAFOX_HUB_URL = hubUrl;
   env.NODE_EXTRA_CA_CERTS = extraCaCerts;
   env.E2E_HOLD_UNTIL = holdUntil;
   env.E2E_SEND = toJson(send);
@@ -89,7 +89,7 @@ const toEnvironment = (options: AppOptions): NodeJS.ProcessEnv => {
 export const runApp = async (options: AppOptions): Promise<AppRun> => {
   // The source condition, as in tests and `pnpm dev`: no build runs before the tests. ipv6first makes localhost try
   // ::1 before the hub's 127.0.0.1 on every OS, as Linux does, so the fallback to the next address is always tested.
-  const args = ["--conditions=@probex-platform/source", "--dns-result-order=ipv6first", "--import", "tsx", APP_FILE];
+  const args = ["--conditions=@micafox/source", "--dns-result-order=ipv6first", "--import", "tsx", APP_FILE];
   const child = spawn(process.execPath, args, {
     cwd: import.meta.dirname,
     env: toEnvironment(options),

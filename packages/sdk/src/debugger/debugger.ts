@@ -1,4 +1,4 @@
-import type { Connector, ConnectorStatus, Message } from "@probex-platform/protocol";
+import type { Connector, ConnectorStatus, Message } from "@micafox/protocol";
 import { Session, url as readInspectorUrl } from "node:inspector";
 import { isMainThread } from "node:worker_threads";
 
@@ -149,7 +149,7 @@ export class Debugger {
     this.applyLoggerOptions();
 
     if (!resolveEnabled(options.enabled, this.env, this.warn)) {
-      this.logger.log("info", "turned off by enabled or PROBEX_ENABLED; not started", { component: COMPONENT });
+      this.logger.log("info", "turned off by enabled or MICAFOX_ENABLED; not started", { component: COMPONENT });
       return;
     }
 
@@ -178,10 +178,10 @@ export class Debugger {
 
   private findRefusal(): string | undefined {
     if (!this.isMainThread) {
-      return "run() in a worker thread does nothing; ProbeX debugs the main thread only";
+      return "run() in a worker thread does nothing; MicaFox debugs the main thread only";
     }
 
-    // Another debugger may be attached; ProbeX resumes every pause it did not cause, so it stays off
+    // Another debugger may be attached; MicaFox resumes every pause it did not cause, so it stays off
     if (this.inspectorUrl() !== undefined) {
       return "the inspector is already open (--inspect or inspector.open()); not started";
     }

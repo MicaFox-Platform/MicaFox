@@ -66,21 +66,21 @@ describe("resolveConnectorConfig options", () => {
 
   it("takes url, token and service from the environment when they are not passed", () => {
     const env = envOf(
-      ["PROBEX_HUB_URL", "wss://hub.example.com/probex"],
-      ["PROBEX_TOKEN", "t-env"],
-      ["PROBEX_SERVICE", "checkout"],
+      ["MICAFOX_HUB_URL", "wss://hub.example.com/micafox"],
+      ["MICAFOX_TOKEN", "t-env"],
+      ["MICAFOX_SERVICE", "checkout"],
     );
 
     const { options } = resolve({}, env);
 
-    expect(options).toMatchObject({ url: "wss://hub.example.com/probex", token: "t-env", service: "checkout" });
+    expect(options).toMatchObject({ url: "wss://hub.example.com/micafox", token: "t-env", service: "checkout" });
   });
 
   it("prefers passed url, token and service over the environment", () => {
     const env = envOf(
-      ["PROBEX_HUB_URL", "wss://env.example.com"],
-      ["PROBEX_TOKEN", "t-env"],
-      ["PROBEX_SERVICE", "env-service"],
+      ["MICAFOX_HUB_URL", "wss://env.example.com"],
+      ["MICAFOX_TOKEN", "t-env"],
+      ["MICAFOX_SERVICE", "env-service"],
     );
 
     const { options } = resolve({ url: "ws://localhost:7070", token: "t-code", service: "checkout" }, env);
@@ -89,22 +89,22 @@ describe("resolveConnectorConfig options", () => {
   });
 
   it("treats an empty passed string as unset and falls back to the environment", () => {
-    const { options } = resolve({ url: "", service: "" }, envOf(["PROBEX_HUB_URL", "wss://hub.example.com"]));
+    const { options } = resolve({ url: "", service: "" }, envOf(["MICAFOX_HUB_URL", "wss://hub.example.com"]));
 
     expect(options).toMatchObject({ url: "wss://hub.example.com", service: undefined });
   });
 
   it("treats an empty environment variable as unset", () => {
-    const { options } = resolve({}, envOf(["PROBEX_HUB_URL", ""], ["PROBEX_TOKEN", ""]));
+    const { options } = resolve({}, envOf(["MICAFOX_HUB_URL", ""], ["MICAFOX_TOKEN", ""]));
 
     expect(options).toMatchObject({ url: undefined, token: undefined });
   });
 
   it("keeps the values resolved at creation when the environment changes later", () => {
-    const env = envOf(["PROBEX_HUB_URL", "wss://first.example.com"]);
+    const env = envOf(["MICAFOX_HUB_URL", "wss://first.example.com"]);
     const { options } = resolve({}, env);
 
-    env.PROBEX_HUB_URL = "wss://second.example.com";
+    env.MICAFOX_HUB_URL = "wss://second.example.com";
 
     expect(options.url).toBe("wss://first.example.com");
   });
@@ -130,7 +130,7 @@ describe("resolveConnectorConfig options", () => {
 
       expect({ maxBytes: options.batch.maxBytes, warnings }).toEqual({
         maxBytes: 65_536,
-        warnings: ["[probex] connector: batch.maxBytes must be an integer of at least 1; using 65536"],
+        warnings: ["[micafox] connector: batch.maxBytes must be an integer of at least 1; using 65536"],
       });
     },
   );
@@ -140,7 +140,7 @@ describe("resolveConnectorConfig options", () => {
 
     expect({ closeTimeoutMs: options.closeTimeoutMs, warnings }).toEqual({
       closeTimeoutMs: 5000,
-      warnings: ["[probex] connector: closeTimeoutMs must be an integer of at least 1; using 5000"],
+      warnings: ["[micafox] connector: closeTimeoutMs must be an integer of at least 1; using 5000"],
     });
   });
 
@@ -149,7 +149,7 @@ describe("resolveConnectorConfig options", () => {
 
     expect({ buffer: options.buffer, warnings }).toEqual({
       buffer: DEFAULT_OPTIONS.buffer,
-      warnings: ["[probex] connector: buffer must be an object; using its defaults"],
+      warnings: ["[micafox] connector: buffer must be an object; using its defaults"],
     });
   });
 
@@ -158,7 +158,9 @@ describe("resolveConnectorConfig options", () => {
 
     expect({ reconnect: options.reconnect, warnings }).toEqual({
       reconnect: { minDelayMs: 1000, maxDelayMs: 30_000 },
-      warnings: ["[probex] connector: reconnect.minDelayMs must not exceed reconnect.maxDelayMs; using 1000 and 30000"],
+      warnings: [
+        "[micafox] connector: reconnect.minDelayMs must not exceed reconnect.maxDelayMs; using 1000 and 30000",
+      ],
     });
   });
 
@@ -168,30 +170,30 @@ describe("resolveConnectorConfig options", () => {
     expect({ reconnect: options.reconnect, warnings }).toEqual({
       reconnect: { minDelayMs: 1000, maxDelayMs: 30_000 },
       warnings: [
-        "[probex] connector: reconnect.maxDelayMs must be an integer of at least 1; using 30000",
-        "[probex] connector: reconnect.minDelayMs must not exceed reconnect.maxDelayMs; using 1000 and 30000",
+        "[micafox] connector: reconnect.maxDelayMs must be an integer of at least 1; using 30000",
+        "[micafox] connector: reconnect.minDelayMs must not exceed reconnect.maxDelayMs; using 1000 and 30000",
       ],
     });
   });
 
   it("warns without the value and ignores the environment when a string option has the wrong type", () => {
-    const { options, warnings } = resolve({ token: 12_345 }, envOf(["PROBEX_TOKEN", "t-env"]));
+    const { options, warnings } = resolve({ token: 12_345 }, envOf(["MICAFOX_TOKEN", "t-env"]));
 
     expect({ token: options.token, warnings }).toEqual({
       token: undefined,
-      warnings: ["[probex] connector: token must be a string; it is ignored"],
+      warnings: ["[micafox] connector: token must be a string; it is ignored"],
     });
   });
 
   it.each([
-    ["url", 42, "PROBEX_HUB_URL"],
-    ["service", {}, "PROBEX_SERVICE"],
+    ["url", 42, "MICAFOX_HUB_URL"],
+    ["service", {}, "MICAFOX_SERVICE"],
   ])("leaves %s unset with a warning when it has the wrong type", (name, value, envName) => {
     const { options, warnings } = resolve({ [name]: value }, envOf([envName, "from-env"]));
 
     expect({ value: options[name as "url" | "service"], warnings }).toEqual({
       value: undefined,
-      warnings: [`[probex] connector: ${name} must be a string; it is ignored`],
+      warnings: [`[micafox] connector: ${name} must be a string; it is ignored`],
     });
   });
 
@@ -210,7 +212,7 @@ describe("resolveConnectorConfig options", () => {
 
     expect({ options, warnings }).toEqual({
       options: DEFAULT_OPTIONS,
-      warnings: ["[probex] connector: options must be an object; using the defaults"],
+      warnings: ["[micafox] connector: options must be an object; using the defaults"],
     });
   });
 });
@@ -222,7 +224,7 @@ describe("resolveConnectorConfig with hostile options", () => {
     expect({ options, warnings }).toEqual({
       options: DEFAULT_OPTIONS,
       warnings: [
-        "Symbol(probex.logger)",
+        "Symbol(micafox.logger)",
         "logger",
         "logLevel",
         "buffer",
@@ -234,7 +236,7 @@ describe("resolveConnectorConfig with hostile options", () => {
         "labels",
         "reconnect",
         "closeTimeoutMs",
-      ].map((name) => `[probex] connector: ${name} could not be read; it is ignored`),
+      ].map((name) => `[micafox] connector: ${name} could not be read; it is ignored`),
     });
   });
 
@@ -245,11 +247,11 @@ describe("resolveConnectorConfig with hostile options", () => {
       },
     };
 
-    const { options, warnings } = resolve(passed, envOf(["PROBEX_HUB_URL", "wss://hub.example.com"]));
+    const { options, warnings } = resolve(passed, envOf(["MICAFOX_HUB_URL", "wss://hub.example.com"]));
 
     expect({ url: options.url, warnings }).toEqual({
       url: "wss://hub.example.com",
-      warnings: ["[probex] connector: url could not be read; it is ignored"],
+      warnings: ["[micafox] connector: url could not be read; it is ignored"],
     });
   });
 
@@ -259,9 +261,9 @@ describe("resolveConnectorConfig with hostile options", () => {
     expect({ batch: options.batch, warnings }).toEqual({
       batch: DEFAULT_OPTIONS.batch,
       warnings: [
-        "[probex] connector: batch.maxMessages could not be read; it is ignored",
-        "[probex] connector: batch.maxBytes could not be read; it is ignored",
-        "[probex] connector: batch.flushIntervalMs could not be read; it is ignored",
+        "[micafox] connector: batch.maxMessages could not be read; it is ignored",
+        "[micafox] connector: batch.maxBytes could not be read; it is ignored",
+        "[micafox] connector: batch.flushIntervalMs could not be read; it is ignored",
       ],
     });
   });
@@ -277,8 +279,8 @@ describe("resolveConnectorConfig with hostile options", () => {
 });
 
 describe("resolveConnectorConfig labels", () => {
-  it("parses PROBEX_LABELS, trimming entries and splitting at the first =", () => {
-    const { options, warnings } = resolve({}, envOf(["PROBEX_LABELS", " team = payments ,region=eu,a=b=c"]));
+  it("parses MICAFOX_LABELS, trimming entries and splitting at the first =", () => {
+    const { options, warnings } = resolve({}, envOf(["MICAFOX_LABELS", " team = payments ,region=eu,a=b=c"]));
 
     expect({ labels: options.labels, warnings }).toEqual({
       labels: { team: "payments", region: "eu", a: "b=c" },
@@ -286,32 +288,32 @@ describe("resolveConnectorConfig labels", () => {
     });
   });
 
-  it("skips PROBEX_LABELS entries without = or with an empty key, naming them only by position", () => {
-    const { options, warnings } = resolve({}, envOf(["PROBEX_LABELS", "team=payments,secret-value, =eu"]));
+  it("skips MICAFOX_LABELS entries without = or with an empty key, naming them only by position", () => {
+    const { options, warnings } = resolve({}, envOf(["MICAFOX_LABELS", "team=payments,secret-value, =eu"]));
 
     expect({ labels: options.labels, warnings }).toEqual({
       labels: { team: "payments" },
       warnings: [
-        '[probex] connector: PROBEX_LABELS entry 2 has no "="; skipped',
-        "[probex] connector: PROBEX_LABELS entry 3 has an empty key; skipped",
+        '[micafox] connector: MICAFOX_LABELS entry 2 has no "="; skipped',
+        "[micafox] connector: MICAFOX_LABELS entry 3 has an empty key; skipped",
       ],
     });
   });
 
-  it("keeps the later value of a repeated PROBEX_LABELS key", () => {
-    const { options } = resolve({}, envOf(["PROBEX_LABELS", "region=us,team=payments,region=eu"]));
+  it("keeps the later value of a repeated MICAFOX_LABELS key", () => {
+    const { options } = resolve({}, envOf(["MICAFOX_LABELS", "region=us,team=payments,region=eu"]));
 
     expect(options.labels).toEqual({ region: "eu", team: "payments" });
   });
 
-  it("ignores empty PROBEX_LABELS entries from a trailing or doubled comma without a warning", () => {
-    const { options, warnings } = resolve({}, envOf(["PROBEX_LABELS", "team=payments,,region=eu,"]));
+  it("ignores empty MICAFOX_LABELS entries from a trailing or doubled comma without a warning", () => {
+    const { options, warnings } = resolve({}, envOf(["MICAFOX_LABELS", "team=payments,,region=eu,"]));
 
     expect({ labels: options.labels, warnings }).toEqual({ labels: { team: "payments", region: "eu" }, warnings: [] });
   });
 
   it("keeps a __proto__ key as a plain label without changing the prototype", () => {
-    const { options } = resolve({}, envOf(["PROBEX_LABELS", "__proto__=x"]));
+    const { options } = resolve({}, envOf(["MICAFOX_LABELS", "__proto__=x"]));
 
     const prototype: unknown = Object.getPrototypeOf(options.labels);
 
@@ -321,20 +323,20 @@ describe("resolveConnectorConfig labels", () => {
     });
   });
 
-  it("keeps an empty value and skips a blank entry in PROBEX_LABELS", () => {
-    const { options, warnings } = resolve({}, envOf(["PROBEX_LABELS", " , team=,region=eu"]));
+  it("keeps an empty value and skips a blank entry in MICAFOX_LABELS", () => {
+    const { options, warnings } = resolve({}, envOf(["MICAFOX_LABELS", " , team=,region=eu"]));
 
     expect({ labels: options.labels, warnings }).toEqual({ labels: { team: "", region: "eu" }, warnings: [] });
   });
 
-  it("uses no labels when an empty labels object is passed, even with PROBEX_LABELS set", () => {
-    const { options, warnings } = resolve({ labels: {} }, envOf(["PROBEX_LABELS", "team=payments"]));
+  it("uses no labels when an empty labels object is passed, even with MICAFOX_LABELS set", () => {
+    const { options, warnings } = resolve({ labels: {} }, envOf(["MICAFOX_LABELS", "team=payments"]));
 
     expect({ labels: options.labels, warnings }).toEqual({ labels: {}, warnings: [] });
   });
 
-  it("uses PROBEX_LABELS when labels is an empty string", () => {
-    const { options } = resolve({ labels: "" }, envOf(["PROBEX_LABELS", "team=payments"]));
+  it("uses MICAFOX_LABELS when labels is an empty string", () => {
+    const { options } = resolve({ labels: "" }, envOf(["MICAFOX_LABELS", "team=payments"]));
 
     expect(options.labels).toEqual({ team: "payments" });
   });
@@ -357,8 +359,8 @@ describe("resolveConnectorConfig labels", () => {
     });
   });
 
-  it("replaces PROBEX_LABELS with a passed labels object", () => {
-    const { options } = resolve({ labels: { region: "eu" } }, envOf(["PROBEX_LABELS", "team=payments"]));
+  it("replaces MICAFOX_LABELS with a passed labels object", () => {
+    const { options } = resolve({ labels: { region: "eu" } }, envOf(["MICAFOX_LABELS", "team=payments"]));
 
     expect(options.labels).toEqual({ region: "eu" });
   });
@@ -378,8 +380,8 @@ describe("resolveConnectorConfig labels", () => {
     expect({ labels: options.labels, warnings }).toEqual({
       labels: { region: "eu" },
       warnings: [
-        "[probex] connector: labels.shard must be a string; skipped",
-        "[probex] connector: labels has an entry with an empty key; skipped",
+        "[micafox] connector: labels.shard must be a string; skipped",
+        "[micafox] connector: labels has an entry with an empty key; skipped",
       ],
     });
   });
@@ -396,16 +398,16 @@ describe("resolveConnectorConfig labels", () => {
 
     expect({ labels: options.labels, warnings }).toEqual({
       labels: { region: "eu" },
-      warnings: ["[probex] connector: labels.team could not be read; it is ignored"],
+      warnings: ["[micafox] connector: labels.team could not be read; it is ignored"],
     });
   });
 
   it.each([["team=payments"], [["team"]], [null]])("warns and uses no labels when labels is %j", (labels) => {
-    const { options, warnings } = resolve({ labels }, envOf(["PROBEX_LABELS", "team=payments"]));
+    const { options, warnings } = resolve({ labels }, envOf(["MICAFOX_LABELS", "team=payments"]));
 
     expect({ labels: options.labels, warnings }).toEqual({
       labels: {},
-      warnings: ["[probex] connector: labels must be an object of strings; using no labels"],
+      warnings: ["[micafox] connector: labels must be an object of strings; using no labels"],
     });
   });
 
@@ -423,7 +425,7 @@ describe("resolveConnectorConfig labels", () => {
 
     expect({ labels: options.labels, warnings }).toEqual({
       labels: {},
-      warnings: ["[probex] connector: labels must be an object of strings; using no labels"],
+      warnings: ["[micafox] connector: labels must be an object of strings; using no labels"],
     });
   });
 });
@@ -447,7 +449,7 @@ describe("resolveConnectorConfig logger", () => {
       debuggerApp: [
         [
           "warn",
-          "[probex] connector: closeTimeoutMs must be an integer of at least 1; using 5000",
+          "[micafox] connector: closeTimeoutMs must be an integer of at least 1; using 5000",
           { component: "connector" },
         ],
       ],
@@ -461,7 +463,7 @@ describe("resolveConnectorConfig logger", () => {
     const { config } = resolve({ logger: app.logger, logLevel: "info" });
     config.logger.log("info", "connected to the hub", { component: "connector" });
 
-    expect(app.calls).toEqual([["info", "[probex] connector: connected to the hub", { component: "connector" }]]);
+    expect(app.calls).toEqual([["info", "[micafox] connector: connected to the hub", { component: "connector" }]]);
   });
 
   it("writes its warnings with component connector to the app's logger", () => {
@@ -470,7 +472,7 @@ describe("resolveConnectorConfig logger", () => {
     resolve({ logger: app.logger, buffer: "big" });
 
     expect(app.calls).toEqual([
-      ["warn", "[probex] connector: buffer must be an object; using its defaults", { component: "connector" }],
+      ["warn", "[micafox] connector: buffer must be an object; using its defaults", { component: "connector" }],
     ]);
   });
 
@@ -482,25 +484,25 @@ describe("resolveConnectorConfig logger", () => {
     expect(app.calls).toEqual([
       [
         "warn",
-        "[probex] connector: logLevel must be one of debug, info, warn, error or silent; using warn",
+        "[micafox] connector: logLevel must be one of debug, info, warn, error or silent; using warn",
         { component: "connector" },
       ],
     ]);
   });
 
-  it("takes the level from PROBEX_LOG_LEVEL when logLevel is an empty string", () => {
+  it("takes the level from MICAFOX_LOG_LEVEL when logLevel is an empty string", () => {
     const app = createRecorder();
 
-    const { config } = resolve({ logger: app.logger, logLevel: "" }, envOf(["PROBEX_LOG_LEVEL", "debug"]));
+    const { config } = resolve({ logger: app.logger, logLevel: "" }, envOf(["MICAFOX_LOG_LEVEL", "debug"]));
 
     expect(config.logger.enabled("debug")).toBe(true);
   });
 
-  it("keeps the level resolved at creation when PROBEX_LOG_LEVEL changes later", () => {
-    const env = envOf(["PROBEX_LOG_LEVEL", "error"]);
+  it("keeps the level resolved at creation when MICAFOX_LOG_LEVEL changes later", () => {
+    const env = envOf(["MICAFOX_LOG_LEVEL", "error"]);
     const { config } = resolve({}, env);
 
-    env.PROBEX_LOG_LEVEL = "debug";
+    env.MICAFOX_LOG_LEVEL = "debug";
 
     expect(config.logger.enabled("warn")).toBe(false);
   });
@@ -520,7 +522,7 @@ describe("resolveConnectorConfig logger", () => {
       calls: [
         [
           "warn",
-          '[probex] connector: the value under Symbol.for("probex.logger") is not an SDK logger; it is ignored',
+          '[micafox] connector: the value under Symbol.for("micafox.logger") is not an SDK logger; it is ignored',
           { component: "connector" },
         ],
       ],
@@ -543,7 +545,7 @@ describe("resolveConnectorConfig logger", () => {
     expect(app.calls).toEqual([
       [
         "warn",
-        '[probex] connector: the value under Symbol.for("probex.logger") is not an SDK logger; it is ignored',
+        '[micafox] connector: the value under Symbol.for("micafox.logger") is not an SDK logger; it is ignored',
         { component: "connector" },
       ],
     ]);
@@ -569,19 +571,19 @@ describe("resolveConnectorConfig logger", () => {
     resolve(passed);
 
     expect(app.calls).toEqual([
-      ["warn", "[probex] connector: logLevel could not be read; it is ignored", { component: "connector" }],
+      ["warn", "[micafox] connector: logLevel could not be read; it is ignored", { component: "connector" }],
     ]);
   });
 
   it("reads process.env and writes to the global console when no dependencies are given", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
-    vi.stubEnv("PROBEX_SERVICE", "checkout");
+    vi.stubEnv("MICAFOX_SERVICE", "checkout");
 
     const { options } = resolveConnectorConfig({ closeTimeoutMs: 0 });
 
     expect({ service: options.service, warnings: warn.mock.calls }).toEqual({
       service: "checkout",
-      warnings: [["[probex] connector: closeTimeoutMs must be an integer of at least 1; using 5000"]],
+      warnings: [["[micafox] connector: closeTimeoutMs must be an integer of at least 1; using 5000"]],
     });
   });
 
@@ -589,7 +591,7 @@ describe("resolveConnectorConfig logger", () => {
     const { calls } = resolve({ closeTimeoutMs: 0 });
 
     expect(calls).toEqual([
-      ["warn", "[probex] connector: closeTimeoutMs must be an integer of at least 1; using 5000"],
+      ["warn", "[micafox] connector: closeTimeoutMs must be an integer of at least 1; using 5000"],
     ]);
   });
 });

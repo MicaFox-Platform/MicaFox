@@ -1,4 +1,4 @@
-import { PROTOCOL_VERSION, type Message } from "@probex-platform/protocol";
+import { PROTOCOL_VERSION, type Message } from "@micafox/protocol";
 import { describe, expect, it } from "vitest";
 
 import { toActiveStatuses } from "../debugger-stand-in.js";

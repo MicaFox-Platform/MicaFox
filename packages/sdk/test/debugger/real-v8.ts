@@ -1,7 +1,7 @@
 // Helpers for tests that run against the real V8 inspector of the test process: fixture modules loaded from disk
 // and a session that records what crosses the boundary.
 
-import type { BreakpointStatus } from "@probex-platform/protocol";
+import type { BreakpointStatus } from "@micafox/protocol";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { Session } from "node:inspector";
@@ -55,7 +55,7 @@ export interface PauseModule {
  * never matches a file of an earlier one.
  */
 export class Fixtures {
-  private readonly dir = realpathSync(mkdtempSync(path.join(tmpdir(), "probex-fixtures-")));
+  private readonly dir = realpathSync(mkdtempSync(path.join(tmpdir(), "micafox-fixtures-")));
   private readonly tag = randomUUID().slice(0, 8);
   private readonly require = createRequire(import.meta.url);
 

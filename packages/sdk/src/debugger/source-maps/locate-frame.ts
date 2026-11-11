@@ -1,4 +1,4 @@
-import type { StackFrame } from "@probex-platform/protocol";
+import type { StackFrame } from "@micafox/protocol";
 import { fileURLToPath } from "node:url";
 
 import type { MapView } from "./source-maps.js";

@@ -1,4 +1,4 @@
-import { PROTOCOL_VERSION, type Batch, type Message } from "@probex-platform/protocol";
+import { PROTOCOL_VERSION, type Batch, type Message } from "@micafox/protocol";
 
 /** A frame the connector logs and drops; `reason` is fixed text that never quotes the frame. */
 export interface IgnoredFrame {

@@ -1,4 +1,4 @@
-import type { Connector, ConnectorStatus, Message } from "@probex-platform/protocol";
+import type { Connector, ConnectorStatus, Message } from "@micafox/protocol";
 
 import type { SdkLogger } from "../logger/index.js";
 

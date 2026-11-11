@@ -1,11 +1,11 @@
 {
-  "name": "@probex-platform/sdk",
+  "name": "@micafox/sdk",
   "version": "0.1.0",
-  "description": "ProbeX SDK: the debugger and the default hub connector, run inside the host app",
+  "description": "MicaFox SDK: the debugger and the default hub connector, run inside the host app",
   "type": "module",
   "exports": {
     ".": {
-      "@probex-platform/source": "./src/index.ts",
+      "@micafox/source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     }
@@ -14,7 +14,7 @@
     "dist"
   ],
   "scripts": {
-    "dev": "tsx --conditions=@probex-platform/source --watch src/index.ts",
+    "dev": "tsx --conditions=@micafox/source --watch src/index.ts",
     "build": "rm -rf ./dist && tsc -b",
     "typecheck": "tsc -b",
     "test": "vitest run"
@@ -26,11 +26,11 @@
     "node": ">=22"
   },
   "dependencies": {
-    "@probex-platform/protocol": "workspace:*",
+    "@micafox/protocol": "workspace:*",
     "ws": "^8.22.1"
   },
   "devDependencies": {
-    "@probex-platform/configs": "workspace:*",
+    "@micafox/configs": "workspace:*",
     "@types/ws": "^8.18.2"
   }
 }

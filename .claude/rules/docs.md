@@ -6,7 +6,7 @@ paths:
 
 # Docs
 
-The reader is a developer integrating ProbeX, not us. Write for someone who has not seen the code. Short beats
+The reader is a developer integrating MicaFox, not us. Write for someone who has not seen the code. Short beats
 complete: a doc that takes more than a few minutes to read gets split.
 
 - One `#` title per file, ≤ 60 chars. Sentence case.

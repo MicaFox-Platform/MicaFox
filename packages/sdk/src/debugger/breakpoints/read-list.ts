@@ -1,4 +1,4 @@
-import type { CaptureLimits } from "@probex-platform/protocol";
+import type { CaptureLimits } from "@micafox/protocol";
 
 import type { ListedEntry } from "./entry.js";
 import { toSegments } from "./script-registry.js";

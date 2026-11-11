@@ -1,4 +1,4 @@
-import type { BreakpointStatus } from "@probex-platform/protocol";
+import type { BreakpointStatus } from "@micafox/protocol";
 import { Buffer } from "node:buffer";
 import { rmSync, truncateSync, writeFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";

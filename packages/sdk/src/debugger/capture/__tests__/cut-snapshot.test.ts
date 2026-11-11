@@ -1,4 +1,4 @@
-import type { StackFrame, Value, Variable } from "@probex-platform/protocol";
+import type { StackFrame, Value, Variable } from "@micafox/protocol";
 import { describe, expect, it } from "vitest";
 
 import { cutSnapshot } from "../cut-snapshot.js";

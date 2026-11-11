@@ -11,7 +11,7 @@ describe("repeat collapsing in a running server", { timeout: E2E_TEST_TIMEOUT_MS
     // The summary's message is left out: its seconds come from the real clock of the child process
     expect(parseRecords(run.stdout)).toMatchObject([
       { step: "/log" },
-      { level: "warn", message: "[probex] e2e: snapshot dropped", context: { component: "e2e" } },
+      { level: "warn", message: "[micafox] e2e: snapshot dropped", context: { component: "e2e" } },
       { step: "/log" },
       { step: "/log" },
       { step: "/flush" },
@@ -23,7 +23,7 @@ describe("repeat collapsing in a running server", { timeout: E2E_TEST_TIMEOUT_MS
   it("names the repeats in the summary's message", async () => {
     const run = await runServer({ logger: "recording" }, [REPEATED, REPEATED, REPEATED, "/flush"]);
 
-    expect(run.stdout.at(-2)).toMatch(/"message":"\[probex\] e2e: snapshot dropped \(repeated 2 times in \d+ s\)"/);
+    expect(run.stdout.at(-2)).toMatch(/"message":"\[micafox\] e2e: snapshot dropped \(repeated 2 times in \d+ s\)"/);
   });
 
   it("exits by itself while a collapse window is still open", async () => {

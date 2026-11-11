@@ -8,7 +8,7 @@ import { PauseHold } from "./pause-hold.js";
 const LEVEL_NAMES = "debug, info, warn, error or silent";
 const INVALID_LEVEL_WARNINGS: Readonly<Record<LevelSource, string>> = {
   option: `logLevel must be one of ${LEVEL_NAMES}; using ${DEFAULT_LOG_LEVEL}`,
-  env: `PROBEX_LOG_LEVEL must be one of ${LEVEL_NAMES}; using ${DEFAULT_LOG_LEVEL}`,
+  env: `MICAFOX_LOG_LEVEL must be one of ${LEVEL_NAMES}; using ${DEFAULT_LOG_LEVEL}`,
 };
 const INVALID_LOGGER = "logger must be an object with debug, info, warn and error methods; using console";
 
@@ -23,7 +23,7 @@ export interface LoggerOptions {
 
 /** What `createLogger()` needs from outside. */
 export interface LoggerDependencies {
-  /** The component that owns the logger; it signs the warning about `PROBEX_LOG_LEVEL` before any `set()`. */
+  /** The component that owns the logger; it signs the warning about `MICAFOX_LOG_LEVEL` before any `set()`. */
   component: string;
   env?: Environment;
   console?: Logger;
@@ -39,13 +39,13 @@ interface ResolvedLevel {
   invalidSource?: LevelSource;
 }
 
-// Option, then PROBEX_LOG_LEVEL, then the default (ADR 0003, ADR 0015); an empty variable counts as unset
+// Option, then MICAFOX_LOG_LEVEL, then the default (ADR 0003, ADR 0015); an empty variable counts as unset
 const resolveLevel = (option: unknown, env: Environment): ResolvedLevel => {
   if (option !== undefined) {
     return isLogLevel(option) ? { level: option } : { level: DEFAULT_LOG_LEVEL, invalidSource: "option" };
   }
 
-  const value = env.PROBEX_LOG_LEVEL;
+  const value = env.MICAFOX_LOG_LEVEL;
   if (value === undefined || value === "") {
     return { level: DEFAULT_LOG_LEVEL };
   }
@@ -98,7 +98,7 @@ export class SdkLogger {
     return rankOf(level) >= this.currentThreshold();
   }
 
-  /** Writes `[probex] <component>: <message>` and its context, unless `level` is below the threshold. */
+  /** Writes `[micafox] <component>: <message>` and its context, unless `level` is below the threshold. */
   log(level: LineLevel, message: string, fields: LineFields): void {
     // Return before `fields` is read: a line below the level costs one comparison
     if (rankOf(level) < this.currentThreshold()) {
@@ -156,7 +156,7 @@ export class SdkLogger {
   }
 
   private emit(level: LineLevel, message: string, context: LogContext): void {
-    const text = `[probex] ${context.component}: ${message}`;
+    const text = `[micafox] ${context.component}: ${message}`;
     if (this.passesContext) {
       // Outside text is passed as it is: a `%s` in it only moves the context into the message (ADR 0014)
       callLogger(this.target, level, [text, context]);
@@ -199,7 +199,7 @@ export class SdkLogger {
   }
 }
 
-/** Creates the SDK's logger; it writes to `console` at `PROBEX_LOG_LEVEL`, or `warn`, until `set()` is called. */
+/** Creates the SDK's logger; it writes to `console` at `MICAFOX_LOG_LEVEL`, or `warn`, until `set()` is called. */
 export const createLogger = ({
   component,
   env = process.env,

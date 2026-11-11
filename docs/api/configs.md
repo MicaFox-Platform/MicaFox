@@ -1,9 +1,9 @@
-# @probex-platform/configs API
+# @micafox/configs API
 
 ## Installation
 
 ```sh
-pnpm add -D @probex-platform/configs
+pnpm add -D @micafox/configs
 ```
 
 `eslint`, `prettier`, `typescript` and `vitest` are optional peer dependencies: install what the presets you use
@@ -18,26 +18,26 @@ need. The ESLint plugins come bundled.
 
 ## Exports
 
-### `@probex-platform/configs/tsconfig/base.json`
+### `@micafox/configs/tsconfig/base.json`
 
 ```json
-{ "extends": "@probex-platform/configs/tsconfig/base.json" }
+{ "extends": "@micafox/configs/tsconfig/base.json" }
 ```
 
 Strict TypeScript for Node: `ES2024`, `NodeNext` modules, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`
 and `verbatimModuleSyntax`.
 
-### `@probex-platform/configs/tsconfig/workspace.json`
+### `@micafox/configs/tsconfig/workspace.json`
 
 ```json
-{ "extends": "@probex-platform/configs/tsconfig/workspace.json" }
+{ "extends": "@micafox/configs/tsconfig/workspace.json" }
 ```
 
 `base.json` plus a composite build of one monorepo package: compiles `src/` to `dist/` with declarations and source
 maps. `*.test.ts` and `*.test-d.ts` are left out of the build and are not typechecked there; the root
 `tsconfig.json` typechecks them, see [Usage](#usage). Paths are relative to the extending `tsconfig.json`.
 
-### `@probex-platform/configs/eslint`
+### `@micafox/configs/eslint`
 
 ```ts
 declare const config: Linter.Config[];
@@ -64,7 +64,7 @@ of those presets, the highlights:
 - **Tests:** no skipped tests, no conditionals, a message on every `toThrow`, `describe` nested at most twice.
 
 ```js
-import config from "@probex-platform/configs/eslint";
+import config from "@micafox/configs/eslint";
 
 export default [
   ...config,
@@ -81,7 +81,7 @@ files as not found:
 export default [...config, { languageOptions: { parserOptions: { tsconfigRootDir: import.meta.dirname } } }];
 ```
 
-### `@probex-platform/configs/prettier`
+### `@micafox/configs/prettier`
 
 ```ts
 declare const config: Config;
@@ -91,7 +91,7 @@ export default config;
 Prettier options: 120 columns, double quotes, semicolons, trailing commas.
 
 ```js
-export { default } from "@probex-platform/configs/prettier";
+export { default } from "@micafox/configs/prettier";
 ```
 
 ### `createVitestConfig()`
@@ -112,7 +112,7 @@ Builds the Vitest project config: runs `**/*.test.ts`, keeps Vitest's default ex
 **Errors** — none.
 
 ```ts
-import { createVitestConfig } from "@probex-platform/configs/vitest";
+import { createVitestConfig } from "@micafox/configs/vitest";
 
 export default createVitestConfig({ sourceCondition: "@acme/source" });
 ```
@@ -129,7 +129,7 @@ interface VitestConfigOptions {
   server environments, so tests import workspace packages from their sources without a build. Without it, or when
   it is empty, Vite's default conditions apply.
 
-### `@probex-platform/configs/vitest` default export
+### `@micafox/configs/vitest` default export
 
 ```ts
 declare const config: UserWorkspaceConfig;
@@ -139,7 +139,7 @@ export default config;
 The result of `createVitestConfig()` without options.
 
 ```ts
-export { default } from "@probex-platform/configs/vitest";
+export { default } from "@micafox/configs/vitest";
 ```
 
 ## Usage
@@ -164,19 +164,19 @@ Its `tsconfig.json` and `vitest.config.ts`, and the repo's root `tsconfig.json`,
 tests and Vitest configs against the sources:
 
 ```json
-{ "extends": "@probex-platform/configs/tsconfig/workspace.json" }
+{ "extends": "@micafox/configs/tsconfig/workspace.json" }
 ```
 
 ```json
 {
-  "extends": "@probex-platform/configs/tsconfig/base.json",
+  "extends": "@micafox/configs/tsconfig/base.json",
   "compilerOptions": { "noEmit": true, "customConditions": ["@acme/source"] },
   "include": ["packages/*/vitest.config.ts", "packages/*/src/**/*.test.ts", "packages/*/src/**/*.test-d.ts"]
 }
 ```
 
 ```ts
-import { createVitestConfig } from "@probex-platform/configs/vitest";
+import { createVitestConfig } from "@micafox/configs/vitest";
 import { defineProject, mergeConfig } from "vitest/config";
 
 export default mergeConfig(

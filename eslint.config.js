@@ -1,4 +1,4 @@
-import config from "@probex-platform/configs/eslint";
+import config from "@micafox/configs/eslint";
 
 const TESTS = ["**/*.test.ts", "**/*.test-d.ts"];
 
@@ -51,7 +51,7 @@ export default [
   // The logger moves with the connector if it becomes its own package: docs/architecture/sdk/logger.md
   ...restrictImports("logger", []),
   // The connector may become its own package with the logger: docs/architecture/sdk/connector.md#boundaries
-  ...restrictImports("connector", ["@probex-platform/protocol", "ws", "../logger/index.js"]),
+  ...restrictImports("connector", ["@micafox/protocol", "ws", "../logger/index.js"]),
   // The debugger imports the connector and the logger, never their files: docs/architecture/sdk/overview.md#packages
-  ...restrictImports("debugger", ["@probex-platform/protocol", "../connector/index.js", "../logger/index.js"]),
+  ...restrictImports("debugger", ["@micafox/protocol", "../connector/index.js", "../logger/index.js"]),
 ];

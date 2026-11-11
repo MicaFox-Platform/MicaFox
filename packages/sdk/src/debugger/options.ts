@@ -1,4 +1,4 @@
-import type { Connector } from "@probex-platform/protocol";
+import type { Connector } from "@micafox/protocol";
 
 import { isRecord, readEnv, readField, type HubConnectorOptions, type Warn } from "../connector/index.js";
 import type { Environment, Logger, LogLevel } from "../logger/index.js";
@@ -65,7 +65,7 @@ export const readConfigureOptions = (options: unknown, warn: Warn): ConfiguredOp
   return fields;
 };
 
-/** Resolves `enabled` as the option, then `PROBEX_ENABLED`, then `true` (ADR 0003); an invalid one warns. */
+/** Resolves `enabled` as the option, then `MICAFOX_ENABLED`, then `true` (ADR 0003); an invalid one warns. */
 export const resolveEnabled = (option: unknown, env: Environment, warn: Warn): boolean => {
   if (option !== undefined) {
     if (typeof option === "boolean") {
@@ -76,14 +76,14 @@ export const resolveEnabled = (option: unknown, env: Environment, warn: Warn): b
     return true;
   }
 
-  // Exact values only, like PROBEX_LOG_LEVEL: `False` or `0` warn instead of guessing
-  const value = readEnv(env, "PROBEX_ENABLED");
+  // Exact values only, like MICAFOX_LOG_LEVEL: `False` or `0` warn instead of guessing
+  const value = readEnv(env, "MICAFOX_ENABLED");
   if (value === undefined || value === "true") {
     return true;
   }
 
   if (value !== "false") {
-    warn("PROBEX_ENABLED must be true or false; using true");
+    warn("MICAFOX_ENABLED must be true or false; using true");
     return true;
   }
 

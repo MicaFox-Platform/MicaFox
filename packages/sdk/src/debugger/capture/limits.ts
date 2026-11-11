@@ -1,4 +1,4 @@
-import type { CaptureLimits } from "@probex-platform/protocol";
+import type { CaptureLimits } from "@micafox/protocol";
 
 /** `CaptureLimits` with every field set: defaults filled in and larger values lowered to their caps. */
 export interface ResolvedLimits {

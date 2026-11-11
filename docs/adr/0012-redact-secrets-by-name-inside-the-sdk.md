@@ -14,7 +14,7 @@ without setup, and must not depend on a hub that may be third-party or custom.
 ## Decision
 
 We redact values inside the SDK by the name of each variable, property and string map key, with a built-in list of
-secret names that the host app extends, never shrinks, through the `redact` option and `PROBEX_REDACT`, which both
+secret names that the host app extends, never shrinks, through the `redact` option and `MICAFOX_REDACT`, which both
 apply. A redacted value is sent as `{ type: "redacted" }`, and its children are never read.
 
 ## Alternatives

@@ -1,4 +1,4 @@
-import type { Message } from "@probex-platform/protocol";
+import type { Message } from "@micafox/protocol";
 import { hostname } from "node:os";
 import { describe, expect, it, vi } from "vitest";
 
@@ -71,7 +71,7 @@ describe("HubConnector connect()", () => {
       labels: { region: "eu" },
       hostname: hostname(),
       pid: process.pid,
-      sdk: { name: "@probex-platform/sdk", version: SDK_VERSION },
+      sdk: { name: "@micafox/sdk", version: SDK_VERSION },
       runtime: { name: "node", version: process.versions.node },
     });
   });
@@ -208,24 +208,24 @@ describe("HubConnector connect() with an invalid target", () => {
   const hubs = useFakeHubs();
 
   it.each<{ name: string; options: (port: number) => HubConnectorOptions; error: string }>([
-    { name: "no URL", options: () => ({}), error: "no hub URL is set; pass url or set PROBEX_HUB_URL" },
+    { name: "no URL", options: () => ({}), error: "no hub URL is set; pass url or set MICAFOX_HUB_URL" },
     {
       name: "an http:// URL",
-      options: (port) => ({ url: `http://127.0.0.1:${String(port)}/probex` }),
+      options: (port) => ({ url: `http://127.0.0.1:${String(port)}/micafox` }),
       error: "the hub URL must be a ws:// or wss:// URL",
     },
     {
       name: "a token over ws:// to a host that only resolves to loopback",
-      options: (port) => ({ url: `ws://localhost.:${String(port)}/probex`, token: TOKEN }),
+      options: (port) => ({ url: `ws://localhost.:${String(port)}/micafox`, token: TOKEN }),
       error: "a token is sent over ws:// only to localhost, 127.0.0.0/8 or [::1]; use wss://",
     },
     {
       name: "a token an HTTP header cannot carry",
-      options: (port) => ({ url: `ws://127.0.0.1:${String(port)}/probex`, token: "abc\r\nX-Injected: 1" }),
+      options: (port) => ({ url: `ws://127.0.0.1:${String(port)}/micafox`, token: "abc\r\nX-Injected: 1" }),
       error: "the token contains characters an HTTP header cannot carry",
     },
   ])("logs an error, stays disconnected and makes no attempt with $name", async ({ options, error }) => {
-    vi.stubEnv("PROBEX_HUB_URL", "");
+    vi.stubEnv("MICAFOX_HUB_URL", "");
     const hub = await hubs.start();
     const { connector, statuses, messagesAt } = createHarness(hubs, options(hub.port));
     vi.unstubAllEnvs();
@@ -240,15 +240,15 @@ describe("HubConnector connect() with an invalid target", () => {
     });
   });
 
-  it("reads the URL from PROBEX_HUB_URL", async () => {
+  it("reads the URL from MICAFOX_HUB_URL", async () => {
     const hub = await hubs.start();
-    vi.stubEnv("PROBEX_HUB_URL", hub.url);
+    vi.stubEnv("MICAFOX_HUB_URL", hub.url);
     const { connector } = createHarness(hubs, {});
     vi.unstubAllEnvs();
 
     connector.connect();
     const request = await hub.nextRequest();
 
-    expect(request.url).toBe("/probex");
+    expect(request.url).toBe("/micafox");
   });
 });

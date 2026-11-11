@@ -1,14 +1,14 @@
-# @probex-platform/configs
+# @micafox/configs
 
-Shared tooling configs for ProbeX and other TS/Node projects.
+Shared tooling configs for MicaFox and other TS/Node projects.
 
-| Export                                             | Tool       | Usage                                                                                       |
-| -------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------- |
-| `@probex-platform/configs/tsconfig/base.json`      | TypeScript | `"extends": "@probex-platform/configs/tsconfig/base.json"`                                  |
-| `@probex-platform/configs/tsconfig/workspace.json` | TypeScript | a monorepo package: `src/` → `dist/`, composite, tests and type tests left out of the build |
-| `@probex-platform/configs/eslint`                  | ESLint     | `export default [...config, { /* overrides */ }]`                                           |
-| `@probex-platform/configs/prettier`                | Prettier   | `export { default } from "@probex-platform/configs/prettier"`                               |
-| `@probex-platform/configs/vitest`                  | Vitest     | `export default createVitestConfig()`, `mergeConfig` it for overrides                       |
+| Export                                     | Tool       | Usage                                                                                       |
+| ------------------------------------------ | ---------- | ------------------------------------------------------------------------------------------- |
+| `@micafox/configs/tsconfig/base.json`      | TypeScript | `"extends": "@micafox/configs/tsconfig/base.json"`                                          |
+| `@micafox/configs/tsconfig/workspace.json` | TypeScript | a monorepo package: `src/` → `dist/`, composite, tests and type tests left out of the build |
+| `@micafox/configs/eslint`                  | ESLint     | `export default [...config, { /* overrides */ }]`                                           |
+| `@micafox/configs/prettier`                | Prettier   | `export { default } from "@micafox/configs/prettier"`                                       |
+| `@micafox/configs/vitest`                  | Vitest     | `export default createVitestConfig()`, `mergeConfig` it for overrides                       |
 
 ESLint plugins are bundled as dependencies. `eslint`, `prettier`, `typescript` and `vitest` are optional peer
 dependencies — install only the tools you use.
@@ -17,9 +17,9 @@ To run tests against workspace sources without a build, export a source conditio
 `"@acme/source": "./src/index.ts"`, and build the Vitest config with it:
 
 ```ts
-import { createVitestConfig } from "@probex-platform/configs/vitest";
+import { createVitestConfig } from "@micafox/configs/vitest";
 
 export default createVitestConfig({ sourceCondition: "@acme/source" });
 ```
 
-Full reference: [docs/api/configs.md](https://github.com/ProbeX-Platform/probex-platform/blob/main/docs/api/configs.md).
+Full reference: [docs/api/configs.md](https://github.com/MicaFox-Platform/MicaFox/blob/main/docs/api/configs.md).

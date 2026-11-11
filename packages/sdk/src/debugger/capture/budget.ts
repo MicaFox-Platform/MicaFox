@@ -1,4 +1,4 @@
-import type { Value } from "@probex-platform/protocol";
+import type { Value } from "@micafox/protocol";
 import { Buffer } from "node:buffer";
 
 /** The time and size a capture may use. */

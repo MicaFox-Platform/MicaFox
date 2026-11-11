@@ -2,7 +2,7 @@ import { LineQueue, type HeldLine, type TakenLines } from "./line-queue.js";
 
 // Shared by every logger in the process, whatever copy or version of the SDK created it: the ES module and CommonJS
 // builds, and two installs of the package, find each other through the registry key
-const HOLD_KEY = Symbol.for("probex.logger.hold");
+const HOLD_KEY = Symbol.for("micafox.logger.hold");
 
 type Drain = () => void;
 

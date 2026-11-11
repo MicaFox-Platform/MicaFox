@@ -53,8 +53,8 @@ describe("resolveRedaction", () => {
     expect(rules.isSecret(name)).toBe(false);
   });
 
-  it("adds the names of the redact option and of PROBEX_REDACT, trimmed", () => {
-    const { rules, warnings } = resolve(["iban"], envOf(["PROBEX_REDACT", " ssn , client_key"]));
+  it("adds the names of the redact option and of MICAFOX_REDACT, trimmed", () => {
+    const { rules, warnings } = resolve(["iban"], envOf(["MICAFOX_REDACT", " ssn , client_key"]));
 
     expect({
       added: ["iban", "userSSN", "clientKey", "orderId"].map((name) => rules.isSecret(name)),
@@ -64,13 +64,13 @@ describe("resolveRedaction", () => {
   });
 
   it("counts a name once when it repeats a built-in rule or another entry", () => {
-    const { rules } = resolve(["Password", "api-key", "iban"], envOf(["PROBEX_REDACT", "IBAN"]));
+    const { rules } = resolve(["Password", "api-key", "iban"], envOf(["MICAFOX_REDACT", "IBAN"]));
 
     expect(rules.count).toBe(16);
   });
 
   it("skips an entry that is empty after normalizing, with a warning, and keeps the others", () => {
-    const { rules, warnings } = resolve(["", "_-.", "iban"], envOf(["PROBEX_REDACT", "ssn,, ,"]));
+    const { rules, warnings } = resolve(["", "_-.", "iban"], envOf(["MICAFOX_REDACT", "ssn,, ,"]));
 
     expect({ count: rules.count, iban: rules.isSecret("iban"), ssn: rules.isSecret("ssn"), warnings }).toEqual({
       count: 17,
@@ -79,9 +79,9 @@ describe("resolveRedaction", () => {
       warnings: [
         "redact has an entry that is not a usable name; it is skipped",
         "redact has an entry that is not a usable name; it is skipped",
-        "PROBEX_REDACT has an entry that is not a usable name; it is skipped",
-        "PROBEX_REDACT has an entry that is not a usable name; it is skipped",
-        "PROBEX_REDACT has an entry that is not a usable name; it is skipped",
+        "MICAFOX_REDACT has an entry that is not a usable name; it is skipped",
+        "MICAFOX_REDACT has an entry that is not a usable name; it is skipped",
+        "MICAFOX_REDACT has an entry that is not a usable name; it is skipped",
       ],
     });
   });
@@ -108,8 +108,8 @@ describe("resolveRedaction", () => {
     });
   });
 
-  it("treats an empty PROBEX_REDACT as unset", () => {
-    const { rules, warnings } = resolve(undefined, envOf(["PROBEX_REDACT", ""]));
+  it("treats an empty MICAFOX_REDACT as unset", () => {
+    const { rules, warnings } = resolve(undefined, envOf(["MICAFOX_REDACT", ""]));
 
     expect({ count: rules.count, warnings }).toEqual({ count: 15, warnings: [] });
   });
@@ -143,11 +143,11 @@ describe("resolveRedaction", () => {
     });
   });
 
-  it("adds at most 100 names from redact and PROBEX_REDACT together, with one warning", () => {
+  it("adds at most 100 names from redact and MICAFOX_REDACT together, with one warning", () => {
     const option = Array.from({ length: 60 }, (_unused, index) => `option${String(index)}x`);
     const env = Array.from({ length: 60 }, (_unused, index) => `env${String(index)}x`).join(",");
 
-    const { rules, warnings } = resolve(option, envOf(["PROBEX_REDACT", env]));
+    const { rules, warnings } = resolve(option, envOf(["MICAFOX_REDACT", env]));
 
     expect({
       count: rules.count,
@@ -156,7 +156,7 @@ describe("resolveRedaction", () => {
     }).toEqual({
       count: 115,
       kept: [true, false],
-      warnings: ["redact and PROBEX_REDACT add at most 100 names; the rest are ignored"],
+      warnings: ["redact and MICAFOX_REDACT add at most 100 names; the rest are ignored"],
     });
   });
 

@@ -32,7 +32,7 @@ enough to track progress card by card. This is a conversation, one step per repl
 5. **Architecture check.** An open design question (for example "WebSocket or HTTP?") → stop and suggest
    `/architect` first. The cards then link the resulting doc or ADR.
 6. **Create.** Show all cards filled from `.claude/templates/card.md`. Once the user confirms, create them in the
-   **Backlog** list of the Trello board https://trello.com/b/hzrnwdVz/probex-platform, in dependency order with
+   **Backlog** list of the Trello board https://trello.com/b/hzrnwdVz/micafox, in dependency order with
    sequential positions, so each card can link the cards it depends on, with the labels from the template. Print
    every link. Never put a card anywhere but Backlog.
 7. **Seed.** A seed that stays one card is rewritten in place instead of created anew and keeps its list. A seed

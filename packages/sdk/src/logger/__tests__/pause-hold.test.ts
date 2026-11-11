@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createLogger, type Logger, type SdkLogger } from "../index.js";
 
-const HOLD_KEY = Symbol.for("probex.logger.hold");
+const HOLD_KEY = Symbol.for("micafox.logger.hold");
 
 type Call = [level: string, ...args: unknown[]];
 
@@ -28,7 +28,7 @@ const setup = (logLevel = "warn", component = "debugger") => {
 
 const messages = (calls: Call[]): unknown[] => calls.map(([, message]) => message);
 
-const lineMessage = (index: number): string => `[probex] debugger: line ${String(index)}`;
+const lineMessage = (index: number): string => `[micafox] debugger: line ${String(index)}`;
 
 const writeLines = (logger: SdkLogger, from: number, to: number): void => {
   for (let index = from; index <= to; index += 1) {
@@ -97,7 +97,7 @@ describe("hold", () => {
     first.logger.release();
     runImmediates();
 
-    expect(messages(app.calls)).toEqual(["[probex] connector: hub unreachable"]);
+    expect(messages(app.calls)).toEqual(["[micafox] connector: hub unreachable"]);
   });
 
   it("ends the hold of a second module instance", async () => {
@@ -111,7 +111,7 @@ describe("hold", () => {
     second.release();
     runImmediates();
 
-    expect(messages(first.app.calls)).toEqual(["[probex] debugger: snapshot failed"]);
+    expect(messages(first.app.calls)).toEqual(["[micafox] debugger: snapshot failed"]);
   });
 
   it("does nothing on a second hold", () => {
@@ -123,7 +123,7 @@ describe("hold", () => {
     logger.release();
     runImmediates();
 
-    expect(messages(app.calls)).toEqual(["[probex] debugger: snapshot failed"]);
+    expect(messages(app.calls)).toEqual(["[micafox] debugger: snapshot failed"]);
   });
 
   it("writes directly again after one release that follows two holds", () => {
@@ -135,7 +135,7 @@ describe("hold", () => {
 
     logger.log("warn", "snapshot failed", { component: "debugger" });
 
-    expect(messages(app.calls)).toEqual(["[probex] debugger: snapshot failed"]);
+    expect(messages(app.calls)).toEqual(["[micafox] debugger: snapshot failed"]);
   });
 
   it("does nothing on release without hold", () => {
@@ -151,7 +151,7 @@ describe("hold", () => {
 
     logger.log("warn", "snapshot failed", { component: "debugger" });
 
-    expect(messages(app.calls)).toEqual(["[probex] debugger: snapshot failed"]);
+    expect(messages(app.calls)).toEqual(["[micafox] debugger: snapshot failed"]);
   });
 
   it("does not throw when the global record cannot be written", () => {
@@ -177,7 +177,7 @@ describe("hold", () => {
     logger.log("warn", "snapshot failed", { component: "debugger" });
     logger.release();
 
-    expect(messages(app.calls)).toEqual(["[probex] debugger: snapshot failed"]);
+    expect(messages(app.calls)).toEqual(["[micafox] debugger: snapshot failed"]);
   });
 
   it("honors the flag of a record from another copy that has no drains", () => {
@@ -197,7 +197,7 @@ describe("hold", () => {
     logger.release();
     runImmediates();
 
-    expect(messages(app.calls)).toEqual(["[probex] debugger: snapshot failed"]);
+    expect(messages(app.calls)).toEqual(["[micafox] debugger: snapshot failed"]);
   });
 
   it("ignores a record that is not an object", () => {
@@ -233,7 +233,7 @@ describe("queued lines", () => {
     logger.release();
     runImmediates();
 
-    expect(messages(app.calls)).toEqual(["[probex] connector: hub unreachable"]);
+    expect(messages(app.calls)).toEqual(["[micafox] connector: hub unreachable"]);
   });
 
   it("queues the summary of a window that ends during the pause", () => {
@@ -260,8 +260,8 @@ describe("queued lines", () => {
     runImmediates();
 
     expect(messages(app.calls)).toEqual([
-      "[probex] connector: hub unreachable",
-      "[probex] connector: hub unreachable (repeated 1 times in 60 s)",
+      "[micafox] connector: hub unreachable",
+      "[micafox] connector: hub unreachable (repeated 1 times in 60 s)",
     ]);
   });
 
@@ -287,7 +287,7 @@ describe("queued lines", () => {
     runImmediates();
 
     expect(app.calls.slice(100)).toEqual([
-      ["warn", "[probex] debugger: log lines dropped while the thread was paused: 5", { component: "debugger" }],
+      ["warn", "[micafox] debugger: log lines dropped while the thread was paused: 5", { component: "debugger" }],
     ]);
   });
 
@@ -302,7 +302,7 @@ describe("queued lines", () => {
 
     expect(app.calls.at(-1)).toEqual([
       "warn",
-      "[probex] connector: log lines dropped while the thread was paused: 1",
+      "[micafox] connector: log lines dropped while the thread was paused: 1",
       { component: "connector" },
     ]);
   });
@@ -316,7 +316,7 @@ describe("queued lines", () => {
     runImmediates();
 
     expect(messages(app.calls).filter((message) => String(message).includes("dropped"))).toEqual([
-      "[probex] debugger: log lines dropped while the thread was paused: 150",
+      "[micafox] debugger: log lines dropped while the thread was paused: 150",
     ]);
   });
 
@@ -439,8 +439,8 @@ describe("release", () => {
     runImmediates();
 
     expect([messages(first.app.calls), messages(second.app.calls)]).toEqual([
-      ["[probex] debugger: snapshot failed"],
-      ["[probex] connector: hub unreachable"],
+      ["[micafox] debugger: snapshot failed"],
+      ["[micafox] connector: hub unreachable"],
     ]);
   });
 });
@@ -514,8 +514,8 @@ describe("flush", () => {
     runImmediates();
 
     expect(messages(app.calls)).toEqual([
-      "[probex] connector: hub unreachable",
-      "[probex] connector: hub unreachable (repeated 1 times in 0 s)",
+      "[micafox] connector: hub unreachable",
+      "[micafox] connector: hub unreachable (repeated 1 times in 0 s)",
     ]);
   });
 
@@ -531,9 +531,9 @@ describe("flush", () => {
     logger.flush();
 
     expect(messages(app.calls)).toEqual([
-      "[probex] connector: hub unreachable",
-      "[probex] debugger: snapshot failed",
-      "[probex] connector: hub unreachable (repeated 1 times in 0 s)",
+      "[micafox] connector: hub unreachable",
+      "[micafox] debugger: snapshot failed",
+      "[micafox] connector: hub unreachable (repeated 1 times in 0 s)",
     ]);
   });
 
@@ -548,7 +548,7 @@ describe("flush", () => {
     first.logger.flush();
     runImmediates();
 
-    expect(messages(second.app.calls)).toEqual(["[probex] connector: hub unreachable"]);
+    expect(messages(second.app.calls)).toEqual(["[micafox] connector: hub unreachable"]);
   });
 
   it("writes only its own logger's queue", () => {
@@ -561,7 +561,7 @@ describe("flush", () => {
 
     first.logger.flush();
 
-    expect([messages(first.app.calls), second.app.calls]).toEqual([["[probex] debugger: snapshot failed"], []]);
+    expect([messages(first.app.calls), second.app.calls]).toEqual([["[micafox] debugger: snapshot failed"], []]);
   });
 });
 
@@ -665,7 +665,7 @@ describe("cleanup", () => {
 
     expect(app.calls.at(-1)).toEqual([
       "warn",
-      "[probex] connector: log lines dropped while the thread was paused: 2",
+      "[micafox] connector: log lines dropped while the thread was paused: 2",
       { component: "connector" },
     ]);
   });

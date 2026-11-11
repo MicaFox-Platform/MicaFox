@@ -1,6 +1,6 @@
 // Stands in for the debugger until it exists: the replies the debugger will send, made up instead of captured.
 
-import { PROTOCOL_VERSION, type BreakpointStatus, type Message, type Snapshot } from "@probex-platform/protocol";
+import { PROTOCOL_VERSION, type BreakpointStatus, type Message, type Snapshot } from "@micafox/protocol";
 
 const readId = (entry: unknown): unknown =>
   typeof entry === "object" && entry !== null ? Reflect.get(entry, "id") : undefined;

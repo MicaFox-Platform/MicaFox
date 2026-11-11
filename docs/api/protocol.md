@@ -1,12 +1,12 @@
-# @probex-platform/protocol API
+# @micafox/protocol API
 
 ## Installation
 
 ```sh
-pnpm add @probex-platform/protocol
+pnpm add @micafox/protocol
 ```
 
-Types and constants only, for `import` and `require()`. `@probex-platform/sdk` installs it for you; install it
+Types and constants only, for `import` and `require()`. `@micafox/sdk` installs it for you; install it
 yourself to write a custom connector or hub.
 
 ## Exports
@@ -45,7 +45,7 @@ Every implementation keeps this contract:
 throws must not stop the connector or the other handlers.
 
 ```ts
-import type { Connector } from "@probex-platform/protocol";
+import type { Connector } from "@micafox/protocol";
 
 function watch(connector: Connector): () => void {
   return connector.onStatus((status) => {
@@ -65,7 +65,7 @@ The state of a [`Connector`](#connector): `disconnected` before `connect()` and 
 `close()`. Any status but `closed` may follow any other; `closed` follows only `close()` and nothing follows it.
 
 ```ts
-import type { ConnectorStatus } from "@probex-platform/protocol";
+import type { ConnectorStatus } from "@micafox/protocol";
 
 const canSend = (status: ConnectorStatus): boolean => status === "connected";
 ```
@@ -86,7 +86,7 @@ with `incompatibleVersion` otherwise. The SDK speaks only its own `PROTOCOL_VERS
 [ADR 0016](../adr/0016-use-the-hellos-protocol-version-for-the-session.md).
 
 ```ts
-import { PROTOCOL_VERSION } from "@probex-platform/protocol";
+import { PROTOCOL_VERSION } from "@micafox/protocol";
 
 const speaksSameVersion = (version: number): boolean => version === PROTOCOL_VERSION;
 ```
@@ -103,7 +103,7 @@ whose `type` it does not know, a message only the other side sends, and a repeat
 message.
 
 ```ts
-import type { Message } from "@probex-platform/protocol";
+import type { Message } from "@micafox/protocol";
 
 const isHello = (message: Message): boolean => message.type === "hello";
 ```
@@ -147,7 +147,7 @@ On the wire:
   answers pings.
 
 ```ts
-import { PROTOCOL_VERSION, type Hello } from "@probex-platform/protocol";
+import { PROTOCOL_VERSION, type Hello } from "@micafox/protocol";
 
 const hello: Hello = {
   version: PROTOCOL_VERSION,
@@ -157,7 +157,7 @@ const hello: Hello = {
   labels: { region: "eu" },
   hostname: "checkout-7d9f",
   pid: 1,
-  sdk: { name: "@probex-platform/sdk", version: "0.1.0" },
+  sdk: { name: "@micafox/sdk", version: "0.1.0" },
   runtime: { name: "node", version: process.versions.node },
 };
 ```
@@ -175,7 +175,7 @@ The hub's reply to [`hello`](#hello): it accepts the session. A connector report
 other messages only after it.
 
 ```ts
-import { PROTOCOL_VERSION, type Welcome } from "@probex-platform/protocol";
+import { PROTOCOL_VERSION, type Welcome } from "@micafox/protocol";
 
 const welcome: Welcome = { version: PROTOCOL_VERSION, type: "welcome" };
 ```
@@ -196,7 +196,7 @@ either. A batch never holds `hello` or another batch. Why:
 [ADR 0005](../adr/0005-batch-and-rate-limit-messages-in-the-connector.md).
 
 ```ts
-import { PROTOCOL_VERSION, type Batch, type Message } from "@probex-platform/protocol";
+import { PROTOCOL_VERSION, type Batch, type Message } from "@micafox/protocol";
 
 const toBatch = (messages: Message[]): Batch => ({ version: PROTOCOL_VERSION, type: "batch", messages });
 ```
@@ -220,7 +220,7 @@ A hub sends at most 100 entries. In list order, entries after the 100th get stat
 200th, entries without a string `id`, and repeats of an `id` get no status.
 
 ```ts
-import { PROTOCOL_VERSION, type Breakpoints } from "@probex-platform/protocol";
+import { PROTOCOL_VERSION, type Breakpoints } from "@micafox/protocol";
 
 const breakpoints: Breakpoints = {
   version: PROTOCOL_VERSION,
@@ -253,7 +253,7 @@ One breakpoint in [`breakpoints`](#breakpoints).
 - `limits` — [`CaptureLimits`](#capturelimits) for this breakpoint's snapshots.
 
 ```ts
-import type { Breakpoint } from "@probex-platform/protocol";
+import type { Breakpoint } from "@micafox/protocol";
 
 const breakpoint: Breakpoint = { id: "bp-1", file: "src/orders/checkout.ts", line: 42, limits: { maxDepth: 2 } };
 ```
@@ -277,7 +277,7 @@ status `error`. The SDK lowers a larger value to its cap.
   most `4096`.
 
 ```ts
-import type { CaptureLimits } from "@probex-platform/protocol";
+import type { CaptureLimits } from "@micafox/protocol";
 
 const deep: CaptureLimits = { maxDepth: 5, maxItems: 50 };
 ```
@@ -307,7 +307,7 @@ and whenever it changes.
   breakpoints.
 
 ```ts
-import { PROTOCOL_VERSION, type BreakpointStatus } from "@probex-platform/protocol";
+import { PROTOCOL_VERSION, type BreakpointStatus } from "@micafox/protocol";
 
 const status: BreakpointStatus = {
   version: PROTOCOL_VERSION,
@@ -358,7 +358,7 @@ From the SDK: the state of the app at one hit of a breakpoint.
   on their object, and the children of an `array`, `set` or `map`.
 
 ```ts
-import type { Snapshot, Value } from "@probex-platform/protocol";
+import type { Snapshot, Value } from "@micafox/protocol";
 
 const total = (snapshot: Snapshot): Value | undefined =>
   snapshot.variables.find((variable) => variable.name === "total")?.value;
@@ -379,7 +379,7 @@ One frame of a [`Snapshot`](#snapshot)'s stack: the function's name, empty for a
 described under `stack` there.
 
 ```ts
-import type { StackFrame } from "@probex-platform/protocol";
+import type { StackFrame } from "@micafox/protocol";
 
 const where = (frame: StackFrame): string => `${frame.file}:${String(frame.line)}`;
 ```
@@ -396,7 +396,7 @@ interface Variable {
 A named [`Value`](#value): a variable of a [`Snapshot`](#snapshot) or a property of an `object` value.
 
 ```ts
-import type { Variable } from "@probex-platform/protocol";
+import type { Variable } from "@micafox/protocol";
 
 const names = (variables: Variable[]): string[] => variables.map((variable) => variable.name);
 ```
@@ -447,7 +447,7 @@ A typed array or `Buffer` is an `array` of numbers. A `date` is an ISO 8601 stri
 date is `unavailable`. A reader shows a `type` it does not know as `unavailable`.
 
 ```ts
-import type { Value } from "@probex-platform/protocol";
+import type { Value } from "@micafox/protocol";
 
 const order: Value = {
   type: "object",
@@ -472,7 +472,7 @@ has welcomed with 1000 when it closes, aborts one the hub has not welcomed yet w
 1009 when a frame is too large, see [`Hello`](#hello).
 
 ```ts
-import { CLOSE_CODES } from "@probex-platform/protocol";
+import { CLOSE_CODES } from "@micafox/protocol";
 
 const isRejected = (code: number): boolean => Object.values<number>(CLOSE_CODES).includes(code);
 ```
@@ -482,7 +482,7 @@ const isRejected = (code: number): boolean => Object.values<number>(CLOSE_CODES)
 A custom connector, here an in-memory one for tests, implements [`Connector`](#connector):
 
 ```ts
-import type { Connector, ConnectorStatus, Message } from "@probex-platform/protocol";
+import type { Connector, ConnectorStatus, Message } from "@micafox/protocol";
 
 type Handler<T> = (value: T) => void;
 

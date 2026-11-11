@@ -8,7 +8,7 @@ effort: high
 
 Card: $ARGUMENTS
 
-Board: Trello https://trello.com/b/hzrnwdVz/probex-platform. Card format: `.claude/templates/card.md`.
+Board: Trello https://trello.com/b/hzrnwdVz/micafox. Card format: `.claude/templates/card.md`.
 
 ## 1. Pick
 

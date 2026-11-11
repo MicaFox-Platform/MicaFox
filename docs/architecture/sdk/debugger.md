@@ -9,7 +9,7 @@ limits, redacts secrets and sends them to the hub through a connector. How to us
 ## Boundaries
 
 - Owns:
-  - the lifecycle of [`probex`](../../api/sdk/debugger.md#probex): options, `run()`, `stop()`, the connector it
+  - the lifecycle of [`micafox`](../../api/sdk/debugger.md#micafox): options, `run()`, `stop()`, the connector it
     creates and the [logger](logger.md) it shares with that connector;
   - the in-process inspector session and the V8 breakpoints in it;
   - matching repository paths and TypeScript lines to loaded scripts through source maps;
@@ -34,13 +34,13 @@ limits, redacts secrets and sends them to the hub through a connector. How to us
     reply: an object's own properties are read in one call, and a string comes in full with the object or scope that
     holds it and is cut afterwards. An object with a very large number of own properties, or a string of many
     megabytes, can make that one pause longer than 10 ms and cost its size in memory until the pause ends.
-  - Without breakpoints the inspector's `Debugger` domain is off, so V8 runs the app as if ProbeX were not there.
+  - Without breakpoints the inspector's `Debugger` domain is off, so V8 runs the app as if MicaFox were not there.
   - Runs no user code: getters are never called and nothing is evaluated.
   - A redacted value never reaches the snapshot or the logs: a container under a redacted name is never expanded,
     and a primitive, which V8 returns with its siblings in one `Runtime.getProperties` reply, is dropped there.
     Only the host app sets the redaction rules; the hub cannot change them.
   - One debugger per process: the first copy of the SDK loaded stores its `Debugger` on `globalThis` under
-    `Symbol.for("probex.debugger")`, and every later copy, an ES module or CommonJS build or another install,
+    `Symbol.for("micafox.debugger")`, and every later copy, an ES module or CommonJS build or another install,
     exports that object. A copy of another major version logs a warning and exports it too.
   - Debugs the main thread only; worker threads are not debugged.
   - Does not start when the inspector is already open at `run()`, by `--inspect` or `inspector.open()`.
@@ -54,7 +54,7 @@ limits, redacts secrets and sends them to the hub through a connector. How to us
   - Reads source maps inline (`data:` URLs) or from a relative `sourceMappingURL` resolved against the script's
     path; a map with any other scheme is not read, and an entry that nothing else resolves gets the status `error`.
     Bundles, where many sources map into one script, are not supported.
-  - Imports only `@probex-platform/protocol`, the connector and logger modules and Node built-ins; source maps are
+  - Imports only `@micafox/protocol`, the connector and logger modules and Node built-ins; source maps are
     decoded by its own VLQ decoder.
   - Never keeps the host process alive: every timer is unref'd. While `stop()` flushes the connector it created,
     the connector keeps the process alive, see [Closing](connector.md#closing).
@@ -91,7 +91,7 @@ limits, redacts secrets and sends them to the hub through a connector. How to us
 
 The parts live in `packages/sdk/src/debugger/`:
 
-- `Debugger` — the `probex` object. Resolves the options and the redaction rules, creates the logger, the connector
+- `Debugger` — the `micafox` object. Resolves the options and the redaction rules, creates the logger, the connector
   and the parts below, hands `breakpoints` messages to `Breakpoints` and sends what they produce. It is not running,
   running or stopping.
 - `Breakpoints` — holds the latest list from the hub, the V8 breakpoint of each entry and its status, and handles
@@ -136,7 +136,7 @@ packages/sdk/src/debugger/
 ├── redaction/                  RedactionRules: the names whose values are redacted, resolved once at run()
 │   ├── index.ts                the sub-component's only entry: resolveRedaction and RedactionRules
 │   ├── redaction-rules.ts      RedactionRules: the built-in names, normalizeName and the match by containment
-│   └── resolve-redaction.ts    resolveRedaction: the built-in names plus redact and PROBEX_REDACT, at most 100
+│   └── resolve-redaction.ts    resolveRedaction: the built-in names plus redact and MICAFOX_REDACT, at most 100
 ├── source-maps/                SourceMaps: reads the maps of loaded scripts and keeps what each one is needed for
 │   ├── index.ts                the sub-component's only entry: SourceMaps, locateFrame and the types of what it knows
 │   ├── source-maps.ts          SourceMaps: one read per script record, shared; the index kept while an entry holds it
@@ -262,7 +262,7 @@ packages/sdk/src/debugger/
 ### Redacting secrets
 
 1. At `run()` the rules are resolved once: the built-in names, plus the names from `redact` and from
-   `PROBEX_REDACT`, at most 100 together, copied from the app's array entry by entry. The app adds names; it cannot
+   `MICAFOX_REDACT`, at most 100 together, copied from the app's array entry by entry. The app adds names; it cannot
    remove the built-in ones.
 2. Names are normalized before matching: lowercased, with `_`, `-` and `.` removed, so `api_key`, `API-KEY` and
    `apiKey` are all `apikey`. A rule that is empty after normalizing is skipped with a warning.

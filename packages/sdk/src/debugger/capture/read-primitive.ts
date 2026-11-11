@@ -1,4 +1,4 @@
-import type { Value } from "@probex-platform/protocol";
+import type { Value } from "@micafox/protocol";
 
 import { truncateText } from "./limits.js";
 import type { RemoteObject } from "./remote-object.js";
