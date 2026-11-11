@@ -15,7 +15,8 @@ const micafox: Debugger;
 The debugger, the SDK's first module. It sets non-breaking breakpoints and captures snapshots, and talks to the hub
 through a connector. Modules added later get their own named exports and share the same
 connector.
-There is one per process, shared by every import of the SDK, even when two copies of the package are installed.
+There is one per process, shared by every import of the SDK, even when two copies of the package are installed;
+a copy of another major version logs a warning and uses the first copy's debugger.
 Call `configure()` if you need to, then `run()` once at startup, and `stop()` on shutdown. It keeps the process
 alive only while `stop()` sends buffered snapshots.
 
@@ -51,6 +52,10 @@ module loads. Design:
   which sends buffered snapshots for up to `hubConnector.closeTimeoutMs`. Resolves when done; `run()` may be called
   again after it, with the options configured so far.
 
+`run()` logs one `info` line when it starts, such as `started with the hub connector (service checkout, hub host
+hub.example.com) and 15 redaction rules`. It names the service and the host of the hub URL, never the token, and no
+other line contains the token or the credentials of the URL.
+
 Calls in any order are safe:
 
 | Call          | Not running        | Running                         | Stopping                        |
@@ -65,6 +70,9 @@ per second, and every problem is logged to the [`logger`](#debuggeroptions). Aft
 running, so `configure()` and `run()` can be called again.
 
 - No `url` and no `connector`: `run()` logs an error and the debugger does not start.
+- A hub URL or token that `HubConnector` would refuse, such as a URL that is not `ws://` or `wss://`, or a token over
+  `ws://` to a host other than localhost: `run()` logs the reason as an error and the debugger does not start.
+- `run()` in a worker thread: it logs a warning and does nothing, because MicaFox debugs the main thread only.
 - The inspector is already open, by `--inspect` or `inspector.open()`: `run()` logs a warning and the debugger
   does not start.
 - The inspector session cannot be opened or anything else fails while starting: an error is logged, whatever was

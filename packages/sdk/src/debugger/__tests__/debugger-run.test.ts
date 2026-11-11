@@ -9,7 +9,7 @@ import {
   FakeInspectorBinding,
   type LoggedLine,
 } from "../../../test/debugger/fakes.js";
-import { Debugger, type DebuggerOptions } from "../index.js";
+import { MicafoxDebugger, type DebuggerOptions } from "../index.js";
 
 // A message from a buggy custom connector: reading its type throws inside the debugger's handler
 const throwingMessage = (): Message =>
@@ -154,13 +154,13 @@ describe("Debugger.run() refusals", () => {
     });
   });
 
-  it("logs an error and does not start without a connector", () => {
+  it("logs an error and does not start without a connector or a hub URL", () => {
     const { micafox, binding, lines } = createDebugger();
 
     micafox.run();
 
     expect({ lines, isConnected: binding.isConnected }).toEqual({
-      lines: [{ level: "error", message: "connector is not set; not started" }],
+      lines: [{ level: "error", message: "no hub URL: set url or MICAFOX_HUB_URL, or a connector; not started" }],
       isConnected: false,
     });
   });
@@ -421,7 +421,7 @@ describe("Debugger.run() with an unusual connector", () => {
 
   it("starts and stops on the real inspector and main thread when no dependencies are passed", async () => {
     const lines: LoggedLine[] = [];
-    const micafox = new Debugger({ env: {}, console: createRecordingLogger(lines) });
+    const micafox = new MicafoxDebugger({ env: {}, console: createRecordingLogger(lines) });
     micafox.configure({ connector: new FakeConnector(), logLevel: "info" });
     micafox.run();
 

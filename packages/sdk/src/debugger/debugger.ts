@@ -4,20 +4,14 @@ import { performance } from "node:perf_hooks";
 import { isMainThread } from "node:worker_threads";
 
 import { Breakpoints } from "./breakpoints/index.js";
+import { chooseConnector, type ConnectorChoice } from "./connector-choice.js";
 import { ConnectorLink } from "./connector-link.js";
 import { InspectorSession, type InspectorBinding } from "./inspector-session.js";
-import {
-  findHubOptions,
-  isConnector,
-  readConfigureOptions,
-  resolveEnabled,
-  type ConfiguredOptions,
-  type DebuggerOptions,
-} from "./options.js";
+import { readConfigureOptions, resolveEnabled, type ConfiguredOptions, type DebuggerOptions } from "./options.js";
 import { Pauses } from "./pauses/index.js";
 import { RateLimiter } from "./rate-limiter/index.js";
 import { resolveRedaction, type RedactionRules } from "./redaction/index.js";
-import type { Warn } from "../connector/index.js";
+import { HubConnector, type HubConnectorOptions, type Warn } from "../connector/index.js";
 import { createLogger, type Environment, type Logger, type SdkLogger } from "../logger/index.js";
 
 const COMPONENT = "debugger";
@@ -31,6 +25,8 @@ export interface DebuggerDependencies {
   inspectorUrl?: () => string | undefined;
   isMainThread?: boolean;
   createInspectorBinding?: () => InspectorBinding;
+  /** Creates the default connector, which `run()` uses when the app sets no `connector`. */
+  createHubConnector?: (options: HubConnectorOptions) => Connector;
 }
 
 /** A start step failed: the inspector session could not connect. */
@@ -40,6 +36,7 @@ class DebuggerStartError extends Error {
 
 /** What one `run()` started, so that `stop()` undoes exactly that. */
 interface Running {
+  readonly connector: ConnectorChoice;
   readonly link: ConnectorLink;
   readonly session: InspectorSession;
   readonly breakpoints: Breakpoints;
@@ -50,16 +47,24 @@ type State = { kind: "notRunning" } | { kind: "running"; running: Running } | { 
 
 const NOT_RUNNING: State = { kind: "notRunning" };
 
+/** The type of `micafox`: three methods, so an app can write a test double of it (docs/api/sdk/debugger.md). */
+export interface Debugger {
+  configure(options?: DebuggerOptions): void;
+  run(): void;
+  stop(): Promise<void>;
+}
+
 /**
  * The debugger: `configure()`, `run()` and `stop()` in any order, never throwing into the app. It is not running,
  * running or stopping.
  */
-export class Debugger {
+export class MicafoxDebugger implements Debugger {
   private readonly logger: SdkLogger;
   private readonly env: Environment;
   private readonly inspectorUrl: () => string | undefined;
   private readonly isMainThread: boolean;
   private readonly createInspectorBinding: () => InspectorBinding;
+  private readonly createHubConnector: (options: HubConnectorOptions) => Connector;
   private readonly warn: Warn = (message) => {
     this.logger.log("warn", message, { component: COMPONENT });
   };
@@ -71,6 +76,7 @@ export class Debugger {
     this.inspectorUrl = dependencies.inspectorUrl ?? readInspectorUrl;
     this.isMainThread = dependencies.isMainThread ?? isMainThread;
     this.createInspectorBinding = dependencies.createInspectorBinding ?? ((): InspectorBinding => new Session());
+    this.createHubConnector = dependencies.createHubConnector ?? ((options): Connector => new HubConnector(options));
     // One logger for the debugger's lifetime: configure() and run() only change its target and level
     this.logger = createLogger({ component: COMPONENT, env: this.env, console: dependencies.console ?? console });
   }
@@ -163,21 +169,19 @@ export class Debugger {
       return;
     }
 
-    const { connector } = options;
-    if (!isConnector(connector)) {
-      const reason = connector === undefined ? "connector is not set" : "connector is not a Connector";
-      this.logger.log("error", `${reason}; not started`, { component: COMPONENT });
+    const choice = chooseConnector(options, {
+      env: this.env,
+      logger: this.logger,
+      warn: this.warn,
+      createHubConnector: this.createHubConnector,
+    });
+    if (choice === undefined) {
       return;
-    }
-
-    const ignored = findHubOptions(options);
-    if (ignored.length > 0) {
-      this.warn(`${ignored.join(", ")} ignored: a custom connector is set`);
     }
 
     // Resolved once per run()
     const redaction = resolveRedaction(options.redact, this.env, this.warn);
-    this.startWith(connector, redaction);
+    this.startWith(choice, redaction);
   }
 
   private findRefusal(): string | undefined {
@@ -194,8 +198,8 @@ export class Debugger {
   }
 
   // The parts of one run(); `fail` stops the debugger only while this run is the current one
-  private createRunning(connector: Connector, redaction: RedactionRules, fail: (error: unknown) => void): Running {
-    const link = new ConnectorLink(connector, this.logger);
+  private createRunning(choice: ConnectorChoice, redaction: RedactionRules, fail: (error: unknown) => void): Running {
+    const link = new ConnectorLink(choice.connector, this.logger);
     const session = new InspectorSession(this.logger, this.createInspectorBinding());
     const limiter = new RateLimiter(() => performance.now());
     const send = (message: Message): void => {
@@ -219,11 +223,11 @@ export class Debugger {
       send,
       fail,
     });
-    return { link, session, breakpoints, pauses };
+    return { connector: choice, link, session, breakpoints, pauses };
   }
 
-  private startWith(connector: Connector, redaction: RedactionRules): void {
-    const running = this.createRunning(connector, redaction, (error) => {
+  private startWith(choice: ConnectorChoice, redaction: RedactionRules): void {
+    const running = this.createRunning(choice, redaction, (error) => {
       this.failRunning(running, error);
     });
     this.state = { kind: "running", running };
@@ -263,11 +267,8 @@ export class Debugger {
       return;
     }
 
-    this.logStarted(redaction.count);
-  }
-
-  private logStarted(redactionRules: number): void {
-    this.logger.log("info", `started with a custom connector and ${String(redactionRules)} redaction rules`, {
+    const rules = String(redaction.count);
+    this.logger.log("info", `started with ${choice.description} and ${rules} redaction rules`, {
       component: COMPONENT,
     });
   }
@@ -332,13 +333,39 @@ export class Debugger {
       running.pauses.stop();
       running.session.disconnect();
       running.link.unsubscribe();
-      finish();
-    } finally {
-      this.state = NOT_RUNNING;
-      resolve(undefined);
+    } catch (error) {
+      this.logInternalError(error);
     }
 
+    const end = (): void => {
+      try {
+        finish();
+      } catch (error) {
+        this.logInternalError(error);
+      } finally {
+        this.state = NOT_RUNNING;
+        resolve(undefined);
+      }
+    };
+
+    // A custom connector stays open, so there is nothing to wait for
+    if (!running.connector.isOwned) {
+      end();
+      return promise;
+    }
+
+    // Closing the connector this run created sends what is buffered, so the debugger stays stopping until it ends
+    void this.closeConnector(running.connector.connector).then(end);
     return promise;
+  }
+
+  // Never throws or rejects
+  private async closeConnector(connector: Connector): Promise<void> {
+    try {
+      await connector.close();
+    } catch (error) {
+      this.logger.log("error", "closing the connector failed", { component: COMPONENT, error });
+    }
   }
 
   private isCurrent(running: Running): boolean {

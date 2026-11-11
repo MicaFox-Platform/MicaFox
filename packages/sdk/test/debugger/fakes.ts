@@ -3,7 +3,7 @@
 import type { Connector, ConnectorStatus, Message } from "@micafox/protocol";
 import { EventEmitter } from "node:events";
 
-import { Debugger, type DebuggerDependencies, type InspectorBinding } from "../../src/debugger/index.js";
+import { MicafoxDebugger, type DebuggerDependencies, type InspectorBinding } from "../../src/debugger/index.js";
 import type { Logger } from "../../src/logger/index.js";
 
 /** One line the debugger wrote, without the `[micafox] debugger: ` prefix. */
@@ -153,7 +153,7 @@ export class FakeBreakpointsInspector {
 
 /** A debugger under test, with the lines it wrote to its default console and its fake inspector session. */
 export interface DebuggerUnderTest {
-  micafox: Debugger;
+  micafox: MicafoxDebugger;
   lines: LoggedLine[];
   binding: FakeInspectorBinding;
   /** The messages written at `level`. */
@@ -166,7 +166,7 @@ export const createDebugger = (
   binding = new FakeInspectorBinding(),
 ): DebuggerUnderTest => {
   const lines: LoggedLine[] = [];
-  const micafox = new Debugger({
+  const micafox = new MicafoxDebugger({
     env: {},
     console: createRecordingLogger(lines),
     inspectorUrl: () => undefined,
