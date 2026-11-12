@@ -19,6 +19,7 @@ pnpm monorepo, Node >= 22, TypeScript (strict, NodeNext), Vitest, ESLint, Pretti
 | `packages/sdk`            | debugger and default connector, in host app    | protocol      |
 | `examples/node-basic`     | demo app                                       | sdk, protocol |
 | `examples/module-formats` | apps that load the built SDK per module format | sdk, protocol |
+| `examples/frameworks`     | Express, NestJS and Next.js apps on built SDK  | sdk, protocol |
 
 Dependencies point down this table only.
 

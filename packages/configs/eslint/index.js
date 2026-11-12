@@ -10,7 +10,7 @@ export default [
   ...tseslint.configs.stylisticTypeChecked,
 
   {
-    ignores: ["**/dist/**", "**/coverage/**", "**/node_modules/**", "**/*.d.ts", "**/*.js"],
+    ignores: ["**/dist/**", "**/coverage/**", "**/node_modules/**", "**/.next/**", "**/*.d.ts", "**/*.js"],
   },
 
   {

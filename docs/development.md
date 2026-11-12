@@ -17,6 +17,7 @@ table only, and packages import each other by package name, never by relative pa
 | `packages/sdk`            | `src/debugger/` and `src/connector/`, run inside the host app | protocol      |
 | `examples/node-basic`     | demo app to try the SDK by hand                               | sdk, protocol |
 | `examples/module-formats` | one app per module format, run on the built SDK               | sdk, protocol |
+| `examples/frameworks`     | Express, NestJS and Next.js apps, run on the built SDK        | sdk, protocol |
 
 A package exports its `src/index.ts` under the `@micafox/source` condition, which `pnpm dev`, tests and
 typecheck resolve: packages read each other's sources directly, so development needs no build step.
@@ -44,8 +45,8 @@ pnpm typecheck    → typecheck every package, then the root files and tests
 pnpm test         → one Vitest run over all packages; pnpm test <paths> runs only those test files
 pnpm lint         → one ESLint run over the repo
 pnpm format       → one Prettier check over the repo
-pnpm test:build   → tests of the built output: packages loaded with import and require(), examples/module-formats;
-                    run pnpm build first
+pnpm test:build   → tests of the built output: packages loaded with import and require(), examples/module-formats
+                    and examples/frameworks; run pnpm build first
 pnpm verify       → lint → format → typecheck → build → test:build → test:coverage (≥ 80%), stops at the first failure
 pnpm verify:brief → the same steps, one line per green step and the start of a failure (for AI agents)
 pnpm verify:fix   → auto-fix lint and formatting
@@ -69,7 +70,7 @@ the same scripts on every pull request: see [Checks](#checks).
   `packages/<name>/test/e2e/<component>/`: a small fixture app started as a child process, and one test file per
   behavior of the component. Tests of the whole system, through the public API only, live in `examples/<name>/tests/`
   and start the example's app and fake hub as child processes. Those that need the built packages, as in
-  `examples/module-formats`, run in `pnpm test:build`.
+  `examples/module-formats` and `examples/frameworks`, run in `pnpm test:build`.
 
 Full rules: [testing](../.claude/rules/testing.md).
 

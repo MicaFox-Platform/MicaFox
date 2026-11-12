@@ -18,6 +18,26 @@ What your app can rely on:
   briefly while it connects to the hub or closes a connection: [`HubConnector`](connector.md#hubconnector).
 - Its problems go to `console` at `warn` and above, or to your [`Logger`](logger.md#logger).
 
+### Compatibility
+
+CI runs each framework below in a real app on Node.js 22.13 and 24, with breakpoints set by a hub:
+
+| Framework                                 | Tested with                                      | Breakpoints                         |
+| ----------------------------------------- | ------------------------------------------------ | ----------------------------------- |
+| Fastify 5                                 | TypeScript run by tsx                            | yes                                 |
+| Express 5                                 | CommonJS JavaScript run by `node`                | yes                                 |
+| NestJS 12                                 | the Nest CLI's build: CommonJS with `.map` files | yes                                 |
+| Next.js 16, Node.js runtime, `next start` | MicaFox started in `instrumentation.ts`          | not yet: route handlers are bundled |
+
+Module formats are tested separately, in plain Node.js apps: CommonJS, ES modules, and TypeScript compiled by tsc with
+source maps.
+
+Not supported: bundled output (Next.js server code included), the Edge runtime, Vercel serverless functions, Bun and
+Deno.
+
+What each framework needs and the apps CI runs: [frameworks](../../../examples/frameworks/README.md),
+[module formats](../../../examples/module-formats/README.md), [Fastify](../../../examples/node-basic/README.md).
+
 ## Exports
 
 - [Debugger](debugger.md):
