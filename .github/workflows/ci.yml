@@ -88,6 +88,10 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # Loads `dist/` of each package through import and require() in child processes, so it follows the build
+      - name: Tests of the built output
+        run: pnpm test:build
+
   # The required check `ci` of the repo ruleset: stays one name however the matrix above changes
   ci:
     needs: verify

@@ -45,9 +45,10 @@ is unref'd except the connector's `closeTimeoutMs` timer while it flushes on clo
 debugger imports the connector and the logger, the connector imports only the logger, and the logger imports no SDK
 module, so the connector and the logger can move out together.
 
-The package is built as ES modules and as CommonJS, see
-[ADR 0013](../../adr/0013-publish-the-packages-as-es-modules-and-commonjs.md). Every copy, either build or another
-install, shares [one debugger per process](debugger.md#boundaries).
+The package is built as ES modules (`dist/esm`) and as CommonJS (`dist/cjs`), and `exports` serves one to `import` and
+the other to `require()`, see [ADR 0013](../../adr/0013-publish-the-packages-as-es-modules-and-commonjs.md). The
+CommonJS build rejects top-level `await` and `import.meta`, so the sources use neither. Every copy, either build or
+another install, shares [one debugger per process](debugger.md#boundaries).
 
 ## Key flows
 

@@ -32,13 +32,14 @@ the package can also serve any TS/Node project that installs it from npm.
 Consumers apply a preset in their own config file and add their overrides on top.
 Signatures and examples: [`docs/api/configs.md`](../api/configs.md).
 
-| Preset                    | Applied with                                                     |
-| ------------------------- | ---------------------------------------------------------------- |
-| `tsconfig/base.json`      | `"extends"` in `tsconfig.json`                                   |
-| `tsconfig/workspace.json` | `"extends"` in a package's `tsconfig.json`                       |
-| `eslint`                  | spread into the flat config array                                |
-| `prettier`                | re-exported from `prettier.config.js`                            |
-| `vitest`                  | `createVitestConfig()` or the default export in a project config |
+| Preset                        | Applied with                                                            |
+| ----------------------------- | ----------------------------------------------------------------------- |
+| `tsconfig/base.json`          | `"extends"` in `tsconfig.json`                                          |
+| `tsconfig/workspace.json`     | `"extends"` in a package's `tsconfig.json`                              |
+| `tsconfig/workspace-cjs.json` | `"extends"` in a package's `tsconfig.cjs.json`, beside `workspace.json` |
+| `eslint`                      | spread into the flat config array                                       |
+| `prettier`                    | re-exported from `prettier.config.js`                                   |
+| `vitest`                      | `createVitestConfig()` or the default export in a project config        |
 
 ## Key flows
 

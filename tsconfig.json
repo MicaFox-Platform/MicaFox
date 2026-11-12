@@ -6,7 +6,7 @@
   },
   "include": [
     "*.ts",
-    "packages/*/vitest.config.ts",
+    "packages/*/vitest*.config.ts",
     "packages/*/src/**/*.test.ts",
     "packages/*/src/**/*.test-d.ts",
     "examples/*/src/**/*.test.ts",

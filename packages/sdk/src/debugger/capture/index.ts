@@ -2,6 +2,7 @@ export { cutSnapshot, type SnapshotTarget } from "./cut-snapshot.js";
 export {
   CaptureError,
   readPause,
+  SYSTEM_CLOCK,
   type CaptureClock,
   type CaptureDependencies,
   type PausedLocation,
