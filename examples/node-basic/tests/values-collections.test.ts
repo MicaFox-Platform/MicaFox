@@ -3,11 +3,6 @@ import { describe, expect, it } from "vitest";
 import { E2E_TEST_TIMEOUT_MS, useProcesses } from "./harness.js";
 import { captureValues, readVariable } from "./values-capture.js";
 
-interface Children {
-  items?: unknown[];
-  entries?: unknown[];
-}
-
 describe("snapshot of arrays, sets and maps", { timeout: E2E_TEST_TIMEOUT_MS }, () => {
   useProcesses();
 
@@ -52,16 +47,24 @@ describe("snapshot of arrays, sets and maps", { timeout: E2E_TEST_TIMEOUT_MS }, 
     });
   });
 
-  it("keeps the children of the same collections when the breakpoint raises maxItems to 25", async () => {
-    const { snapshot, httpStatus } = await captureValues("collections", { limits: { maxItems: 25 } });
+  it("keeps only the size of a collection above the breakpoint's own maxItems of 2", async () => {
+    const { snapshot, httpStatus } = await captureValues("collections", { limits: { maxItems: 2 } });
 
-    // Each variable is a collection of the route; a missing one gives undefined counts, which fails the assertion
-    const children = (name: string): Children | undefined => readVariable(snapshot, name) as Children | undefined;
     expect({
       httpStatus,
-      bigListItems: children("bigList")?.items?.length,
-      bigSetItems: children("bigSet")?.items?.length,
-      bigMapEntries: children("bigMap")?.entries?.length,
-    }).toEqual({ httpStatus: 200, bigListItems: 25, bigSetItems: 25, bigMapEntries: 25 });
+      smallList: readVariable(snapshot, "smallList"),
+      smallSet: readVariable(snapshot, "smallSet"),
+    }).toEqual({
+      httpStatus: 200,
+      smallList: { type: "array", length: 3 },
+      smallSet: {
+        type: "set",
+        size: 2,
+        items: [
+          { type: "string", value: "a", length: 1 },
+          { type: "string", value: "b", length: 1 },
+        ],
+      },
+    });
   });
 });

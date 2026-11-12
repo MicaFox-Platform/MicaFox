@@ -31,7 +31,7 @@ describe("snapshot of values larger than 64 KiB", { timeout: E2E_TEST_TIMEOUT_MS
       truncated: snapshot.truncated,
     }).toEqual({
       httpStatus: 200,
-      hugeText: { type: "string", value: "x".repeat(256), length: 100_000 },
+      hugeText: { type: "string", value: "x".repeat(256), length: 10_000 },
       hugeObjectProperties: 20,
       isHugeObjectTruncated: true,
       truncated: undefined,

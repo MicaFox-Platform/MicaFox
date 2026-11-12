@@ -4,10 +4,12 @@
 
 import type { FastifyInstance } from "fastify";
 
+// Values just large enough for their limits: V8 hands a string and an object's own properties to the debugger whole,
+// within its 10 ms per pause, so larger ones only make a capture slower on a slow machine.
 // A string of this size cannot be captured whole: a string is cut at 4096 UTF-16 code units at most
-const HUGE_TEXT_LENGTH = 100_000;
-// 100 properties of 4096 characters each pass the 64 KiB of a snapshot, with the limits at their caps
-const HUGE_OBJECT_PROPERTIES = 100;
+const HUGE_TEXT_LENGTH = 10_000;
+// 24 properties of 4096 characters pass the 64 KiB of a snapshot with the limits at their caps, and 20 items
+const HUGE_OBJECT_PROPERTIES = 24;
 const HUGE_PROPERTY_LENGTH = 4096;
 // More than the default 20 items of a container
 const ABOVE_MAX_ITEMS = 25;
