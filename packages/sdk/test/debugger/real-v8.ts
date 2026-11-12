@@ -253,7 +253,9 @@ const createParts = (inspector: InspectorSession, logger: SdkLogger, isSecret: (
       snapshots.push(snapshot);
     },
     fail,
-    now,
+    // Fake timers stop Date.now() but not performance.now() of node:perf_hooks: with the system clock a slow runner
+    // spends the capture's 10 ms on V8's replies and cuts the snapshot
+    clock: { now, epochMs: now },
   });
   return { sent, snapshots, failures, breakpoints, pauses };
 };

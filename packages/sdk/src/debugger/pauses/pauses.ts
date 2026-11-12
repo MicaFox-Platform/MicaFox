@@ -1,10 +1,17 @@
 import type { Snapshot } from "@micafox/protocol";
 import { Buffer } from "node:buffer";
-import { performance } from "node:perf_hooks";
 
 import { Throttle, type ThrottledBreakpoints, type ThrottleInspector } from "./throttle.js";
 import type { SdkLogger } from "../../logger/index.js";
-import { cutSnapshot, readPause, type PausedLocation, type PauseRead, type SnapshotTarget } from "../capture/index.js";
+import {
+  cutSnapshot,
+  readPause,
+  SYSTEM_CLOCK,
+  type CaptureClock,
+  type PausedLocation,
+  type PauseRead,
+  type SnapshotTarget,
+} from "../capture/index.js";
 import type { Admission, RateLimiter } from "../rate-limiter/index.js";
 import type { FrameLocation } from "../source-maps/index.js";
 
@@ -38,8 +45,8 @@ export interface PausesDependencies {
   send: (snapshot: Snapshot) => void;
   /** Reports an unexpected error: the debugger stops itself. */
   fail: (error: unknown) => void;
-  /** A monotonic clock in milliseconds for the pause budget; defaults to `performance.now()`. */
-  now?: () => number;
+  /** Times each pause for the pause budget and limits the capture inside it; defaults to `SYSTEM_CLOCK`. */
+  clock?: CaptureClock;
 }
 
 /** What happened inside one pause, before the thread resumed. */
@@ -56,11 +63,11 @@ const NOBODY: Admission = { allowed: [], outOfTokens: [] };
  */
 export class Pauses {
   private readonly throttle: Throttle;
-  private readonly now: () => number;
+  private readonly clock: CaptureClock;
   private unsubscribe: (() => void) | undefined;
 
   constructor(private readonly dependencies: PausesDependencies) {
-    this.now = dependencies.now ?? (() => performance.now());
+    this.clock = dependencies.clock ?? SYSTEM_CLOCK;
     this.throttle = new Throttle(dependencies);
   }
 
@@ -80,14 +87,14 @@ export class Pauses {
 
   // The thread is resumed whatever happens; the work after it runs on a running thread, before the held lines go
   private onPaused(params: unknown): void {
-    const startedAt = this.now();
+    const startedAt = this.clock.now();
     const inside = this.readInside(params);
     try {
       if (!this.resume()) {
         return;
       }
 
-      const pauseMs = this.now() - startedAt;
+      const pauseMs = this.clock.now() - startedAt;
       this.dependencies.limiter.charge(pauseMs);
       this.afterResume(inside, pauseMs);
     } catch (error) {
@@ -120,6 +127,7 @@ export class Pauses {
           session: this.dependencies.session,
           locateFrame: (frame) => this.dependencies.breakpoints.locateFrame(frame),
           isSecret: this.dependencies.isSecret,
+          clock: this.clock,
         },
       );
       return { kind: "captured", admission, targets, read };

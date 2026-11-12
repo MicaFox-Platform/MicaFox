@@ -66,7 +66,8 @@ interface CallFrame {
   scopes: Array<{ type: string; objectId: string | undefined }>;
 }
 
-const SYSTEM_CLOCK: CaptureClock = { now: () => performance.now(), epochMs: () => Date.now() };
+/** The clock of a capture in the app: `performance.now()` for its time limit, `Date.now()` for its time. */
+export const SYSTEM_CLOCK: CaptureClock = { now: () => performance.now(), epochMs: () => Date.now() };
 
 const readScopes = (raw: unknown): CallFrame["scopes"] =>
   Array.isArray(raw)

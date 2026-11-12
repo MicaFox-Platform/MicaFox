@@ -5,6 +5,7 @@ import type { CaptureLimits } from "@micafox/protocol";
 
 import {
   readPause,
+  type CaptureClock,
   type CaptureDependencies,
   type PausedLocation,
   type PauseRead,
@@ -37,6 +38,10 @@ const MODULE = `exports.pause = function run() {
 };
 `;
 
+// A stopped clock: the time limit of a pause is 10 ms of real time, which a slow CI runner can spend on V8's replies
+// alone and turn a value into `unavailable`. A test of the time limit passes its own clock.
+const STOPPED_CLOCK: CaptureClock = { now: () => 0, epochMs: () => Date.now() };
+
 const plainLocation = (spot: PausedLocation) => ({
   file: spot.scriptId,
   line: spot.lineNumber + 1,
@@ -67,6 +72,7 @@ export const readRealPause = (body: string, options: RealPauseOptions = {}): Rea
         session,
         locateFrame: plainLocation,
         isSecret: () => false,
+        clock: STOPPED_CLOCK,
         ...options.dependencies,
       });
     } catch (error) {
