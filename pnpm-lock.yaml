@@ -33,6 +33,31 @@ importers:
         specifier: ^4.1.11
         version: 4.1.11(@types/node@26.6.5)(@vitest/coverage-v8@4.1.11)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(tsx@4.23.15))
 
+  examples/module-formats:
+    dependencies:
+      '@micafox/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+    devDependencies:
+      '@micafox/configs':
+        specifier: workspace:*
+        version: link:../../packages/configs
+      '@micafox/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      '@types/ws':
+        specifier: ^8.18.2
+        version: 8.18.2
+      esbuild:
+        specifier: ^0.28.2
+        version: 0.28.2
+      tsx:
+        specifier: ^4.23.15
+        version: 4.23.15
+      ws:
+        specifier: ^8.22.1
+        version: 8.22.1
+
   examples/node-basic:
     dependencies:
       '@micafox/protocol':

@@ -12,12 +12,13 @@ the long-term shape of the code, and you push back on anything that breaks the r
 
 pnpm monorepo, Node >= 22, TypeScript (strict, NodeNext), Vitest, ESLint, Prettier.
 
-| Package               | Role                                         | May depend on |
-| --------------------- | -------------------------------------------- | ------------- |
-| `packages/configs`    | shared tsconfig / eslint / prettier / vitest | -             |
-| `packages/protocol`   | messages, protocol version, `Connector`      | -             |
-| `packages/sdk`        | debugger and default connector, in host app  | protocol      |
-| `examples/node-basic` | demo app                                     | sdk, protocol |
+| Package                   | Role                                           | May depend on |
+| ------------------------- | ---------------------------------------------- | ------------- |
+| `packages/configs`        | shared tsconfig / eslint / prettier / vitest   | -             |
+| `packages/protocol`       | messages, protocol version, `Connector`        | -             |
+| `packages/sdk`            | debugger and default connector, in host app    | protocol      |
+| `examples/node-basic`     | demo app                                       | sdk, protocol |
+| `examples/module-formats` | apps that load the built SDK per module format | sdk, protocol |
 
 Dependencies point down this table only.
 
