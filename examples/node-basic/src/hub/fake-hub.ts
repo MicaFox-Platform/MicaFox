@@ -4,16 +4,15 @@
 // PORT=0 picks a free port. It never prints headers or the token.
 
 import { CLOSE_CODES, PROTOCOL_VERSION, type Breakpoint } from "@micafox/protocol";
+import { readFileSync } from "node:fs";
 import { createServer, type IncomingMessage } from "node:http";
 import type { AddressInfo, Socket } from "node:net";
+import path from "node:path";
 import { WebSocketServer, type RawData, type WebSocket } from "ws";
 
 const DEFAULT_PORT = 8787;
-// Only reported back as active by the app's stand-in for the debugger, which does not set them
-const SAMPLE_BREAKPOINTS: Breakpoint[] = [
-  { id: "bp-checkout", file: "src/orders/checkout.ts", line: 42 },
-  { id: "bp-refund", file: "src/orders/refund.ts", line: 17 },
-];
+const PRICING_FILE = path.join(import.meta.dirname, "..", "pricing.ts");
+const PRICING_MARKER = "// breakpoint here";
 
 const print = (line: string): void => {
   process.stdout.write(`${line}\n`);
@@ -24,10 +23,18 @@ const readPort = (): number => {
   return port === "" ? DEFAULT_PORT : Number(port);
 };
 
+// The return of quote(), as a hub sets it: by the file's path in the repository. Its line is found by the marker, as
+// tests/ find it, so editing pricing.ts does not move the sample off it
+const readSampleBreakpoints = (): Breakpoint[] => {
+  const lines = readFileSync(PRICING_FILE, "utf8").split("\n");
+  const line = lines.findIndex((text) => text.includes(PRICING_MARKER)) + 1;
+  return [{ id: "bp-quote", file: "examples/node-basic/src/pricing.ts", line }];
+};
+
 const readBreakpoints = (): unknown[] => {
   const json = process.env.HUB_BREAKPOINTS ?? "";
   if (json === "") {
-    return SAMPLE_BREAKPOINTS;
+    return readSampleBreakpoints();
   }
 
   const breakpoints: unknown = JSON.parse(json);

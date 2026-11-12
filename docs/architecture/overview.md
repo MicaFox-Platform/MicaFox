@@ -50,8 +50,8 @@ The exact limits: [SDK API](../api/sdk/overview.md#installation).
 - `@micafox/configs` — shared TypeScript, ESLint, Prettier and Vitest presets; dev-time only, never in the
   host app: [architecture](configs.md), [API](../api/configs.md).
 
-`examples/node-basic` is a demo app to try the SDK by hand: it runs `HubConnector` beside a Fastify server, with a
-fake hub to connect to, and its end-to-end tests run both as real processes.
+`examples/node-basic` is a demo app to try the SDK by hand: a Fastify server debugged by `micafox` under tsx, with a
+fake hub that sets breakpoints, and its end-to-end tests run both as real processes.
 
 The protocol and the SDK ship as ES modules and CommonJS, so apps load them with `import` or `require()`.
 
