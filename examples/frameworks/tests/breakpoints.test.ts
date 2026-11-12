@@ -33,11 +33,19 @@ describe.each([EXPRESS_APP, NESTJS_APP])("the $name app", { timeout: E2E_TEST_TI
     const [snapshot] = await hub.run.waitForMessages("snapshot");
     const [top] = snapshot?.stack ?? [];
 
-    expect({ statuses, file: top?.file, line: top?.line, variables: snapshot?.variables }).toEqual({
+    expect({
+      statuses,
+      file: top?.file,
+      line: top?.line,
+      truncated: snapshot?.truncated,
+      variables: snapshot?.variables,
+    }).toEqual({
       statuses: Array.from({ length: REQUESTS }, () => 200),
       // For NestJS, the original .ts file and line from the .map the Nest CLI wrote beside the compiled file
       file: expect.stringMatching(new RegExp(`/${escapeRegExp(toRepositoryPath(app.quoteSource))}$`)) as unknown,
       line: findQuoteLine(app),
+      // Within the 10 ms of a pause, so every variable was read
+      truncated: undefined,
       variables: expect.arrayContaining([
         { name: "sku", value: { type: "string", value: "SKU-2", length: 5 } },
         { name: "quantity", value: { type: "number", value: 3 } },

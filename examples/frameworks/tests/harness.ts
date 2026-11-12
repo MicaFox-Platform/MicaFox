@@ -3,7 +3,7 @@
 // useProcesses() kills and awaits every process a test started, so none outlives it. Each app serves HTTP from the one
 // process it starts, so killing it leaves no worker behind. Adapted from examples/module-formats/tests/harness.ts.
 
-import type { BreakpointStatus } from "@micafox/protocol";
+import type { BreakpointStatus, CaptureLimits } from "@micafox/protocol";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach } from "vitest";
@@ -36,6 +36,8 @@ export interface App {
   readonly stopMarker: string;
   /** Environment variables the app needs, by name. */
   readonly env?: ReadonlyMap<string, string>;
+  /** The capture limits of the breakpoint the hub sets on the handler, when the defaults do not fit. */
+  readonly limits?: CaptureLimits;
 }
 
 /** The line a process prints once it serves, and the line that holds its port as the first group. */
@@ -54,6 +56,9 @@ export const EXPRESS_APP: App = {
   ready: LISTENING_READINESS,
   exitOnSigterm: 0,
   stopMarker: "micafox stopped",
+  // The handler's `request` and `response` come first in its scope and are large: at the default depth of 3, reading
+  // them can take the 10 ms of a pause on a slow machine, and the locals after them are left out of the snapshot
+  limits: { maxDepth: 1 },
 };
 
 /** NestJS compiled by the Nest CLI; Nest ends the process by the signal it received, after its shutdown hooks. */
@@ -132,7 +137,12 @@ const start = async (run: ChildProcessRun, readiness: Readiness): Promise<Listen
 
 /** Starts the fake hub with one breakpoint on the marked line of `app`'s quote handler; resolves once it listens. */
 export const startHub = (app: App): Promise<ListeningRun> => {
-  const breakpoint = { id: BREAKPOINT_ID, file: toRepositoryPath(app.quoteSource), line: findQuoteLine(app) };
+  const breakpoint = {
+    id: BREAKPOINT_ID,
+    file: toRepositoryPath(app.quoteSource),
+    line: findQuoteLine(app),
+    ...(app.limits === undefined ? {} : { limits: app.limits }),
+  };
   const env = createEnvironment();
   env.HUB_BREAKPOINTS = JSON.stringify([breakpoint]);
   // tsx as an import, so no wrapper process can be orphaned

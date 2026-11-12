@@ -17,7 +17,10 @@ Breakpoints work in Express and NestJS. In Next.js the SDK runs, but a breakpoin
 ## What each framework needs
 
 - **Express** — start MicaFox before the app loads its routes, and call `await micafox.stop()` on SIGTERM after the
-  server has closed.
+  server has closed. A handler's `request` and `response` come before its own variables and are large: on a slow
+  machine, reading them at the default depth can use up the 10 ms of a pause, and the variables after them are left
+  out. Give a breakpoint in a handler `limits: { maxDepth: 1 }` ([`CaptureLimits`](../../docs/api/protocol.md)), as
+  the tests do.
 - **NestJS** — set `"sourceMap": true` in the tsconfig the Nest CLI builds with, so breakpoints on `.ts` lines
   resolve. Call `app.enableShutdownHooks()` and `await micafox.stop()` in `onApplicationShutdown()`. The example
   builds with `@nestjs/cli` 11: `@nestjs/cli` 12 fails to start on Node.js 22.13, a bug of the CLI, not of NestJS.
