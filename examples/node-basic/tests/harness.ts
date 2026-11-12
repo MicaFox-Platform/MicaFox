@@ -17,21 +17,35 @@ const PRICING_MARKER = "// breakpoint here";
 const HUB_LISTENING = /^listening on port (\d+)$/;
 const APP_LISTENING = /"msg":"Server listening at http:\/\/127\.0\.0\.1:(\d+)"/;
 
-/** The 1-based line of the return of `quote()` in `src/pricing.ts`, found by its marker so edits do not break tests. */
-export const PRICING_LINE =
-  readFileSync(PRICING_FILE, "utf8")
+/**
+ * The 1-based line of `file` that holds `marker`, so edits to the file do not break tests. A lost marker fails here,
+ * not as a breakpoint on line 0 that a test would wait on until its timeout.
+ */
+export const findMarkerLine = (file: string, marker: string): number => {
+  const index = readFileSync(file, "utf8")
     .split("\n")
-    .findIndex((line) => line.includes(PRICING_MARKER)) + 1;
+    .findIndex((line) => line.includes(marker));
+  if (index === -1) {
+    throw new Error(`no line of ${path.basename(file)} holds the marker "${marker}"`);
+  }
+
+  return index + 1;
+};
+
+/** The 1-based line of the return of `quote()` in `src/pricing.ts`, found by its marker so edits do not break tests. */
+export const PRICING_LINE = findMarkerLine(PRICING_FILE, PRICING_MARKER);
 
 /** The timeout of each test: two process starts and a reconnect fit well within it. */
 export const E2E_TEST_TIMEOUT_MS = 10_000;
 
-// The developer's own MICAFOX_*, HUB_*, PORT and PRICING_API_KEY variables never reach the processes: each test sets
-// its own
+// The developer's own MICAFOX_*, HUB_*, PORT, PRICING_API_KEY and VALUES_SECRET variables never reach the processes:
+// each test sets its own
 const createEnvironment = (): Record<string, string> => {
   const inherited = Object.entries(process.env).filter(
     (entry): entry is [string, string] =>
-      entry[1] !== undefined && !/^(MICAFOX_|HUB_)/.test(entry[0]) && !["PORT", "PRICING_API_KEY"].includes(entry[0]),
+      entry[1] !== undefined &&
+      !/^(MICAFOX_|HUB_)/.test(entry[0]) &&
+      !["PORT", "PRICING_API_KEY", "VALUES_SECRET"].includes(entry[0]),
   );
   const environment = Object.fromEntries(inherited);
   environment.PORT = "0";
@@ -103,6 +117,8 @@ export interface AppOptions {
   logLevel?: string;
   /** `PRICING_API_KEY`, the secret of `src/pricing.ts`. */
   pricingApiKey?: string;
+  /** `VALUES_SECRET`, the secret the `/values/secrets` route nests in its values. */
+  valuesSecret?: string;
 }
 
 const APP_VARIABLES: ReadonlyArray<[keyof AppOptions, string]> = [
@@ -112,6 +128,7 @@ const APP_VARIABLES: ReadonlyArray<[keyof AppOptions, string]> = [
   ["enabled", "MICAFOX_ENABLED"],
   ["logLevel", "MICAFOX_LOG_LEVEL"],
   ["pricingApiKey", "PRICING_API_KEY"],
+  ["valuesSecret", "VALUES_SECRET"],
 ];
 
 /** Starts the app; resolves once it serves HTTP. */
@@ -162,8 +179,8 @@ export const waitForStatus = async (
   return JSON.parse(line) as BreakpointStatus;
 };
 
-// The breakpointStatus a line of the fake hub holds; fake-hub.ts prints every message it receives as one JSON line
-const readStatus = (line: string): BreakpointStatus | undefined =>
+/** The `breakpointStatus` a line of the fake hub holds; fake-hub.ts prints every message it receives as one line. */
+export const readStatus = (line: string): BreakpointStatus | undefined =>
   readType(line) === "breakpointStatus" ? (JSON.parse(line) as BreakpointStatus) : undefined;
 
 /** Sends `count` GET requests to `url`, each after the previous one answered; resolves with their HTTP statuses. */
