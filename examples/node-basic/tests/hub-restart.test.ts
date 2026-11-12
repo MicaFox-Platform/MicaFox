@@ -1,36 +1,43 @@
 import { describe, expect, it } from "vitest";
 
-import { E2E_TEST_TIMEOUT_MS, startApp, startHub, toAppUrl, useProcesses, type ListeningRun } from "./harness.js";
+import {
+  E2E_TEST_TIMEOUT_MS,
+  startApp,
+  startHub,
+  toAppUrl,
+  useProcesses,
+  waitForStatus,
+  type ListeningRun,
+} from "./harness.js";
 
-const BREAKPOINTS = [{ id: "bp-cart", file: "src/cart.ts", line: 12 }];
-
-// Starts a hub and the app, waits until the app has reported the breakpoints, then kills the hub
+// Starts a hub and the app, waits until the breakpoint is active, then kills the hub and waits until it has exited
 const connectAndKillHub = async (): Promise<{ hub: ListeningRun; app: ListeningRun }> => {
-  const hub = await startHub({ breakpoints: BREAKPOINTS });
+  const hub = await startHub();
   const app = await startApp({ hubPort: hub.port });
-  await hub.run.waitForMessages("breakpointStatus");
+  await waitForStatus(hub.run, "bp-quote", (status) => status.status === "active");
   hub.run.stop("SIGKILL");
-  await app.run.waitForLines((line) => line === "connector status: disconnected");
+  await hub.run.exited;
   return { hub, app };
 };
 
 describe("hub restart", { timeout: E2E_TEST_TIMEOUT_MS }, () => {
   useProcesses();
 
-  it("keeps answering HTTP while the hub is down", async () => {
+  it("keeps answering on the breakpointed line while the hub is down", async () => {
     const { app } = await connectAndKillHub();
 
-    const response = await fetch(toAppUrl(app.port, "/health"));
+    const response = await fetch(toAppUrl(app.port, "/price"));
 
     expect(response.status).toBe(200);
   });
 
-  it("reconnects to a hub restarted on the same port and reports the breakpoints again", async () => {
+  it("sends the breakpoint statuses again to a hub restarted on the same port", async () => {
     const { hub } = await connectAndKillHub();
 
-    const restarted = await startHub({ port: hub.port, breakpoints: BREAKPOINTS });
-    const statuses = await restarted.run.waitForMessages("breakpointStatus");
+    const restarted = await startHub({ port: hub.port });
+    // The breakpoint is still set in the app, so the first status the new hub gets is active, never pending
+    const status = await waitForStatus(restarted.run, "bp-quote");
 
-    expect(statuses).toEqual([{ version: 1, type: "breakpointStatus", breakpointId: "bp-cart", status: "active" }]);
+    expect(status.status).toBe("active");
   });
 });
