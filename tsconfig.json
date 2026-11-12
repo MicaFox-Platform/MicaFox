@@ -11,7 +11,7 @@
     "packages/*/src/**/*.test-d.ts",
     "examples/*/src/**/*.test.ts",
     "packages/*/test",
-    "examples/*/vitest.config.ts",
+    "examples/*/vitest*.config.ts",
     "examples/*/tests"
   ]
 }

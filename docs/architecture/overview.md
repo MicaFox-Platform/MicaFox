@@ -51,7 +51,10 @@ The exact limits: [SDK API](../api/sdk/overview.md#installation).
   host app: [architecture](configs.md), [API](../api/configs.md).
 
 `examples/node-basic` is a demo app to try the SDK by hand: a Fastify server debugged by `micafox` under tsx, with a
-fake hub that sets breakpoints, and its end-to-end tests run both as real processes.
+fake hub that sets breakpoints, and its end-to-end tests run both as real processes. `examples/module-formats` runs
+the built SDK in one small app per format: plain JavaScript with `require()` and with `import`, TypeScript compiled by
+tsc to CommonJS and to ES modules with `.map` files, and a bundle, which is not supported; its tests run after the
+build.
 
 The protocol and the SDK ship as ES modules and CommonJS, so apps load them with `import` or `require()`.
 

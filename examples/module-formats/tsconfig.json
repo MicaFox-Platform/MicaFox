@@ -1,0 +1,17 @@
+{
+  "extends": "@micafox/configs/tsconfig/workspace.json",
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false
+  },
+  "include": ["${configDir}/src/tsc-esm"],
+  "references": [
+    {
+      "path": "../../packages/protocol"
+    },
+    {
+      "path": "../../packages/sdk"
+    }
+  ]
+}

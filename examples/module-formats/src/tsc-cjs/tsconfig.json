@@ -1,0 +1,22 @@
+{
+  "extends": "@micafox/configs/tsconfig/workspace.json",
+  "compilerOptions": {
+    "verbatimModuleSyntax": false,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+
+    "rootDir": "${configDir}",
+    "outDir": "${configDir}/../../dist/tsc-cjs",
+    "tsBuildInfoFile": "${configDir}/../../dist/tsc-cjs/tsconfig.tsbuildinfo"
+  },
+  "include": ["${configDir}"],
+  "references": [
+    {
+      "path": "../../../../packages/protocol/tsconfig.cjs.json"
+    },
+    {
+      "path": "../../../../packages/sdk/tsconfig.cjs.json"
+    }
+  ]
+}
