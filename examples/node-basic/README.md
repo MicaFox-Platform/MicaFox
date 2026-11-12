@@ -4,6 +4,10 @@ A demo app for the MicaFox SDK: a Fastify server debugged by `micafox`, configur
 variables. `GET /price` calls `quote()` in `src/pricing.ts`, the code to debug; its local `apiKey` shows how a
 snapshot redacts secrets.
 
+`src/values.ts` adds one route per group of value types, each holding its values as locals to capture:
+`/values/primitives`, `nesting`, `collections`, `objects`, `large` and `secrets`. A breakpoint on the line after
+`// breakpoint on the next line: <group>` shows how a snapshot encodes each kind of value and where its limits cut it.
+
 A fake hub in `src/hub/fake-hub.ts` plays the hub: it sets breakpoints and prints what the app sends back.
 
 ## Run it locally
@@ -49,6 +53,7 @@ App:
 | `MICAFOX_LOG_LEVEL` | the lowest level of the SDK's lines, default `warn`; `info` shows its startup |
 | `MICAFOX_ENABLED`   | `false` turns MicaFox off: no connection, the app serves as usual             |
 | `PRICING_API_KEY`   | the secret `quote()` signs with; a demo value by default                      |
+| `VALUES_SECRET`     | the secret `/values/secrets` nests in its values; a demo value by default     |
 
 All `MICAFOX_*` variables: [SDK API](../../docs/api/sdk/debugger.md#debuggeroptions). The app always uses a reconnect
 delay of 100 ms to 1 s, a demo choice that lets a restarted hub see it again quickly.
@@ -70,5 +75,6 @@ name on purpose: a breakpoint on `util.ts` alone gets status `error`, and one on
 
 `tests/` starts the fake hub and the app as real processes under tsx and checks the debugger end to end: a breakpoint
 in `pricing.ts` and its snapshot, redaction, `pending` and `error` statuses, serving under load, a hub restart,
-a rejected token, startup options and shutdown. They run in `pnpm verify`, or alone with
+a rejected token, startup options and shutdown, and a snapshot of every group of value types of `src/values.ts`:
+encodings, limits, truncation and redaction at any depth. They run in `pnpm verify`, or alone with
 `pnpm --filter @micafox/node-basic test`.

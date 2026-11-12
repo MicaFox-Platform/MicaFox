@@ -5,6 +5,7 @@ import { micafox } from "@micafox/sdk";
 import Fastify, { type FastifyInstance } from "fastify";
 
 import { quote } from "./pricing.js";
+import { registerValueRoutes } from "./values.js";
 
 const DEFAULT_PORT = 3000;
 // A demo choice, not a recommendation: a restarted hub sees the app again within a second
@@ -36,6 +37,7 @@ const createServer = (): FastifyInstance => {
     const { sku, quantity } = request.query as PriceQuery;
     return quote(sku, quantity);
   });
+  registerValueRoutes(server);
   return server;
 };
 
