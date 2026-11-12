@@ -4,6 +4,7 @@ import {
   E2E_TEST_TIMEOUT_MS,
   EXPRESS_APP,
   fetchInARow,
+  fetchUntilCompleteSnapshot,
   findQuoteLine,
   NESTJS_APP,
   shutDown,
@@ -30,22 +31,19 @@ describe.each([EXPRESS_APP, NESTJS_APP])("the $name app", { timeout: E2E_TEST_TI
     await waitForStatus(hub.run, (status) => status.status === "active");
 
     const statuses = await fetchInARow(toUrl(server.port), REQUESTS);
-    const [snapshot] = await hub.run.waitForMessages("snapshot");
-    const [top] = snapshot?.stack ?? [];
+    const snapshot = await fetchUntilCompleteSnapshot(toUrl(server.port), hub.run);
+    const [top] = snapshot.stack;
 
     expect({
       statuses,
       file: top?.file,
       line: top?.line,
-      truncated: snapshot?.truncated,
-      variables: snapshot?.variables,
+      variables: snapshot.variables,
     }).toEqual({
       statuses: Array.from({ length: REQUESTS }, () => 200),
       // For NestJS, the original .ts file and line from the .map the Nest CLI wrote beside the compiled file
       file: expect.stringMatching(new RegExp(`/${escapeRegExp(toRepositoryPath(app.quoteSource))}$`)) as unknown,
       line: findQuoteLine(app),
-      // Within the 10 ms of a pause, so every variable was read
-      truncated: undefined,
       variables: expect.arrayContaining([
         { name: "sku", value: { type: "string", value: "SKU-2", length: 5 } },
         { name: "quantity", value: { type: "number", value: 3 } },

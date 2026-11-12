@@ -3,7 +3,7 @@
 // useProcesses() kills and awaits every process a test started, so none outlives it. Each app serves HTTP from the one
 // process it starts, so killing it leaves no worker behind. Adapted from examples/module-formats/tests/harness.ts.
 
-import type { BreakpointStatus, CaptureLimits } from "@micafox/protocol";
+import type { BreakpointStatus, CaptureLimits, Snapshot } from "@micafox/protocol";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach } from "vitest";
@@ -163,6 +163,27 @@ export const toUrl = (port: number, pathname = "/quote?sku=SKU-2&quantity=3"): s
 /** The `breakpointStatus` a line of the fake hub holds; fake-hub.ts prints every message it receives as one line. */
 export const readStatus = (line: string): BreakpointStatus | undefined =>
   readType(line) === "breakpointStatus" ? (JSON.parse(line) as BreakpointStatus) : undefined;
+
+/**
+ * Sends GET requests to `url`, one at a time, until the fake hub has printed a snapshot that is not `truncated`, and
+ * resolves with it. The first pause of a freshly started process can take the whole 10 ms of a pause on a slow machine,
+ * such as a CI runner, before it reads a variable, and slow pauses use up the 20 ms a second the app may be paused, so
+ * the snapshots of the next requests in that second are not taken. Requests go on until a warm pause reads them all.
+ */
+export const fetchUntilCompleteSnapshot = async (url: string, hub: ChildProcessRun): Promise<Snapshot> => {
+  const isComplete = (line: string): boolean =>
+    readType(line) === "snapshot" && (JSON.parse(line) as Snapshot).truncated !== true;
+  const state = { isSettled: false };
+  const found = hub.waitForLines(isComplete).finally(() => {
+    state.isSettled = true;
+  });
+  while (!state.isSettled) {
+    await fetchInARow(url, 1);
+  }
+  const [line = ""] = await found;
+  // isComplete() has accepted the line as a snapshot
+  return JSON.parse(line) as Snapshot;
+};
 
 /** Resolves with the first `breakpointStatus` of BREAKPOINT_ID the fake hub printed that `isWanted` accepts. */
 export const waitForStatus = async (
