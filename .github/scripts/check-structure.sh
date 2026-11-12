@@ -26,7 +26,8 @@ while IFS= read -r dir; do
   sources=$(find "$dir" -maxdepth 1 -type f -name '*.ts' ! -name '*.test.ts' ! -name '*.test-d.ts' | grep -c .)
   ((sources > max_sources)) &&
     fail "$dir has $sources source files, at most $max_sources: group them into sub-component folders with an index.ts"
-done < <(find packages/*/src packages/*/test examples/*/src -type d 2>/dev/null)
+# Next.js writes its build to .next/ beside its sources; it is not ours to structure
+done < <(find packages/*/src packages/*/test examples/*/src -type d -not -path '*/.next' -not -path '*/.next/*' 2>/dev/null)
 
 # In src/, tests live only in __tests__/, which holds nothing else
 while IFS= read -r file; do
@@ -36,7 +37,7 @@ while IFS= read -r file; do
   elif ! is_test "$file" && [[ -n $in_tests_folder ]]; then
     fail "$file is not a test: __tests__/ holds only *.test.ts and *.test-d.ts; move it out"
   fi
-done < <(find packages/*/src examples/*/src -type f 2>/dev/null)
+done < <(find packages/*/src examples/*/src -type f -not -path '*/.next/*' 2>/dev/null)
 
 while IFS= read -r dir; do
   fail "$dir is a folder inside __tests__/: tests of a sub-component go to its own __tests__/"

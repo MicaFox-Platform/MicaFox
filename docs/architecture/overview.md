@@ -54,7 +54,9 @@ The exact limits: [SDK API](../api/sdk/overview.md#installation).
 fake hub that sets breakpoints, and its end-to-end tests run both as real processes. `examples/module-formats` runs
 the built SDK in one small app per format: plain JavaScript with `require()` and with `import`, TypeScript compiled by
 tsc to CommonJS and to ES modules with `.map` files, and a bundle, which is not supported; its tests run after the
-build.
+build. `examples/frameworks` runs the built SDK in an Express app, a NestJS app built by the Nest CLI and a Next.js app
+served by `next start`, where the SDK runs but breakpoints in the bundled route handlers stay `pending`; its tests run
+after the build too.
 
 The protocol and the SDK ship as ES modules and CommonJS, so apps load them with `import` or `require()`.
 
