@@ -6,6 +6,7 @@
   "exports": {
     "./tsconfig/base.json": "./tsconfig/base.json",
     "./tsconfig/workspace.json": "./tsconfig/workspace.json",
+    "./tsconfig/workspace-cjs.json": "./tsconfig/workspace-cjs.json",
     "./eslint": {
       "types": "./eslint/index.d.ts",
       "default": "./eslint/index.js"

@@ -6,8 +6,14 @@
   "exports": {
     ".": {
       "@micafox/source": "./src/index.ts",
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.js"
+      }
     }
   },
   "files": [
@@ -15,9 +21,10 @@
   ],
   "scripts": {
     "dev": "tsx --conditions=@micafox/source --watch src/index.ts",
-    "build": "rm -rf ./dist && tsc -b",
-    "typecheck": "tsc -b",
-    "test": "vitest run"
+    "build": "rm -rf ./dist && tsc -b tsconfig.json tsconfig.cjs.json && echo '{ \"type\": \"commonjs\" }' > dist/cjs/package.json",
+    "typecheck": "tsc -b tsconfig.json tsconfig.cjs.json && echo '{ \"type\": \"commonjs\" }' > dist/cjs/package.json",
+    "test": "vitest run",
+    "test:build": "vitest run --config vitest.build.config.ts"
   },
   "keywords": [],
   "author": "Artem Horovyi",

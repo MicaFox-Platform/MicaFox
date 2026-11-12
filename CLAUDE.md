@@ -23,7 +23,8 @@ Dependencies point down this table only.
 
 ## Commands
 
-- `pnpm verify` — lint, format check, typecheck, tests with coverage ≥ 80%. The gate; CI runs the same scripts.
+- `pnpm verify` — lint, format check, typecheck, build, tests of the built output, tests with coverage ≥ 80%. The
+  gate; CI runs the same scripts.
 - `pnpm verify:brief` — the same checks with a short report; use it instead of `pnpm verify`.
 - `pnpm verify:fix` — auto-fix lint and formatting.
 - `pnpm test <test file paths>` — only the tests you are working on; the full run is part of `verify`.

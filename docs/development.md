@@ -38,12 +38,13 @@ pnpm verify    # everything must pass on a fresh clone
 
 ```text
 pnpm dev          → every package and the demo app in watch mode (tsx --watch)
-pnpm build        → build every package to dist/, dependencies first
+pnpm build        → build every package to dist/ (ES modules in dist/esm, CommonJS in dist/cjs), dependencies first
 pnpm typecheck    → typecheck every package, then the root files and tests
 pnpm test         → one Vitest run over all packages; pnpm test <paths> runs only those test files
 pnpm lint         → one ESLint run over the repo
 pnpm format       → one Prettier check over the repo
-pnpm verify       → lint → format → typecheck → test:coverage (≥ 80%), stops at the first failure
+pnpm test:build   → load the built packages with import and require() in child processes; run pnpm build first
+pnpm verify       → lint → format → typecheck → build → test:build → test:coverage (≥ 80%), stops at the first failure
 pnpm verify:brief → the same steps, one line per green step and the start of a failure (for AI agents)
 pnpm verify:fix   → auto-fix lint and formatting
 ```
@@ -184,7 +185,7 @@ legs pass. Steps, in order:
 | PR title        | the title breaks [Naming](#naming); fix it with `gh pr edit <number> --title "…"`           |
 | Commit messages | a non-merge commit subject breaks [Naming](#naming); skipped for release PRs from `staging` |
 | Linter … Tests  | `pnpm lint`, `pnpm format`, `pnpm typecheck` or `pnpm test` fails; coverage is checked once |
-| Build           | `pnpm build` fails                                                                          |
+| Build           | `pnpm build` fails, or `pnpm test:build` fails on the built output                          |
 
 Only the Node 22.13 leg runs the name steps and the coverage run (`pnpm test:coverage`).
 

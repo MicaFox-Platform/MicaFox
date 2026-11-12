@@ -37,6 +37,18 @@ and `verbatimModuleSyntax`.
 maps. `*.test.ts` and `*.test-d.ts` are left out of the build and are not typechecked there; the root
 `tsconfig.json` typechecks them, see [Usage](#usage). Paths are relative to the extending `tsconfig.json`.
 
+### `@micafox/configs/tsconfig/workspace-cjs.json`
+
+```json
+{ "extends": "@micafox/configs/tsconfig/workspace-cjs.json" }
+```
+
+`workspace.json` for the CommonJS build of a package that also ships ES modules: compiles `src/` to `dist/cjs/`
+as CommonJS, keeping its build info there. Top-level `await` and `import.meta` fail the build, since CommonJS cannot
+express them. The ES module build overrides `outDir` and `tsBuildInfoFile` of `workspace.json` to `dist/esm/`.
+tsc does not mark the output as CommonJS: the build writes `dist/cjs/package.json` with `{ "type": "commonjs" }`,
+or Node loads it as ES modules in a `"type": "module"` package.
+
 ### `@micafox/configs/eslint`
 
 ```ts
