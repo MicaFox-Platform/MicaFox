@@ -29,6 +29,6 @@ export const quote = (rawSku: string, quantity: number): Quote => {
     .update(`${apiKey}:${sku}:${String(total)}`)
     .digest("hex")
     .slice(0, 16);
-  // src/hub/sample-breakpoints.json holds the number of the next line; tests/breakpoints.test.ts fails when it moves
+  // tools/testkit/.env.example holds the number of the next line; its test/env-examples.test.ts fails when it moves
   return { sku, quantity, total, signature }; // breakpoint here
 };

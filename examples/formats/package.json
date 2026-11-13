@@ -5,6 +5,11 @@
   "description": "Apps that load the built MicaFox SDK as CommonJS, ES modules, tsc output and a bundle",
   "type": "module",
   "scripts": {
+    "start:cjs": "PORT=${PORT:-3101} node --env-file-if-exists=.env src/cjs/server.js",
+    "start:esm": "PORT=${PORT:-3102} node --env-file-if-exists=.env src/esm/server.js",
+    "start:tsc-cjs": "PORT=${PORT:-3103} node --env-file-if-exists=.env dist/tsc-cjs/server.js",
+    "start:tsc-esm": "PORT=${PORT:-3104} node --env-file-if-exists=.env dist/tsc-esm/server.js",
+    "start:bundled": "PORT=${PORT:-3105} node --env-file-if-exists=.env dist/bundled/server.cjs",
     "build": "rm -rf ./dist && tsc -b tsconfig.json src/tsc-cjs/tsconfig.json src/bundled/tsconfig.json && echo '{ \"type\": \"commonjs\" }' > dist/tsc-cjs/package.json && esbuild src/bundled/server.ts --bundle --platform=node --format=cjs --sourcemap --log-level=warning --outfile=dist/bundled/server.cjs",
     "typecheck": "tsc -b tsconfig.json src/tsc-cjs/tsconfig.json src/bundled/tsconfig.json && echo '{ \"type\": \"commonjs\" }' > dist/tsc-cjs/package.json",
     "test:build": "vitest run --config vitest.build.config.ts"

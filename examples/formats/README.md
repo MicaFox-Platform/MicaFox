@@ -33,15 +33,17 @@ pnpm build                                       # the SDK, the protocol, then t
 pnpm --filter @micafox/example-formats test:build # the end-to-end tests
 ```
 
-To try an app by hand, start [the kit's fake hub](../../tools/testkit/README.md#fake-hub) with a breakpoint on
-the app's `quote.*` and run the app with plain `node`:
+To try an app by hand, copy `.env.example` to `.env`, start [the kit's fake hub](../../tools/testkit/README.md#fake-hub),
+whose `.env.example` sets a breakpoint on every app, and run one app's script. Each script has its own port:
+`start:cjs` 3101, `start:esm` 3102, `start:tsc-cjs` 3103, `start:tsc-esm` 3104 and `start:bundled` 3105.
 
 ```sh
-HUB_BREAKPOINTS='[{"id":"bp-1","file":"examples/formats/src/tsc-esm/quote.ts","line":16}]' \
-  pnpm --filter @micafox/example-fastify dev:hub
-MICAFOX_HUB_URL=ws://127.0.0.1:8787/micafox PORT=3000 node examples/formats/dist/tsc-esm/server.js
-curl 'http://127.0.0.1:3000/quote?sku=SKU-2&quantity=3'
+pnpm --filter @micafox/testkit start:hub
+pnpm --filter @micafox/example-formats start:tsc-esm
+curl 'http://127.0.0.1:3104/quote?sku=SKU-2&quantity=3'
 ```
+
+More in [the examples' README](../README.md).
 
 The tests run in `pnpm verify` through `pnpm test:build`, after `pnpm build`; `pnpm test` skips them, since they need
 the build.

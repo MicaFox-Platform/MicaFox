@@ -55,7 +55,8 @@ pnpm verify:brief → the same steps, one line per green step and the start of a
 pnpm verify:fix   → auto-fix lint and formatting
 ```
 
-One package: `pnpm --filter @micafox/sdk test`, `pnpm --filter @micafox/example-fastify dev`. CI runs
+One package: `pnpm --filter @micafox/sdk test`, `pnpm --filter @micafox/example-fastify start`; to run an example by
+hand with the fake hub, see [the examples](../examples/README.md). CI runs
 the same scripts on every pull request: see [Checks](#checks).
 
 ## Testing
@@ -63,7 +64,7 @@ the same scripts on every pull request: see [Checks](#checks).
 - Unit tests live in the `__tests__/` folder of the folder that holds their module, so folders list only code.
   Tests that are not about one module (doc examples, lint boundaries, end-to-end) live in `packages/<name>/test/`, or in
   `examples/<name>/tests/` and `examples/frameworks/<name>/tests/` for the whole system; the configs package keeps all
-  its tests there.
+  its tests there, and `tools/testkit/test/` the checks of the examples' `.env.example` files.
   Coverage of `packages/*/src` must stay ≥ 80% in lines, branches and functions; a line no meaningful test can
   reach is excluded in `vitest.config.ts` with the reason, never covered by a hollow test.
 - Test behavior through the public surface. Mock only at the boundaries: the WebSocket, time and `node:inspector`.

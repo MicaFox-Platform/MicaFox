@@ -1,5 +1,5 @@
 // Starts the app of this example under tsx and the kit's fake hub as real child processes, the way a developer runs
-// them with `pnpm dev` and `pnpm dev:hub`. Processes, waits and the fake hub come from @micafox/testkit.
+// them with `pnpm start` and the kit's `start:hub`. Processes, waits and the fake hub come from @micafox/testkit.
 
 import {
   ChildProcessRun,
@@ -17,17 +17,18 @@ const EXAMPLE_DIR = path.join(import.meta.dirname, "..");
 const APP_FILE = path.join(EXAMPLE_DIR, "src", "index.ts");
 const PRICING_FILE = path.join(EXAMPLE_DIR, "src", "pricing.ts");
 const PRICING_MARKER = "// breakpoint here";
-// The sample breakpoints of `pnpm dev:hub`: one on the return of quote(), at PRICING_LINE
-const SAMPLE_BREAKPOINTS_FILE = path.join(EXAMPLE_DIR, "src", "hub", "sample-breakpoints.json");
 // The app's Fastify logs `Server listening at http://127.0.0.1:<port>` through pino
 const APP_LISTENING = /"msg":"Server listening at http:\/\/127\.0\.0\.1:(\d+)"/;
 
 /** The 1-based line of the return of `quote()` in `src/pricing.ts`, found by its marker so edits do not break tests. */
 export const PRICING_LINE = findMarkerLine(PRICING_FILE, PRICING_MARKER);
 
-/** Starts the fake hub as `pnpm dev:hub` does, with its sample breakpoint unless `breakpoints` is set. */
+// One breakpoint on the return of quote(), the line the kit's `.env.example` sets one on for `start:hub`
+const QUOTE_BREAKPOINT = { id: "bp-quote", file: "examples/frameworks/fastify/src/pricing.ts", line: PRICING_LINE };
+
+/** Starts the fake hub with a breakpoint on the return of `quote()` unless `breakpoints` is set. */
 export const startHub = (options: HubOptions = {}): Promise<ListeningRun> =>
-  startFakeHub({ breakpointsFile: SAMPLE_BREAKPOINTS_FILE, ...options });
+  startFakeHub({ breakpoints: [QUOTE_BREAKPOINT], ...options });
 
 /** How the app is started; each field is unset by default. */
 export interface AppOptions {
@@ -75,7 +76,7 @@ export const startApp = (options: AppOptions = {}): Promise<ListeningRun> => {
       env[variable] = String(value);
     }
   }
-  // The source condition, as `pnpm dev` runs the app; tsx as an import, so no wrapper process can be orphaned
+  // The source condition, as `pnpm start` runs the app; tsx as an import, so no wrapper process can be orphaned
   const args = ["--conditions=@micafox/source", "--import", "tsx", APP_FILE];
   const readiness = { ready: APP_LISTENING, port: APP_LISTENING };
   return startProcess({ name: "app", args, env, cwd: EXAMPLE_DIR, readiness });

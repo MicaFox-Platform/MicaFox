@@ -5,6 +5,7 @@
   "description": "NestJS app debugged by the built MicaFox SDK",
   "type": "module",
   "scripts": {
+    "start": "node --env-file-if-exists=.env dist/main.js",
     "build": "nest build --config src/nest-cli.json && echo '{ \"type\": \"commonjs\" }' > dist/package.json",
     "typecheck": "tsc -p src/tsconfig.json --noEmit",
     "test:build": "vitest run --config vitest.build.config.ts"

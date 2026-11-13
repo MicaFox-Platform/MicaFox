@@ -17,6 +17,7 @@
     "examples/*/tests",
     "examples/frameworks/*/tests",
     "tools/*/vitest*.config.ts",
-    "tools/*/src"
+    "tools/*/src",
+    "tools/*/test"
   ]
 }

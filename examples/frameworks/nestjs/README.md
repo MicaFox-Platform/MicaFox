@@ -29,15 +29,16 @@ pnpm build                                       # the SDK, the protocol, then t
 pnpm --filter @micafox/example-nestjs test:build # the end-to-end tests
 ```
 
-To try the app by hand, start [the kit's fake hub](../../../tools/testkit/README.md#fake-hub) with a breakpoint on
-the handler and run the app:
+To try the app by hand, copy `.env.example` to `.env`, start [the kit's fake hub](../../../tools/testkit/README.md#fake-hub),
+whose `.env.example` sets a breakpoint on the handler, and run the app on port 3002:
 
 ```sh
-HUB_BREAKPOINTS='[{"id":"bp-1","file":"examples/frameworks/nestjs/src/quote.controller.ts","line":23}]' \
-  pnpm --filter @micafox/example-fastify dev:hub
-MICAFOX_HUB_URL=ws://127.0.0.1:8787/micafox PORT=3000 node examples/frameworks/nestjs/dist/main.js
-curl 'http://127.0.0.1:3000/quote?sku=SKU-2&quantity=3'
+pnpm --filter @micafox/testkit start:hub
+pnpm --filter @micafox/example-nestjs start
+curl 'http://127.0.0.1:3002/quote?sku=SKU-2&quantity=3'
 ```
+
+More in [the examples' README](../../README.md).
 
 The tests run in `pnpm verify` through `pnpm test:build`, after `pnpm build`; `pnpm test` skips them, since they need
 the build.

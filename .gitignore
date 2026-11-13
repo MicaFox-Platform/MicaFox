@@ -8,6 +8,11 @@
 **/TODO
 .claude/settings.local.json
 
+# Local settings of the examples: copy .env.example to .env
+.env
+.env.*
+!.env.example
+
 # Editors
 .zed/
 .vscode/

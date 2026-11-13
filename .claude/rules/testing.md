@@ -39,7 +39,8 @@ A folder lists only the code it runs; its tests sit one level down, in its own `
   - end-to-end tests: `test/e2e/` (below).
 - An example's end-to-end tests of the whole system, with its own part of the harness: `examples/<name>/tests/` or
   `examples/frameworks/<name>/tests/` (below). What every example shares, the process runner and the fake hub, lives in
-  `tools/testkit/src/`.
+  `tools/testkit/src/`; checks that span the examples, such as their `.env.example` files, live in
+  `tools/testkit/test/`.
 
 ## How
 
