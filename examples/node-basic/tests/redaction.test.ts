@@ -1,6 +1,7 @@
+import { E2E_TEST_TIMEOUT_MS, useProcesses, waitForStatus } from "@micafox/testkit";
 import { describe, expect, it } from "vitest";
 
-import { E2E_TEST_TIMEOUT_MS, startApp, startHub, toAppUrl, useProcesses, waitForStatus } from "./harness.js";
+import { startApp, startHub, toAppUrl } from "./harness.js";
 
 // A distinctive value, so a match in the output can only be a leak
 const API_KEY = "pricing-key-4b9e17";

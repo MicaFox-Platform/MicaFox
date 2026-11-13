@@ -8,19 +8,22 @@ debugging session flows through them, and which [decisions](adr/) are already ma
 ## Repository
 
 A pnpm monorepo in TypeScript (strict, NodeNext) with Vitest, ESLint and Prettier. Dependencies point down the
-table only, and packages import each other by package name, never by relative path.
+table only, and packages import each other by package name, never by relative path. Only examples depend on
+`tools/testkit`, which is private and never published; ESLint keeps it out of `packages/`.
 
-| Package                   | Holds                                                         | May depend on |
-| ------------------------- | ------------------------------------------------------------- | ------------- |
-| `packages/configs`        | shared tsconfig, ESLint, Prettier and Vitest presets          | -             |
-| `packages/protocol`       | messages, `PROTOCOL_VERSION` and the `Connector` type         | -             |
-| `packages/sdk`            | `src/debugger/` and `src/connector/`, run inside the host app | protocol      |
-| `examples/node-basic`     | demo app to try the SDK by hand                               | sdk, protocol |
-| `examples/module-formats` | one app per module format, run on the built SDK               | sdk, protocol |
-| `examples/frameworks`     | Express, NestJS and Next.js apps, run on the built SDK        | sdk, protocol |
+| Package                   | Holds                                                         | May depend on          |
+| ------------------------- | ------------------------------------------------------------- | ---------------------- |
+| `packages/configs`        | shared tsconfig, ESLint, Prettier and Vitest presets          | -                      |
+| `packages/protocol`       | messages, `PROTOCOL_VERSION` and the `Connector` type         | -                      |
+| `packages/sdk`            | `src/debugger/` and `src/connector/`, run inside the host app | protocol               |
+| `tools/testkit`           | private kit of the examples' E2E tests: runner and fake hub   | protocol               |
+| `examples/node-basic`     | demo app to try the SDK by hand                               | sdk, protocol, testkit |
+| `examples/module-formats` | one app per module format, run on the built SDK               | sdk, protocol, testkit |
+| `examples/frameworks`     | Express, NestJS and Next.js apps, run on the built SDK        | sdk, protocol, testkit |
 
 A package exports its `src/index.ts` under the `@micafox/source` condition, which `pnpm dev`, tests and
 typecheck resolve: packages read each other's sources directly, so development needs no build step.
+`tools/testkit` is never built: it exports its sources only.
 
 ## Setup
 
@@ -69,8 +72,9 @@ the same scripts on every pull request: see [Checks](#checks).
 - End-to-end tests run a component in a real Node process. A package keeps its own in
   `packages/<name>/test/e2e/<component>/`: a small fixture app started as a child process, and one test file per
   behavior of the component. Tests of the whole system, through the public API only, live in `examples/<name>/tests/`
-  and start the example's app and fake hub as child processes. Those that need the built packages, as in
-  `examples/module-formats` and `examples/frameworks`, run in `pnpm test:build`.
+  and start the example's app and the fake hub of [`tools/testkit`](../tools/testkit/README.md) as child processes.
+  Those that need the built packages, as in `examples/module-formats` and `examples/frameworks`, run in
+  `pnpm test:build`.
 
 Full rules: [testing](../.claude/rules/testing.md).
 

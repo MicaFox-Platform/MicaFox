@@ -8,7 +8,9 @@ snapshot redacts secrets.
 `/values/primitives`, `nesting`, `collections`, `objects`, `large` and `secrets`. A breakpoint on the line after
 `// breakpoint on the next line: <group>` shows how a snapshot encodes each kind of value and where its limits cut it.
 
-A fake hub in `src/hub/fake-hub.ts` plays the hub: it sets breakpoints and prints what the app sends back.
+The fake hub of [`@micafox/testkit`](../../tools/testkit/README.md#fake-hub) plays the hub: it sets breakpoints and
+prints what the app sends back. `pnpm dev:hub` starts it with the sample breakpoint of
+`src/hub/sample-breakpoints.json`.
 
 ## Run it locally
 
@@ -58,13 +60,8 @@ App:
 All `MICAFOX_*` variables: [SDK API](../../docs/api/sdk/debugger.md#debuggeroptions). The app always uses a reconnect
 delay of 100 ms to 1 s, a demo choice that lets a restarted hub see it again quickly.
 
-Fake hub:
-
-| Variable          | Meaning                                                                                |
-| ----------------- | -------------------------------------------------------------------------------------- |
-| `PORT`            | port, default `8787`; `0` picks a free one and prints it                               |
-| `HUB_TOKEN`       | when set, an upgrade without `Authorization: Bearer <HUB_TOKEN>` gets 401              |
-| `HUB_BREAKPOINTS` | JSON array of breakpoints sent after `welcome`; unset → one on the return of `quote()` |
+Fake hub: `PORT`, `HUB_TOKEN` and `HUB_BREAKPOINTS`, which replaces the sample breakpoint on the return of `quote()`:
+[its variables](../../tools/testkit/README.md#fake-hub).
 
 A breakpoint names its file by the path in the repository, such as
 `[{"id":"bp-1","file":"examples/node-basic/src/a/util.ts","line":5}]`. `src/a/util.ts` and `src/b/util.ts` share a
@@ -73,8 +70,8 @@ name on purpose: a breakpoint on `util.ts` alone gets status `error`, and one on
 
 ## Tests
 
-`tests/` starts the fake hub and the app as real processes under tsx and checks the debugger end to end: a breakpoint
-in `pricing.ts` and its snapshot, redaction, `pending` and `error` statuses, serving under load, a hub restart,
-a rejected token, startup options and shutdown, and a snapshot of every group of value types of `src/values.ts`:
-encodings, limits, truncation and redaction at any depth. They run in `pnpm verify`, or alone with
+`tests/` starts the kit's fake hub and the app as real processes under tsx and checks the debugger end to end: a
+breakpoint in `pricing.ts` and its snapshot, redaction, `pending` and `error` statuses, serving under load, a hub
+restart, a rejected token, startup options and shutdown, and a snapshot of every group of value types of
+`src/values.ts`: encodings, limits, truncation and redaction at any depth. They run in `pnpm verify`, or alone with
 `pnpm --filter @micafox/node-basic test`.

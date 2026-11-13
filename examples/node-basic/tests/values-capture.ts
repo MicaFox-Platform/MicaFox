@@ -4,11 +4,10 @@
 // anything but size is taken again; one cut by size is kept.
 
 import type { CaptureLimits, Snapshot, Value } from "@micafox/protocol";
+import { type ChildProcessRun, findMarkerLine, readStatus, readType, waitForStatus } from "@micafox/testkit";
 import path from "node:path";
 
-import type { ChildProcessRun } from "./child-process-run.js";
-import { readType } from "./child-process-run.js";
-import { findMarkerLine, readStatus, startApp, startHub, toAppUrl, waitForStatus } from "./harness.js";
+import { startApp, startHub, toAppUrl } from "./harness.js";
 
 const VALUES_FILE = path.join(import.meta.dirname, "..", "src", "values.ts");
 // The breakpoint names its file as a hub does, by the path in the repository

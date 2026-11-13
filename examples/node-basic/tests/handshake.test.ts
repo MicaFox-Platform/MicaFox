@@ -1,6 +1,7 @@
+import { E2E_TEST_TIMEOUT_MS, useProcesses, waitForStatus } from "@micafox/testkit";
 import { describe, expect, it } from "vitest";
 
-import { E2E_TEST_TIMEOUT_MS, startApp, startHub, useProcesses, waitForStatus } from "./harness.js";
+import { startApp, startHub } from "./harness.js";
 
 describe("handshake with the hub", { timeout: E2E_TEST_TIMEOUT_MS }, () => {
   useProcesses();

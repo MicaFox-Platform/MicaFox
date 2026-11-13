@@ -3,17 +3,10 @@
 // whose file name matches the breakpoint's (docs/architecture/sdk/debugger.md, loading a source map), and the bundle is
 // `server.cjs`, not `quote.*`. A change to that rule fails these tests on purpose; it is not flakiness.
 
+import { E2E_TEST_TIMEOUT_MS, readStatus, useProcesses } from "@micafox/testkit";
 import { describe, expect, it } from "vitest";
 
-import {
-  BUNDLED_APP,
-  E2E_TEST_TIMEOUT_MS,
-  readStatus,
-  startApp,
-  startHub,
-  toQuoteUrl,
-  useProcesses,
-} from "./harness.js";
+import { BUNDLED_APP, startApp, startHub, toQuoteUrl } from "./harness.js";
 
 describe("an app bundled with the SDK", { timeout: E2E_TEST_TIMEOUT_MS }, () => {
   useProcesses();

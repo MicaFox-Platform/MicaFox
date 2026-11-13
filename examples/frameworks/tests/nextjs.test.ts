@@ -5,19 +5,10 @@
 // sdk/debugger.md, loading a source map). These tests record that the breakpoint stays `pending`, so a change to it
 // shows up here. A change of Next.js or of that rule fails them on purpose; it is not flakiness.
 
+import { E2E_TEST_TIMEOUT_MS, fetchInARow, readStatus, useProcesses } from "@micafox/testkit";
 import { describe, expect, it } from "vitest";
 
-import {
-  E2E_TEST_TIMEOUT_MS,
-  fetchInARow,
-  NEXTJS_APP,
-  readStatus,
-  shutDown,
-  startApp,
-  startHub,
-  toUrl,
-  useProcesses,
-} from "./harness.js";
+import { NEXTJS_APP, shutDown, startApp, startHub, toUrl } from "./harness.js";
 
 const REQUESTS = 20;
 const EDGE_LOG = "MicaFox does not run on the Edge runtime: the SDK is not started";

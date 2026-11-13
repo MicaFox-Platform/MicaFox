@@ -1,6 +1,6 @@
+import { E2E_TEST_TIMEOUT_MS, useProcesses } from "@micafox/testkit";
 import { describe, expect, it } from "vitest";
 
-import { E2E_TEST_TIMEOUT_MS, useProcesses } from "./harness.js";
 import { captureValues, readVariable } from "./values-capture.js";
 
 describe("snapshot of primitives", { timeout: E2E_TEST_TIMEOUT_MS }, () => {

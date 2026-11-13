@@ -38,8 +38,8 @@ This example links the SDK from the workspace, and Turbopack bundles workspace p
 - `src/nestjs/` — the Nest app, its `nest-cli.json` and its CommonJS `tsconfig.json`; built to `dist/nestjs/`.
 - `src/nextjs/` — the Next.js project: `instrumentation.ts`, and `app/quote/` (Node.js runtime)
   and `app/edge/` (Edge runtime) route handlers; built to `src/nextjs/.next/`.
-- `tests/` — the end-to-end tests, their harness and a fake hub that sets one breakpoint and prints every message it
-  receives.
+- `tests/` — the end-to-end tests and their harness, which starts each app and the fake hub of
+  [`@micafox/testkit`](../../tools/testkit/README.md) with one breakpoint.
 
 ## Run it
 
@@ -50,7 +50,7 @@ pnpm build                                    # the SDK, the protocol, then the 
 pnpm --filter @micafox/frameworks test:build  # the end-to-end tests
 ```
 
-To try an app by hand, start [node-basic's fake hub](../node-basic/README.md#run-it-locally) with a breakpoint on the
+To try an app by hand, start [the kit's fake hub](../../tools/testkit/README.md#fake-hub) with a breakpoint on the
 app's handler and run the app:
 
 ```sh
