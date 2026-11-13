@@ -24,6 +24,7 @@ afterEach(() => {
 // The hub's message, as a custom connector delivers it
 const breakpointsMessage = (...breakpoints: Breakpoint[]): Message => ({
   version: 1,
+  module: "debugger",
   type: "breakpoints",
   breakpoints,
 });
@@ -32,6 +33,7 @@ const checkoutEntry = (id: string, line: number): Breakpoint => ({
   id,
   file: fixtures.file("orders/checkout.cjs"),
   line,
+  expiresInMs: 3_600_000,
 });
 
 const statusesOf = (connector: FakeConnector): Array<[string, BreakpointStatus["status"]]> =>
@@ -142,7 +144,7 @@ describe("Debugger failing while applying breakpoints", () => {
 
   it("warns and keeps running when breakpoints is not an array", async () => {
     const { connector, micafox, messagesAt, session } = runDebugger();
-    const message: unknown = { version: 1, type: "breakpoints", breakpoints: "bp-1" };
+    const message: unknown = { version: 1, module: "debugger", type: "breakpoints", breakpoints: "bp-1" };
 
     // A buggy hub: the connector passes on what it received
     connector.deliver(message as Message);

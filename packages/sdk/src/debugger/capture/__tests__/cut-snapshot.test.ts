@@ -33,6 +33,7 @@ describe("cutSnapshot", () => {
 
     expect(snapshot).toEqual({
       version: 1,
+      module: "debugger",
       type: "snapshot",
       breakpointId: "bp-1",
       time: 1_700_000_000_000,

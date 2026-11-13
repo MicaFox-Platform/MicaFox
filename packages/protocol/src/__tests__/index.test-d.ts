@@ -112,15 +112,21 @@ describe("messages", () => {
       pid: 1,
       sdk: { name: "@micafox/sdk", version: "0.1.0" },
       runtime: { name: "node", version: "22.0.0" },
+      modules: ["debugger"],
+      commit: "3f9c2e1a7b6d4c0e9f8a1b2c3d4e5f6a7b8c9d0e",
     });
-    assertType<Welcome>({ version: PROTOCOL_VERSION, type: "welcome" });
+    assertType<Welcome>({ version: PROTOCOL_VERSION, type: "welcome", modules: ["debugger"] });
     assertType<Breakpoints>({
       version: PROTOCOL_VERSION,
+      module: "debugger",
       type: "breakpoints",
-      breakpoints: [{ id: "bp-1", file: "src/orders/checkout.ts", line: 42, limits: { maxDepth: 2 } }],
+      breakpoints: [
+        { id: "bp-1", file: "src/orders/checkout.ts", line: 42, expiresInMs: 3_600_000, limits: { maxDepth: 2 } },
+      ],
     });
     assertType<BreakpointStatus>({
       version: PROTOCOL_VERSION,
+      module: "debugger",
       type: "breakpointStatus",
       breakpointId: "bp-1",
       status: "error",
@@ -128,6 +134,7 @@ describe("messages", () => {
     });
     assertType<Snapshot>({
       version: PROTOCOL_VERSION,
+      module: "debugger",
       type: "snapshot",
       breakpointId: "bp-1",
       time: 0,
@@ -153,14 +160,73 @@ describe("messages", () => {
     // @ts-expect-error labels is required
     assertType<Hello>({ version: PROTOCOL_VERSION, type: "hello", instanceId: "i-1", hostname: "h", pid: 1 });
     // @ts-expect-error line is required
-    assertType<Breakpoint>({ id: "bp-1", file: "src/orders/checkout.ts" });
+    assertType<Breakpoint>({ id: "bp-1", file: "src/orders/checkout.ts", expiresInMs: 0 });
+  });
+
+  it("requires the module of every module message", () => {
+    // @ts-expect-error module is required on breakpoints
+    assertType<Breakpoints>({ version: PROTOCOL_VERSION, type: "breakpoints", breakpoints: [] });
+    // @ts-expect-error module is required on breakpointStatus
+    assertType<BreakpointStatus>({
+      version: PROTOCOL_VERSION,
+      type: "breakpointStatus",
+      breakpointId: "b",
+      status: "active",
+    });
+    // @ts-expect-error module is required on snapshot
+    assertType<Snapshot>({
+      version: PROTOCOL_VERSION,
+      type: "snapshot",
+      breakpointId: "b",
+      time: 0,
+      stack: [],
+      variables: [],
+    });
+    expectTypeOf<Breakpoints["module"]>().toEqualTypeOf<"debugger">();
+    expectTypeOf<BreakpointStatus["module"]>().toEqualTypeOf<"debugger">();
+    expectTypeOf<Snapshot["module"]>().toEqualTypeOf<"debugger">();
+  });
+
+  it("leaves the module off the session frames", () => {
+    expectTypeOf<Hello>().not.toHaveProperty("module");
+    expectTypeOf<Welcome>().not.toHaveProperty("module");
+    expectTypeOf<Batch>().not.toHaveProperty("module");
+  });
+
+  it("requires the modules of a hello and a welcome and leaves the commit optional", () => {
+    expectTypeOf<Hello["modules"]>().toEqualTypeOf<string[]>();
+    expectTypeOf<Welcome["modules"]>().toEqualTypeOf<string[]>();
+    expectTypeOf<Hello["commit"]>().toEqualTypeOf<string | undefined>();
+    // @ts-expect-error modules is required on welcome
+    assertType<Welcome>({ version: PROTOCOL_VERSION, type: "welcome" });
+    // @ts-expect-error modules is required on hello
+    assertType<Hello>({
+      version: PROTOCOL_VERSION,
+      type: "hello",
+      instanceId: "i",
+      labels: {},
+      hostname: "h",
+      pid: 1,
+      sdk: { name: "s", version: "1" },
+      runtime: { name: "node", version: "22" },
+    });
+  });
+
+  it("requires the time a breakpoint has left", () => {
+    expectTypeOf<Breakpoint["expiresInMs"]>().toEqualTypeOf<number>();
   });
 
   it("rejects a message with a wrong version or type literal", () => {
     // @ts-expect-error version 2 is not the protocol version
-    assertType<Welcome>({ version: 2, type: "welcome" });
+    assertType<Welcome>({ version: 2, type: "welcome", modules: [] });
     // @ts-expect-error "welcom" is not a message type
-    assertType<Welcome>({ version: PROTOCOL_VERSION, type: "welcom" });
+    assertType<Welcome>({ version: PROTOCOL_VERSION, type: "welcom", modules: [] });
+  });
+
+  it("lists every breakpoint state, expired included", () => {
+    expectTypeOf<BreakpointStatus["status"]>().toEqualTypeOf<
+      "pending" | "active" | "rateLimited" | "expired" | "error"
+    >();
   });
 
   it("rejects a status outside the breakpoint states", () => {

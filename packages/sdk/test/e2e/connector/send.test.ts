@@ -6,6 +6,7 @@ import { useFakeHubs, type FakeHub, type HubConnection } from "../../connector/f
 
 const status = (breakpointId: string): Message => ({
   version: 1,
+  module: "debugger",
   type: "breakpointStatus",
   breakpointId,
   status: "active",

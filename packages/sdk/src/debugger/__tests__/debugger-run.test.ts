@@ -351,7 +351,7 @@ describe("Debugger while running", () => {
     micafox.configure({ connector, logLevel: "debug" });
     micafox.run();
 
-    connector.deliver({ version: 1, type: "welcome" });
+    connector.deliver({ version: 1, type: "welcome", modules: ["debugger"] });
 
     expect(messagesAt("debug")).toEqual(["ignored a welcome message"]);
   });

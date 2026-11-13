@@ -81,7 +81,7 @@ export const summarizeOutcomes = (outcomes: readonly Outcome[]): string => {
 
 /** The `breakpointStatus` message of an entry's outcome. */
 export const toStatus = (breakpointId: string, outcome: Outcome): BreakpointStatus => {
-  const base = { version: PROTOCOL_VERSION, type: "breakpointStatus", breakpointId } as const;
+  const base = { version: PROTOCOL_VERSION, module: "debugger", type: "breakpointStatus", breakpointId } as const;
   return outcome.status === "error"
     ? { ...base, status: "error", message: outcome.message }
     : { ...base, status: outcome.status };

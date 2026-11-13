@@ -193,12 +193,13 @@ describe("Breakpoints comparing lists", () => {
     expect(test.sent).toEqual([
       {
         version: 1,
+        module: "debugger",
         type: "breakpointStatus",
         breakpointId: "bp-1",
         status: "error",
         message: "line must be a positive integer",
       },
-      { version: 1, type: "breakpointStatus", breakpointId: "bp-1", status: "active" },
+      { version: 1, module: "debugger", type: "breakpointStatus", breakpointId: "bp-1", status: "active" },
     ]);
   });
 });
@@ -231,6 +232,7 @@ describe("Breakpoints reading a message", () => {
 
     expect(statusOf("bp-100")).toEqual({
       version: 1,
+      module: "debugger",
       type: "breakpointStatus",
       breakpointId: "bp-100",
       status: "error",
@@ -241,7 +243,7 @@ describe("Breakpoints reading a message", () => {
   it("warns and changes nothing when breakpoints is not an array", () => {
     test.apply(entryAt("bp-1", 4));
 
-    test.breakpoints.apply({ version: 1, type: "breakpoints", breakpoints: "bp-1" });
+    test.breakpoints.apply({ version: 1, module: "debugger", type: "breakpoints", breakpoints: "bp-1" });
 
     expect({ sent: test.sent.length, calls: test.session.methods, warnings: test.messagesAt("warn") }).toEqual({
       sent: 1,

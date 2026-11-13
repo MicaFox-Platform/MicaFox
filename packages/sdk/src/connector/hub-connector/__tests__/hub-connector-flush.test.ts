@@ -8,6 +8,7 @@ import type { HubConnector } from "../hub-connector.js";
 
 const status = (breakpointId: string): Message => ({
   version: 1,
+  module: "debugger",
   type: "breakpointStatus",
   breakpointId,
   status: "active",
@@ -15,6 +16,7 @@ const status = (breakpointId: string): Message => ({
 
 const snapshot: Message = {
   version: 1,
+  module: "debugger",
   type: "snapshot",
   breakpointId: "bp-1",
   time: 1_767_225_600_000,
@@ -141,7 +143,7 @@ describe("HubConnector close() flush", () => {
     const closing = harness.connector.close();
     await connection.nextFrame();
 
-    connection.socket.send('{"version":1,"type":"breakpoints","breakpoints":[]}');
+    connection.socket.send('{"version":1,"module":"debugger","type":"breakpoints","breakpoints":[]}');
     harness.connector.send(status("bp-3"));
     await vi.advanceTimersByTimeAsync(1000);
     await closing;
@@ -287,7 +289,7 @@ describe("HubConnector close() flush", () => {
     harness.connector.onMessage((message) => calls.push(message));
     harness.connector.onStatus((next) => calls.push(next));
 
-    connection.socket.send('{"version":1,"type":"breakpoints","breakpoints":[]}');
+    connection.socket.send('{"version":1,"module":"debugger","type":"breakpoints","breakpoints":[]}');
     await vi.advanceTimersByTimeAsync(1000);
     await closing;
 

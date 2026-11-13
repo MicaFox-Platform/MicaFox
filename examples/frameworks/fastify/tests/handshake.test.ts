@@ -13,7 +13,12 @@ describe("handshake with the hub", { timeout: E2E_TEST_TIMEOUT_MS }, () => {
     await waitForStatus(hub.run, "bp-quote");
 
     expect(hub.run.messages()[0]).toEqual(
-      expect.objectContaining({ type: "hello", service: "checkout", labels: { team: "payments", region: "eu" } }),
+      expect.objectContaining({
+        type: "hello",
+        service: "checkout",
+        labels: { team: "payments", region: "eu" },
+        modules: ["debugger"],
+      }),
     );
   });
 });

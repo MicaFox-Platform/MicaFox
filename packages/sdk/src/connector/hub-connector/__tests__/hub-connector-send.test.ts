@@ -14,6 +14,7 @@ const FLUSH_INTERVAL_MS = 100;
 
 const status = (breakpointId: string): Message => ({
   version: 1,
+  module: "debugger",
   type: "breakpointStatus",
   breakpointId,
   status: "active",
@@ -21,6 +22,7 @@ const status = (breakpointId: string): Message => ({
 
 const snapshot: Message = {
   version: 1,
+  module: "debugger",
   type: "snapshot",
   breakpointId: "bp-1",
   time: 1_767_225_600_000,

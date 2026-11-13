@@ -1,5 +1,5 @@
 // A fake hub to try an app with and to test it end to end: it plays the hub side of docs/api/protocol.md#hello. It
-// answers a hello with welcome and the breakpoints of HUB_BREAKPOINTS (breakpoints.ts), and
+// answers a hello with welcome and the breakpoints of HUB_BREAKPOINTS (breakpoints.ts, modules.ts), and
 // prints every message it receives as one JSON line (connection.ts). Set HUB_TOKEN to accept only
 // `Authorization: Bearer <HUB_TOKEN>`; PORT=0 picks a free port. It never prints headers or the token.
 // Run it with `--conditions=@micafox/source --import tsx`.
@@ -8,7 +8,7 @@ import { createServer, type IncomingMessage } from "node:http";
 import type { AddressInfo, Socket } from "node:net";
 import { WebSocketServer } from "ws";
 
-import { readBreakpoints } from "./breakpoints.js";
+import { readBreakpoints, startCountdown } from "./breakpoints.js";
 import { onConnection, print } from "./connection.js";
 
 const DEFAULT_PORT = 8787;
@@ -28,7 +28,7 @@ const rejectUpgrade = (socket: Socket): void => {
 
 const main = (): void => {
   const token = process.env.HUB_TOKEN ?? "";
-  const breakpoints = readBreakpoints(process.env);
+  const listBreakpoints = startCountdown(readBreakpoints(process.env));
   const server = createServer();
   const hub = new WebSocketServer({ noServer: true });
 
@@ -42,7 +42,7 @@ const main = (): void => {
     }
 
     hub.handleUpgrade(request, socket, head, (webSocket) => {
-      onConnection(webSocket, breakpoints);
+      onConnection(webSocket, listBreakpoints);
     });
   });
   server.on("error", (error) => {

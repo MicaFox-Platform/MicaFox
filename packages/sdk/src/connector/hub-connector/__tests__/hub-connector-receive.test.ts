@@ -9,8 +9,9 @@ const RECONNECT = { minDelayMs: 1000, maxDelayMs: 8000 };
 
 const createBreakpoints = (id: string): Breakpoints => ({
   version: 1,
+  module: "debugger",
   type: "breakpoints",
-  breakpoints: [{ id, file: "src/orders/checkout.ts", line: 42 }],
+  breakpoints: [{ id, file: "src/orders/checkout.ts", line: 42, expiresInMs: 3_600_000 }],
 });
 
 // Subscribes last, so the handlers a test adds run first; resolves with the next `count` messages
@@ -161,7 +162,7 @@ describe("HubConnector receiving", () => {
   it.each([
     {
       name: "a later welcome",
-      frame: '{"version":1,"type":"welcome"}',
+      frame: '{"version":1,"type":"welcome","modules":["debugger"]}',
       debug: "ignored a welcome from the hub after the first one",
     },
     {

@@ -19,13 +19,13 @@ they are.
 - `src/quote-app.ts` — what the framework examples share: a `QuoteApp` describes an app that serves `GET /quote`, and
   `startQuoteHub()`, `startQuoteApp()`, `fetchUntilCompleteSnapshot()` and `shutDownQuoteApp()` run it.
 - `src/fake-hub/` — the fake hub, run as its own process: `main.ts` serves, and `startHub()` and the `start:hub` script
-  run it by that path, `connection.ts` answers one app and prints what it sends, `breakpoints.ts` reads the
-  breakpoints to set.
+  run it by that path, `connection.ts` answers one app and prints what it sends, `modules.ts` picks the modules of its
+  `welcome`, `breakpoints.ts` reads the breakpoints to set and counts their time left down.
 - `test/` — `env-examples.test.ts`: the `.env.example` files and `start` scripts of the examples.
 - `.env.example` — the hub's port and one breakpoint for each example app.
 
-`readBreakpoints()` has unit tests in `src/fake-hub/__tests__/`; the rest of the kit is proven by the examples'
-end-to-end tests, which run on it.
+`readBreakpoints()`, `startCountdown()`, `acceptModules()` and how `onConnection()` answers a `hello` have unit tests in
+`src/fake-hub/__tests__/`; the rest of the kit is proven by the examples' end-to-end tests, which run on it.
 
 An example keeps only its own part of the harness in `tests/harness.ts`: how its apps start and where their
 breakpoints go.
@@ -33,14 +33,21 @@ breakpoints go.
 ## Fake hub
 
 It plays the hub side of [the protocol](../../docs/api/protocol.md#hello): it answers a `hello` with `welcome` and the
-breakpoints to set, prints every message it receives as one JSON line, the messages of a batch one by one, and prints
-`disconnected` once a connection closes, after its last message. It never prints headers or the token.
+breakpoints to set (`welcome.modules` lists the `hello`'s modules the hub knows, which is `debugger`; a `hello` with
+none of them gets an empty list and no breakpoints), prints every message it receives as one JSON line, the messages of
+a batch one by one, and prints `disconnected` once a connection closes, after its last message. It never prints headers
+or the token.
 
 | Variable          | Meaning                                                                   |
 | ----------------- | ------------------------------------------------------------------------- |
 | `PORT`            | port, default `8787`; `0` picks a free one and prints it                  |
 | `HUB_TOKEN`       | when set, an upgrade without `Authorization: Bearer <HUB_TOKEN>` gets 401 |
 | `HUB_BREAKPOINTS` | JSON array of breakpoints sent after `welcome`; unset → no breakpoints    |
+
+Each entry of `HUB_BREAKPOINTS` may set `expiresInMs`, the time the breakpoint lives, an integer of at least `0`; any
+other value, or none, means 1 h (`3600000`). The hub fixes each deadline when it starts and counts it down: every
+`breakpoints` message it sends carries the time left at that moment, never less than `0`, so an app that connects
+later, or reconnects, gets a shorter time. Restart the hub to start the countdown again.
 
 `pnpm --filter @micafox/testkit start:hub` runs it by hand and reads a `.env` in this folder, if there is one. Copy
 `.env.example` to `.env` first: it sets `HUB_BREAKPOINTS` to one breakpoint for each example app, on the line marked

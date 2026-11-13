@@ -21,6 +21,7 @@ afterEach(() => {
 
 const status = (breakpointId: string, state: BreakpointStatus["status"], message?: string): BreakpointStatus => ({
   version: 1,
+  module: "debugger",
   type: "breakpointStatus",
   breakpointId,
   status: state,

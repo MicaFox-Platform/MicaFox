@@ -51,7 +51,12 @@ describe("Breakpoints reading scriptParsed events", () => {
       }
     };
 
-    breakpoints.apply({ version: 1, type: "breakpoints", breakpoints: [{ id: "bp-1", file: "a.js", line: 1 }] });
+    breakpoints.apply({
+      version: 1,
+      module: "debugger",
+      type: "breakpoints",
+      breakpoints: [{ id: "bp-1", file: "a.js", line: 1 }],
+    });
 
     expect({ posted: inspector.posted, sent }).toEqual({ posted: ["Debugger.enable"], sent: [] });
   });

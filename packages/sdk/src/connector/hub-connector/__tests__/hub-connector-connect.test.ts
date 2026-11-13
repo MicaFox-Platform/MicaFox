@@ -73,6 +73,7 @@ describe("HubConnector connect()", () => {
       pid: process.pid,
       sdk: { name: "@micafox/sdk", version: SDK_VERSION },
       runtime: { name: "node", version: process.versions.node },
+      modules: ["debugger"],
     });
   });
 
@@ -81,7 +82,13 @@ describe("HubConnector connect()", () => {
     const { connector, nextStatus } = createHarness(hubs, { url: hub.url });
     const connected = nextStatus("connected");
     connector.connect();
-    connector.send({ version: 1, type: "breakpointStatus", breakpointId: "bp-1", status: "active" });
+    connector.send({
+      version: 1,
+      module: "debugger",
+      type: "breakpointStatus",
+      breakpointId: "bp-1",
+      status: "active",
+    });
     const connection = await hub.nextConnection();
     await connection.nextFrame();
 

@@ -4,11 +4,14 @@ import { readHubFrame } from "../inbound.js";
 
 describe("readHubFrame()", () => {
   it("returns a breakpoints message as a message", () => {
-    const text = '{"version":1,"type":"breakpoints","breakpoints":[]}';
+    const text = '{"version":1,"module":"debugger","type":"breakpoints","breakpoints":[]}';
 
     const frame = readHubFrame(text);
 
-    expect(frame).toEqual({ kind: "message", message: { version: 1, type: "breakpoints", breakpoints: [] } });
+    expect(frame).toEqual({
+      kind: "message",
+      message: { version: 1, module: "debugger", type: "breakpoints", breakpoints: [] },
+    });
   });
 
   it("rejects a message of another protocol version", () => {
@@ -87,7 +90,7 @@ describe("readHubFrame()", () => {
   );
 
   it("ignores a later welcome at debug", () => {
-    const frame = readHubFrame('{"version":1,"type":"welcome"}');
+    const frame = readHubFrame('{"version":1,"type":"welcome","modules":["debugger"]}');
 
     expect(frame).toEqual({
       kind: "ignored",

@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { readBreakpointList } from "../read-list.js";
 
-const read = (...breakpoints: unknown[]) => readBreakpointList({ version: 1, type: "breakpoints", breakpoints });
+const read = (...breakpoints: unknown[]) =>
+  readBreakpointList({ version: 1, module: "debugger", type: "breakpoints", breakpoints });
 
 const checkout = { id: "bp-1", file: "src/orders/checkout.ts", line: 42 };
 
@@ -19,9 +20,13 @@ describe("readBreakpointList", () => {
     expect(read(checkout)?.entries).toEqual([{ kind: "valid", ...checkout }]);
   });
 
+  it("reads an entry that carries the time it has left as an entry without it", () => {
+    expect(read({ ...checkout, expiresInMs: 3_600_000 })?.entries).toEqual([{ kind: "valid", ...checkout }]);
+  });
+
   it("returns nothing when breakpoints is not an array", () => {
     expect([
-      readBreakpointList({ type: "breakpoints" }),
+      readBreakpointList({ module: "debugger", type: "breakpoints" }),
       readBreakpointList({ breakpoints: "bp-1" }),
       readBreakpointList(null),
     ]).toEqual([undefined, undefined, undefined]);

@@ -11,7 +11,7 @@ import {
 } from "../../../../test/connector/harness.js";
 
 const RECONNECT = { minDelayMs: 1000, maxDelayMs: 8000 };
-const BREAKPOINTS = '{"version":1,"type":"breakpoints","breakpoints":[]}';
+const BREAKPOINTS = '{"version":1,"module":"debugger","type":"breakpoints","breakpoints":[]}';
 
 // Lets ws send each ping, and records first a promise of the next `event` on that socket, so a test can wait for
 // the hub's answer to reach the connector

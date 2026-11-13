@@ -88,6 +88,7 @@ export const cutSnapshot = (read: PauseRead, target: SnapshotTarget): Snapshot =
   const limits = resolveLimits(target.limits);
   const snapshot: Snapshot = {
     version: PROTOCOL_VERSION,
+    module: "debugger",
     type: "snapshot",
     breakpointId: target.breakpointId,
     time: read.time,

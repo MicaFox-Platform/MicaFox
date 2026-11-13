@@ -8,7 +8,7 @@ import { findClosedPort, useFakeHubs, type FakeHub } from "../../connector/fake-
 const sendWrongFrameAndStopReading = async (hub: FakeHub): Promise<void> => {
   const connection = await hub.nextConnection();
   await connection.nextFrame();
-  connection.socket.send('{"version":1,"type":"breakpoints","breakpoints":[]}');
+  connection.socket.send('{"version":1,"module":"debugger","type":"breakpoints","breakpoints":[]}');
   connection.socket.pause();
 };
 

@@ -161,7 +161,13 @@ describe("HubConnector close()", () => {
     await harness.connector.close();
 
     harness.connector.connect();
-    harness.connector.send({ version: 1, type: "breakpointStatus", breakpointId: "bp-1", status: "active" });
+    harness.connector.send({
+      version: 1,
+      module: "debugger",
+      type: "breakpointStatus",
+      breakpointId: "bp-1",
+      status: "active",
+    });
     await settle();
 
     expect({ warnings: harness.messagesAt("warn"), requests: hub.requests.length }).toEqual({
