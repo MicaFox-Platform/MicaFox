@@ -11,15 +11,15 @@ A pnpm monorepo in TypeScript (strict, NodeNext) with Vitest, ESLint and Prettie
 table only, and packages import each other by package name, never by relative path. Only examples depend on
 `tools/testkit`, which is private and never published; ESLint keeps it out of `packages/`.
 
-| Package                   | Holds                                                         | May depend on          |
-| ------------------------- | ------------------------------------------------------------- | ---------------------- |
-| `packages/configs`        | shared tsconfig, ESLint, Prettier and Vitest presets          | -                      |
-| `packages/protocol`       | messages, `PROTOCOL_VERSION` and the `Connector` type         | -                      |
-| `packages/sdk`            | `src/debugger/` and `src/connector/`, run inside the host app | protocol               |
-| `tools/testkit`           | private kit of the examples' E2E tests: runner and fake hub   | protocol               |
-| `examples/node-basic`     | demo app to try the SDK by hand                               | sdk, protocol, testkit |
-| `examples/module-formats` | one app per module format, run on the built SDK               | sdk, protocol, testkit |
-| `examples/frameworks`     | Express, NestJS and Next.js apps, run on the built SDK        | sdk, protocol, testkit |
+| Package                       | Holds                                                                     | May depend on          |
+| ----------------------------- | ------------------------------------------------------------------------- | ---------------------- |
+| `packages/configs`            | shared tsconfig, ESLint, Prettier and Vitest presets                      | -                      |
+| `packages/protocol`           | messages, `PROTOCOL_VERSION` and the `Connector` type                     | -                      |
+| `packages/sdk`                | `src/debugger/` and `src/connector/`, run inside the host app             | protocol               |
+| `tools/testkit`               | private kit of the examples' E2E tests: runner and fake hub               | protocol               |
+| `examples/formats`            | one app per module format, run on the built SDK                           | sdk, protocol, testkit |
+| `examples/frameworks/fastify` | Fastify demo app to try the SDK by hand, with the full debugger E2E suite | sdk, protocol, testkit |
+| `examples/frameworks/<name>`  | `express`, `nestjs` and `nextjs`: one app each, run on the built SDK      | sdk, testkit           |
 
 A package exports its `src/index.ts` under the `@micafox/source` condition, which `pnpm dev`, tests and
 typecheck resolve: packages read each other's sources directly, so development needs no build step.
@@ -48,21 +48,22 @@ pnpm typecheck    → typecheck every package, then the root files and tests
 pnpm test         → one Vitest run over all packages; pnpm test <paths> runs only those test files
 pnpm lint         → one ESLint run over the repo
 pnpm format       → one Prettier check over the repo
-pnpm test:build   → tests of the built output: packages loaded with import and require(), examples/module-formats
-                    and examples/frameworks; run pnpm build first
+pnpm test:build   → tests of the built output: packages loaded with import and require(), examples/formats
+                    and examples/frameworks/*; run pnpm build first
 pnpm verify       → lint → format → typecheck → build → test:build → test:coverage (≥ 80%), stops at the first failure
 pnpm verify:brief → the same steps, one line per green step and the start of a failure (for AI agents)
 pnpm verify:fix   → auto-fix lint and formatting
 ```
 
-One package: `pnpm --filter @micafox/sdk test`, `pnpm --filter @micafox/node-basic dev`. CI runs
+One package: `pnpm --filter @micafox/sdk test`, `pnpm --filter @micafox/example-fastify dev`. CI runs
 the same scripts on every pull request: see [Checks](#checks).
 
 ## Testing
 
 - Unit tests live in the `__tests__/` folder of the folder that holds their module, so folders list only code.
-  Tests that are not about one module (doc examples, lint boundaries, end-to-end) live in `packages/<name>/test/`,
-  or in `examples/<name>/tests/` for the whole system; the configs package keeps all its tests there.
+  Tests that are not about one module (doc examples, lint boundaries, end-to-end) live in `packages/<name>/test/`, or in
+  `examples/<name>/tests/` and `examples/frameworks/<name>/tests/` for the whole system; the configs package keeps all
+  its tests there.
   Coverage of `packages/*/src` must stay ≥ 80% in lines, branches and functions; a line no meaningful test can
   reach is excluded in `vitest.config.ts` with the reason, never covered by a hollow test.
 - Test behavior through the public surface. Mock only at the boundaries: the WebSocket, time and `node:inspector`.
@@ -72,8 +73,9 @@ the same scripts on every pull request: see [Checks](#checks).
 - End-to-end tests run a component in a real Node process. A package keeps its own in
   `packages/<name>/test/e2e/<component>/`: a small fixture app started as a child process, and one test file per
   behavior of the component. Tests of the whole system, through the public API only, live in `examples/<name>/tests/`
-  and start the example's app and the fake hub of [`tools/testkit`](../tools/testkit/README.md) as child processes.
-  Those that need the built packages, as in `examples/module-formats` and `examples/frameworks`, run in
+  or `examples/frameworks/<name>/tests/` and start the example's app and the fake hub of
+  [`tools/testkit`](../tools/testkit/README.md) as child processes.
+  Those that need the built packages, as in `examples/formats` and `examples/frameworks/*`, run in
   `pnpm test:build`.
 
 Full rules: [testing](../.claude/rules/testing.md).

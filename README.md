@@ -115,9 +115,10 @@ Logger, buffers, batching, rate limits and the rest: [SDK API](docs/api/sdk/over
 - [Architecture](docs/architecture/overview.md) — how MicaFox works inside.
 - [Architecture decisions](docs/adr/) — why it works this way.
 - [Vision](docs/vision.md) — goals and principles.
-- Examples: [node-basic](examples/node-basic/), a minimal app to try MicaFox,
-  [module-formats](examples/module-formats/), the SDK in CommonJS, ES module, tsc-built and bundled apps, and
-  [frameworks](examples/frameworks/), the SDK in Express, NestJS and Next.js apps.
+- Examples: [Fastify](examples/frameworks/fastify/), a minimal app to try MicaFox,
+  [formats](examples/formats/), the SDK in CommonJS, ES module, tsc-built and bundled apps, and
+  [Express](examples/frameworks/express/), [NestJS](examples/frameworks/nestjs/) and
+  [Next.js](examples/frameworks/nextjs/) apps.
 
 ## Contributing
 

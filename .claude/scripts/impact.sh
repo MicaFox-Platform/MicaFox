@@ -41,7 +41,7 @@ sensitive=$(
 
 importers=$(for file in $sources; do
   name=$(basename "$file" .ts)
-  grep -rlE "from ['\"]\.{1,2}/([^'\"]*/)?$name\.js['\"]" packages/*/src examples/*/src examples/*/tests tools/*/src 2>/dev/null |
+  grep -rlE "from ['\"]\.{1,2}/([^'\"]*/)?$name\.js['\"]" packages/*/src examples/*/src examples/*/tests examples/frameworks/*/src examples/frameworks/*/tests tools/*/src 2>/dev/null |
     grep -vxF "$file" | sed "s|^|$file ← |"
 done)
 

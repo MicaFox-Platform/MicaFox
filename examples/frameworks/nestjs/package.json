@@ -1,0 +1,33 @@
+{
+  "name": "@micafox/example-nestjs",
+  "version": "0.1.0",
+  "private": true,
+  "description": "NestJS app debugged by the built MicaFox SDK",
+  "type": "module",
+  "scripts": {
+    "build": "nest build --config src/nest-cli.json && echo '{ \"type\": \"commonjs\" }' > dist/package.json",
+    "typecheck": "tsc -p src/tsconfig.json --noEmit",
+    "test:build": "vitest run --config vitest.build.config.ts"
+  },
+  "keywords": [],
+  "author": "Artem Horovyi",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@micafox/sdk": "workspace:*",
+    "@nestjs/common": "^12.5.0",
+    "@nestjs/core": "^12.5.0",
+    "@nestjs/platform-express": "^12.5.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@micafox/configs": "workspace:*",
+    "@micafox/testkit": "workspace:*",
+    "@nestjs/cli": "^11.0.24",
+    "@types/express": "^5.0.6",
+    "typescript": "^6.0.3"
+  }
+}

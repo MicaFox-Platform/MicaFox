@@ -13,4 +13,16 @@ export {
   type ListeningRun,
   type Readiness,
 } from "./processes.js";
+export {
+  fetchUntilCompleteSnapshot,
+  findQuoteLine,
+  shutDownQuoteApp,
+  startQuoteApp,
+  startQuoteHub,
+  toQuoteFilePattern,
+  toQuoteRepositoryPath,
+  toQuoteUrl,
+  waitForQuoteStatus,
+  type QuoteApp,
+} from "./quote-app.js";
 export { fetchInARow } from "./requests.js";

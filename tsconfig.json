@@ -10,9 +10,12 @@
     "packages/*/src/**/*.test.ts",
     "packages/*/src/**/*.test-d.ts",
     "examples/*/src/**/*.test.ts",
+    "examples/frameworks/*/src/**/*.test.ts",
     "packages/*/test",
     "examples/*/vitest*.config.ts",
+    "examples/frameworks/*/vitest*.config.ts",
     "examples/*/tests",
+    "examples/frameworks/*/tests",
     "tools/*/vitest*.config.ts",
     "tools/*/src"
   ]

@@ -5,7 +5,7 @@ import { afterAll, describe, expect, it } from "vitest";
 
 import { readBreakpoints } from "../breakpoints.js";
 
-const SAMPLE = [{ id: "bp-quote", file: "examples/node-basic/src/pricing.ts", line: 33 }];
+const SAMPLE = [{ id: "bp-quote", file: "examples/frameworks/fastify/src/pricing.ts", line: 33 }];
 const OVERRIDE = [{ id: "bp-missing", file: "src/missing.ts", line: 1 }];
 
 const DIR = mkdtempSync(path.join(tmpdir(), "fake-hub-"));

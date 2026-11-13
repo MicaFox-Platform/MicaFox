@@ -35,8 +35,9 @@ source maps.
 Not supported: bundled output (Next.js server code included), the Edge runtime, Vercel serverless functions, Bun and
 Deno.
 
-What each framework needs and the apps CI runs: [frameworks](../../../examples/frameworks/README.md),
-[module formats](../../../examples/module-formats/README.md), [Fastify](../../../examples/node-basic/README.md).
+What each framework needs and the apps CI runs: [Express](../../../examples/frameworks/express/README.md),
+[NestJS](../../../examples/frameworks/nestjs/README.md), [Next.js](../../../examples/frameworks/nextjs/README.md),
+[Fastify](../../../examples/frameworks/fastify/README.md), [module formats](../../../examples/formats/README.md).
 
 ## Exports
 
