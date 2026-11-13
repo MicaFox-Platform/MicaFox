@@ -1,6 +1,6 @@
+import { E2E_TEST_TIMEOUT_MS, useProcesses } from "@micafox/testkit";
 import { describe, expect, it } from "vitest";
 
-import { E2E_TEST_TIMEOUT_MS, useProcesses } from "./harness.js";
 import { captureValues, readVariable } from "./values-capture.js";
 
 // An object value with the given properties, as the SDK encodes a plain object; without them, one not read

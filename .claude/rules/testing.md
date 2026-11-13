@@ -4,6 +4,7 @@ paths:
   - "**/*.test-d.ts"
   - "packages/*/test/**"
   - "examples/*/tests/**"
+  - "tools/testkit/**"
 ---
 
 # Testing
@@ -36,7 +37,8 @@ A folder lists only the code it runs; its tests sit one level down, in its own `
   - checks of the lint boundaries of the package's components: `test/boundaries.test.ts`;
   - helpers and fixtures shared by tests: `test/<component>/`;
   - end-to-end tests: `test/e2e/` (below).
-- An example's end-to-end tests of the whole system, with their harness: `examples/<name>/tests/` (below).
+- An example's end-to-end tests of the whole system, with its own part of the harness: `examples/<name>/tests/`
+  (below). What every example shares, the process runner and the fake hub, lives in `tools/testkit/src/`.
 
 ## How
 
@@ -57,7 +59,8 @@ A folder lists only the code it runs; its tests sit one level down, in its own `
 - A package's own: `packages/<name>/test/e2e/<component>/`, with a fixture app started as a child process, a
   harness that drives it, and one `<behavior>.test.ts` per behavior of the component, one `it` per scenario. They may
   import the package's sources by relative path, since they live in it. The whole system: in `examples/<name>/tests/`,
-  through the public API only, with their harness beside them; it starts the example's own `src/` as child processes.
+  through the public API only, with the example's harness beside them; it starts the example's own `src/` and the
+  fake hub as child processes through `@micafox/testkit`, imported by package name.
 - A run ends when the process exits by itself; a deadline after the last request only kills one that never does, and
   a run that fails earlier kills its process. No sleeps and no assertion on elapsed real time: order is shown by
   markers the fixture writes to the same output as the code under test.

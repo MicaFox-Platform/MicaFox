@@ -2,10 +2,10 @@
 
 ## Purpose
 
-`@micafox/configs` holds shared presets for development tools (TypeScript, ESLint, Prettier and Vitest), so
-every consumer configures them the same way instead of copying config. Today the consumers are the root,
-`packages/*` and `examples/*` of this monorepo. The presets are general and contain nothing specific to MicaFox, so
-the package can also serve any TS/Node project that installs it from npm.
+`@micafox/configs` holds shared presets for development tools (TypeScript, ESLint, Prettier and Vitest), so every
+consumer configures them the same way instead of copying config. Today the consumers are the root, `packages/*`,
+`examples/*` and `tools/*` of this monorepo. The presets are general and contain nothing specific to MicaFox, so the
+package can also serve any TS/Node project that installs it from npm.
 
 ## Boundaries
 

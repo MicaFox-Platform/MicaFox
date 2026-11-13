@@ -48,6 +48,16 @@ export default [
       },
     },
   },
+  {
+    // The test kit drives the examples' end-to-end tests; the packages never depend on it
+    files: ["packages/**/*.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        { paths: [{ name: "@micafox/testkit", message: "Only examples use @micafox/testkit (CLAUDE.md#packages)." }] },
+      ],
+    },
+  },
   // The logger moves with the connector if it becomes its own package: docs/architecture/sdk/logger.md
   ...restrictImports("logger", []),
   // The connector may become its own package with the logger: docs/architecture/sdk/connector.md#boundaries

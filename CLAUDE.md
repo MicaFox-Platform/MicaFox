@@ -12,16 +12,17 @@ the long-term shape of the code, and you push back on anything that breaks the r
 
 pnpm monorepo, Node >= 22, TypeScript (strict, NodeNext), Vitest, ESLint, Prettier.
 
-| Package                   | Role                                           | May depend on |
-| ------------------------- | ---------------------------------------------- | ------------- |
-| `packages/configs`        | shared tsconfig / eslint / prettier / vitest   | -             |
-| `packages/protocol`       | messages, protocol version, `Connector`        | -             |
-| `packages/sdk`            | debugger and default connector, in host app    | protocol      |
-| `examples/node-basic`     | demo app                                       | sdk, protocol |
-| `examples/module-formats` | apps that load the built SDK per module format | sdk, protocol |
-| `examples/frameworks`     | Express, NestJS and Next.js apps on built SDK  | sdk, protocol |
+| Package                   | Role                                           | May depend on          |
+| ------------------------- | ---------------------------------------------- | ---------------------- |
+| `packages/configs`        | shared tsconfig / eslint / prettier / vitest   | -                      |
+| `packages/protocol`       | messages, protocol version, `Connector`        | -                      |
+| `packages/sdk`            | debugger and default connector, in host app    | protocol               |
+| `tools/testkit`           | private E2E kit of the examples: runner, hub   | protocol               |
+| `examples/node-basic`     | demo app                                       | sdk, protocol, testkit |
+| `examples/module-formats` | apps that load the built SDK per module format | sdk, protocol, testkit |
+| `examples/frameworks`     | Express, NestJS and Next.js apps on built SDK  | sdk, protocol, testkit |
 
-Dependencies point down this table only.
+Dependencies point down this table only. Only examples depend on `tools/testkit`, which is never published.
 
 ## Commands
 

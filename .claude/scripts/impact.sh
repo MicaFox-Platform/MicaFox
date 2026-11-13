@@ -13,7 +13,7 @@ changed=$({
   git diff --name-only "$base"
   git ls-files --others --exclude-standard
 } | sort -u)
-sources=$(grep -E '^packages/[^/]+/src/.*\.ts$' <<<"$changed" | grep -vE '/__tests__/|\.(test|test-d|d)\.ts$')
+sources=$(grep -E '^(packages|tools)/[^/]+/src/.*\.ts$' <<<"$changed" | grep -vE '/__tests__/|\.(test|test-d|d)\.ts$')
 
 section() {
   echo "$1:"
@@ -28,7 +28,7 @@ sensitive=$(
   grep -E '^packages/[^/]+/src/index\.ts$' <<<"$changed" | sed 's/^/public API: /'
   grep -qE '^packages/protocol/' <<<"$changed" && echo "protocol: packages/protocol"
   grep -qE '^packages/sdk/src/connector/' <<<"$changed" && echo "transport: packages/sdk/src/connector"
-  for manifest in $(grep -E '^packages/[^/]+/package\.json$' <<<"$changed"); do
+  for manifest in $(grep -E '^(packages|tools)/[^/]+/package\.json$' <<<"$changed"); do
     if ! git cat-file -e "$base:$manifest" 2>/dev/null; then
       echo "new package: $manifest"
       continue
@@ -41,7 +41,7 @@ sensitive=$(
 
 importers=$(for file in $sources; do
   name=$(basename "$file" .ts)
-  grep -rlE "from ['\"]\.{1,2}/([^'\"]*/)?$name\.js['\"]" packages/*/src examples/*/src 2>/dev/null |
+  grep -rlE "from ['\"]\.{1,2}/([^'\"]*/)?$name\.js['\"]" packages/*/src examples/*/src examples/*/tests tools/*/src 2>/dev/null |
     grep -vxF "$file" | sed "s|^|$file ← |"
 done)
 

@@ -32,12 +32,10 @@
   "devDependencies": {
     "@micafox/configs": "workspace:*",
     "@micafox/protocol": "workspace:*",
+    "@micafox/testkit": "workspace:*",
     "@nestjs/cli": "^11.0.24",
     "@types/express": "^5.0.6",
     "@types/react": "^19.3.0",
-    "@types/ws": "^8.18.2",
-    "tsx": "^4.23.15",
-    "typescript": "^6.0.3",
-    "ws": "^8.22.1"
+    "typescript": "^6.0.3"
   }
 }

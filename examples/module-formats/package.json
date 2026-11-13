@@ -21,9 +21,7 @@
   "devDependencies": {
     "@micafox/configs": "workspace:*",
     "@micafox/protocol": "workspace:*",
-    "@types/ws": "^8.18.2",
-    "esbuild": "^0.28.2",
-    "tsx": "^4.23.15",
-    "ws": "^8.22.1"
+    "@micafox/testkit": "workspace:*",
+    "esbuild": "^0.28.2"
   }
 }

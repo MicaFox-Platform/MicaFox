@@ -18,8 +18,8 @@ user requested.
    files in full where context matters. For a rework, check that the requested changes are made and review only the
    delta.
 2. Read `CLAUDE.md`; the `.claude/rules/*.md` whose `paths` frontmatter matches a changed file, plus `testing.md`
-   whenever a source file under `packages/*/src/` or `examples/*/src/` changes; and only the ADRs in `docs/adr/`
-   whose file names touch the changed components or the choices the diff makes.
+   whenever a source file under `packages/*/src/`, `examples/*/src/` or `tools/*/src/` changes; and only the ADRs in
+   `docs/adr/` whose file names touch the changed components or the choices the diff makes.
 3. Look for real problems only:
    - bugs, unhandled errors, anything that can crash, throw into or block the host app;
    - broken backward compatibility of the protocol or public API; a public API change without a `docs/api/` update;

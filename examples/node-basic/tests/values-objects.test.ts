@@ -1,6 +1,6 @@
+import { E2E_TEST_TIMEOUT_MS, useProcesses } from "@micafox/testkit";
 import { describe, expect, it } from "vitest";
 
-import { E2E_TEST_TIMEOUT_MS, useProcesses } from "./harness.js";
 import { captureValues, readVariable } from "./values-capture.js";
 
 const numbers = (values: number[]): unknown[] => values.map((value) => ({ type: "number", value }));

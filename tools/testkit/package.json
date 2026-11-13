@@ -1,0 +1,28 @@
+{
+  "name": "@micafox/testkit",
+  "version": "0.1.0",
+  "private": true,
+  "description": "End-to-end test kit of the MicaFox examples: the child-process runner, harness helpers and a fake hub",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "keywords": [],
+  "author": "Artem Horovyi",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@micafox/protocol": "workspace:*",
+    "tsx": "^4.23.15",
+    "ws": "^8.22.1"
+  },
+  "devDependencies": {
+    "@micafox/configs": "workspace:*",
+    "@types/ws": "^8.18.2"
+  },
+  "peerDependencies": {
+    "vitest": "^4.1.11"
+  }
+}
