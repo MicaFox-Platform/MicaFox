@@ -14,7 +14,12 @@ const INSTANCE_ID = "6f1c2a9e-3b4d-4e5f-8a7b-9c0d1e2f3a4b";
 
 describe("buildHello", () => {
   it("describes the instance, the SDK and the runtime", () => {
-    const hello = buildHello({ instanceId: INSTANCE_ID, service: "checkout", labels: { region: "eu" } });
+    const hello = buildHello({
+      instanceId: INSTANCE_ID,
+      service: "checkout",
+      labels: { region: "eu" },
+      modules: ["debugger"],
+    });
 
     expect(hello).toEqual({
       version: 1,
@@ -30,8 +35,17 @@ describe("buildHello", () => {
     });
   });
 
+  it("lists the modules it is given, in order, as a copy", () => {
+    const modules = ["debugger", "errors"];
+
+    const hello = buildHello({ instanceId: INSTANCE_ID, service: undefined, labels: {}, modules });
+    modules.push("logpoints");
+
+    expect(hello.modules).toEqual(["debugger", "errors"]);
+  });
+
   it("leaves service out when it is not set", () => {
-    const hello = buildHello({ instanceId: INSTANCE_ID, service: undefined, labels: {} });
+    const hello = buildHello({ instanceId: INSTANCE_ID, service: undefined, labels: {}, modules: ["debugger"] });
 
     expect(hello).not.toHaveProperty("service");
   });
@@ -41,7 +55,7 @@ describe("buildHello", () => {
       throw new Error("uv_os_gethostname returned ENOSYS");
     });
 
-    const hello = buildHello({ instanceId: INSTANCE_ID, service: undefined, labels: {} });
+    const hello = buildHello({ instanceId: INSTANCE_ID, service: undefined, labels: {}, modules: ["debugger"] });
 
     expect(hello.hostname).toBe("unknown");
   });

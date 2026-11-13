@@ -4,7 +4,7 @@ import type { ConnectorStatus } from "@micafox/protocol";
 import { vi } from "vitest";
 
 import type { FakeHub, FakeHubs, HubConnection } from "./fake-hub.js";
-import { HubConnector, type HubConnectorOptions } from "../../src/connector/index.js";
+import { HubConnector, MODULES_KEY, type HubConnectorOptions } from "../../src/connector/index.js";
 import type { LogContext, Logger } from "../../src/logger/index.js";
 
 /** One call of the app logger. */
@@ -34,6 +34,13 @@ const createRecordingLogger = (lines: LoggedLine[]): Logger => {
       lines.push({ level, message, context });
     };
   return { debug: record("debug"), info: record("info"), warn: record("warn"), error: record("error") };
+};
+
+/** Options that make the connector send `modules` in its hello, as the debugger does through the internal key. */
+export const withModules = (url: string, modules: unknown, rest: HubConnectorOptions = {}): HubConnectorOptions => {
+  // Not an object literal at the call, so the internal key is no excess property
+  const options = { ...rest, url, [MODULES_KEY]: modules };
+  return options;
 };
 
 /** Creates a connector that is closed after the test; its status handler is the first one added. */

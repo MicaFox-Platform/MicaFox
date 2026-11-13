@@ -38,7 +38,8 @@ export interface HubConnection {
   nextFrame(): Promise<string>;
   /** Resolves with the close code once the connection has closed. */
   readonly closed: Promise<number>;
-  sendWelcome(version?: number): void;
+  /** Sends a welcome of the SDK's protocol version listing `debugger`; `fields` replace or, as `undefined`, remove its fields. */
+  sendWelcome(fields?: { version?: number; modules?: unknown }): void;
 }
 
 /** A running fake hub. */
@@ -111,8 +112,8 @@ const createConnection = (socket: WebSocket, request: IncomingMessage): HubConne
     frames,
     nextFrame: () => arrivals.next(),
     closed,
-    sendWelcome: (version = PROTOCOL_VERSION) => {
-      socket.send(JSON.stringify({ version, type: "welcome", modules: ["debugger"] }));
+    sendWelcome: (fields = {}) => {
+      socket.send(JSON.stringify({ version: PROTOCOL_VERSION, type: "welcome", modules: ["debugger"], ...fields }));
     },
   };
 };

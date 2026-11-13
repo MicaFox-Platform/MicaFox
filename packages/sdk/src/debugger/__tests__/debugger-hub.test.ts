@@ -23,6 +23,7 @@ const createHub = (): {
 };
 
 const LOGGER_KEY = Symbol.for("micafox.logger");
+const MODULES_KEY = Symbol.for("micafox.modules");
 
 describe("Debugger.run() with the default connector", () => {
   it("creates a HubConnector from the hub options and connects it", () => {
@@ -48,6 +49,7 @@ describe("Debugger.run() with the default connector", () => {
           closeTimeoutMs: 1000,
           batch: { flushIntervalMs: 250 },
           [LOGGER_KEY]: expect.anything() as unknown,
+          [MODULES_KEY]: ["debugger"],
         },
       ],
       connects: 1,

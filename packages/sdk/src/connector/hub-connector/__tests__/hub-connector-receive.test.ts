@@ -126,9 +126,30 @@ describe("HubConnector receiving", () => {
     {
       name: "a message type only the SDK sends",
       send: (connection: HubConnection) => {
-        connection.socket.send('{"version":1,"type":"snapshot","breakpointId":"bp-1"}');
+        connection.socket.send('{"version":1,"module":"debugger","type":"snapshot","breakpointId":"bp-1"}');
       },
       warning: "ignored a snapshot message from the hub; only the SDK sends it",
+    },
+    {
+      name: "a message without a module",
+      send: (connection: HubConnection) => {
+        connection.socket.send('{"version":1,"type":"breakpoints","breakpoints":[]}');
+      },
+      warning: "ignored a message from the hub without a string module",
+    },
+    {
+      name: "a batch from the hub",
+      send: (connection: HubConnection) => {
+        connection.socket.send('{"version":1,"type":"batch","messages":[]}');
+      },
+      warning: "ignored a batch message from the hub; only the SDK sends it",
+    },
+    {
+      name: "a hello from the hub",
+      send: (connection: HubConnection) => {
+        connection.socket.send('{"version":1,"type":"hello"}');
+      },
+      warning: "ignored a hello message from the hub; only the SDK sends it",
     },
     {
       name: "a frame that is not valid JSON",
@@ -167,8 +188,13 @@ describe("HubConnector receiving", () => {
     },
     {
       name: "an unknown type",
-      frame: '{"version":1,"type":"future"}',
+      frame: '{"version":1,"module":"debugger","type":"future"}',
       debug: "ignored a message of an unknown type from the hub",
+    },
+    {
+      name: "a message of a module the session did not agree on",
+      frame: '{"version":1,"module":"errors","type":"breakpoints","breakpoints":[]}',
+      debug: "ignored a message of a module the session did not agree on",
     },
   ])("logs $name at debug and passes it to no handler", async ({ frame, debug }) => {
     const hub = await hubs.start();
