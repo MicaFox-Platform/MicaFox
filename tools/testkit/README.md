@@ -18,9 +18,11 @@ they are.
 - `src/requests.ts` — `fetchInARow()`.
 - `src/quote-app.ts` — what the framework examples share: a `QuoteApp` describes an app that serves `GET /quote`, and
   `startQuoteHub()`, `startQuoteApp()`, `fetchUntilCompleteSnapshot()` and `shutDownQuoteApp()` run it.
-- `src/fake-hub/` — the fake hub, run as its own process: `main.ts` serves, and `startHub()` and the Fastify example's
-  `dev:hub` run it by that path, `connection.ts` answers one app and prints
-  what it sends, `breakpoints.ts` reads the breakpoints to set.
+- `src/fake-hub/` — the fake hub, run as its own process: `main.ts` serves, and `startHub()` and the `start:hub` script
+  run it by that path, `connection.ts` answers one app and prints what it sends, `breakpoints.ts` reads the
+  breakpoints to set.
+- `test/` — `env-examples.test.ts`: the `.env.example` files and `start` scripts of the examples.
+- `.env.example` — the hub's port and one breakpoint for each example app.
 
 `readBreakpoints()` has unit tests in `src/fake-hub/__tests__/`; the rest of the kit is proven by the examples'
 end-to-end tests, which run on it.
@@ -34,12 +36,13 @@ It plays the hub side of [the protocol](../../docs/api/protocol.md#hello): it an
 breakpoints to set, prints every message it receives as one JSON line, the messages of a batch one by one, and prints
 `disconnected` once a connection closes, after its last message. It never prints headers or the token.
 
-| Variable               | Meaning                                                                          |
-| ---------------------- | -------------------------------------------------------------------------------- |
-| `PORT`                 | port, default `8787`; `0` picks a free one and prints it                         |
-| `HUB_TOKEN`            | when set, an upgrade without `Authorization: Bearer <HUB_TOKEN>` gets 401        |
-| `HUB_BREAKPOINTS`      | JSON array of breakpoints sent after `welcome`; wins over `HUB_BREAKPOINTS_FILE` |
-| `HUB_BREAKPOINTS_FILE` | path of a file that holds that JSON array; neither set → no breakpoints          |
+| Variable          | Meaning                                                                   |
+| ----------------- | ------------------------------------------------------------------------- |
+| `PORT`            | port, default `8787`; `0` picks a free one and prints it                  |
+| `HUB_TOKEN`       | when set, an upgrade without `Authorization: Bearer <HUB_TOKEN>` gets 401 |
+| `HUB_BREAKPOINTS` | JSON array of breakpoints sent after `welcome`; unset → no breakpoints    |
 
-To try an app by hand, `pnpm --filter @micafox/example-fastify dev:hub` starts it with the Fastify example's sample
-breakpoint: [Fastify](../../examples/frameworks/fastify/README.md#run-it-locally).
+`pnpm --filter @micafox/testkit start:hub` runs it by hand and reads a `.env` in this folder, if there is one. Copy
+`.env.example` to `.env` first: it sets `HUB_BREAKPOINTS` to one breakpoint for each example app, on the line marked
+`// breakpoint here`, and `test/env-examples.test.ts` fails when one moves. The tests never read `.env`. How to run the
+apps: [the examples' README](../../examples/README.md).

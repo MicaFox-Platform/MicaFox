@@ -1,5 +1,5 @@
 // A fake hub to try an app with and to test it end to end: it plays the hub side of docs/api/protocol.md#hello. It
-// answers a hello with welcome and the breakpoints of HUB_BREAKPOINTS or HUB_BREAKPOINTS_FILE (breakpoints.ts), and
+// answers a hello with welcome and the breakpoints of HUB_BREAKPOINTS (breakpoints.ts), and
 // prints every message it receives as one JSON line (connection.ts). Set HUB_TOKEN to accept only
 // `Authorization: Bearer <HUB_TOKEN>`; PORT=0 picks a free port. It never prints headers or the token.
 // Run it with `--conditions=@micafox/source --import tsx`.

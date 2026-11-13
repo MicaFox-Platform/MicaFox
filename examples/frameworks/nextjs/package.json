@@ -5,6 +5,7 @@
   "description": "Next.js app debugged by the built MicaFox SDK",
   "type": "module",
   "scripts": {
+    "start": "node --env-file-if-exists=.env node_modules/next/dist/bin/next start src --hostname 127.0.0.1",
     "build": "NEXT_TELEMETRY_DISABLED=1 next build src",
     "typecheck": "tsc -p src/tsconfig.json --noEmit",
     "test:build": "vitest run --config vitest.build.config.ts"

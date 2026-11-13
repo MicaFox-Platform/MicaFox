@@ -9,23 +9,23 @@ snapshot redacts secrets.
 `// breakpoint on the next line: <group>` shows how a snapshot encodes each kind of value and where its limits cut it.
 
 The fake hub of [`@micafox/testkit`](../../../tools/testkit/README.md#fake-hub) plays the hub: it sets breakpoints and
-prints what the app sends back. `pnpm dev:hub` starts it with the sample breakpoint of
-`src/hub/sample-breakpoints.json`.
+prints what the app sends back. `pnpm --filter @micafox/testkit start:hub` starts it with the breakpoint of its
+`.env.example`, on the return of `quote()`.
 
 ## Run it locally
 
-From the repository root, after `pnpm install`, start the fake hub in one terminal:
+From the repository root, after `pnpm install`, copy the `.env.example` of the hub and of the app to `.env`
+(`tools/testkit/` and this folder). Both are ignored by Git; the tests never read them. Start the fake hub in one terminal:
 
 ```sh
-pnpm --filter @micafox/example-fastify dev:hub
+pnpm --filter @micafox/testkit start:hub
 # listening on port 8787
 ```
 
-Then the app in another:
+Then the app in another; `pnpm --filter @micafox/example-fastify dev` is the same with `--watch`:
 
 ```sh
-MICAFOX_HUB_URL=ws://127.0.0.1:8787/micafox MICAFOX_SERVICE=demo MICAFOX_LOG_LEVEL=info \
-  pnpm --filter @micafox/example-fastify dev
+pnpm --filter @micafox/example-fastify start
 ```
 
 The app logs JSON lines through Fastify's pino, the SDK's `[micafox]` lines among them. The hub prints every message

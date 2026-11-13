@@ -1,5 +1,5 @@
 // The end-to-end test kit of the examples: they start their apps and the fake hub as real child processes and wait
-// on what each prints. The fake hub itself runs from fake-hub/main.ts, started by startHub() or a `dev:hub` script.
+// on what each prints. The fake hub itself runs from fake-hub/main.ts, started by startHub() or the `start:hub` script.
 
 export { ChildProcessRun, parseJsonLine, readType, type Exit } from "./child-process-run.js";
 export { readStatus, startHub, waitForStatus, type HubOptions } from "./hub.js";

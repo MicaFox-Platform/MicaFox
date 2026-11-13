@@ -15,16 +15,13 @@ export interface HubOptions {
   port?: number;
   /** `HUB_TOKEN`. */
   token?: string;
-  /** `HUB_BREAKPOINTS`, as JSON; wins over `breakpointsFile`. */
+  /** `HUB_BREAKPOINTS`, as JSON. */
   breakpoints?: unknown[];
-  /** `HUB_BREAKPOINTS_FILE`: the absolute path of a JSON array of breakpoints. */
-  breakpointsFile?: string;
 }
 
 const HUB_VARIABLES: ReadonlyArray<[keyof HubOptions, string]> = [
   ["port", "PORT"],
   ["token", "HUB_TOKEN"],
-  ["breakpointsFile", "HUB_BREAKPOINTS_FILE"],
 ];
 
 /** Starts the fake hub; resolves once it listens. */

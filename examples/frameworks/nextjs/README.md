@@ -37,14 +37,17 @@ pnpm build                                       # the SDK, the protocol, then t
 pnpm --filter @micafox/example-nextjs test:build # the end-to-end tests
 ```
 
-To try the app by hand, start [the kit's fake hub](../../../tools/testkit/README.md#fake-hub), run the app with
-`MICAFOX_HUB_URL` set, and send a request:
+To try the app by hand, copy `.env.example` to `.env`, start [the kit's fake hub](../../../tools/testkit/README.md#fake-hub),
+whose `.env.example` sets a breakpoint on the handler, and run the app on port 3003. The breakpoint stays `pending`, as
+above.
 
 ```sh
-pnpm --filter @micafox/example-fastify dev:hub
-MICAFOX_HUB_URL=ws://127.0.0.1:8787/micafox pnpm --filter @micafox/example-nextjs exec next start src --port 3000
-curl 'http://127.0.0.1:3000/quote?sku=SKU-2&quantity=3'
+pnpm --filter @micafox/testkit start:hub
+pnpm --filter @micafox/example-nextjs start
+curl 'http://127.0.0.1:3003/quote?sku=SKU-2&quantity=3'
 ```
+
+More in [the examples' README](../../README.md).
 
 The tests run in `pnpm verify` through `pnpm test:build`, after `pnpm build`; `pnpm test` skips them, since they need
 the build.

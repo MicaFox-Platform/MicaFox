@@ -4,6 +4,9 @@
   "private": true,
   "description": "End-to-end test kit of the MicaFox examples: the child-process runner, harness helpers and a fake hub",
   "type": "module",
+  "scripts": {
+    "start:hub": "node --env-file-if-exists=.env --conditions=@micafox/source --import tsx src/fake-hub/main.ts"
+  },
   "exports": {
     ".": "./src/index.ts"
   },

@@ -5,8 +5,8 @@
   "description": "Demo app for the MicaFox SDK",
   "type": "module",
   "scripts": {
-    "dev": "tsx --conditions=@micafox/source --watch src/index.ts",
-    "dev:hub": "HUB_BREAKPOINTS_FILE=src/hub/sample-breakpoints.json tsx --conditions=@micafox/source node_modules/@micafox/testkit/src/fake-hub/main.ts",
+    "start": "tsx --conditions=@micafox/source --env-file-if-exists=.env src/index.ts",
+    "dev": "tsx --conditions=@micafox/source --env-file-if-exists=.env --watch src/index.ts",
     "build": "rm -rf ./dist && tsc -b",
     "typecheck": "tsc -b",
     "test": "vitest run"
