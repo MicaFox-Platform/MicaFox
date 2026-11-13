@@ -1,8 +1,9 @@
 # @micafox/testkit
 
-The end-to-end test kit of the examples: it starts their apps and one fake hub as real child processes and waits on
-what each prints. Private and never published; only `examples/*` depend on it, and ESLint keeps it out of
-`packages/`. It is never built: it exports its TypeScript sources, which Vitest and tsx run as they are.
+The end-to-end test kit of the examples: it starts their apps and one fake hub as real child processes and waits on what
+each prints. Private and never published; only the examples (`examples/*`, `examples/frameworks/*`) depend on it, and
+ESLint keeps it out of `packages/`. It is never built: it exports its TypeScript sources, which Vitest and tsx run as
+they are.
 
 ## Layout
 
@@ -15,7 +16,9 @@ what each prints. Private and never published; only `examples/*` depend on it, a
   `--conditions=@micafox/source --import tsx`, so it never reads a stale build of the protocol.
 - `src/markers.ts` — `findMarkerLine()`: the line a test sets its breakpoint on, found by a marker comment.
 - `src/requests.ts` — `fetchInARow()`.
-- `src/fake-hub/` — the fake hub, run as its own process: `main.ts` serves, and `startHub()` and node-basic's
+- `src/quote-app.ts` — what the framework examples share: a `QuoteApp` describes an app that serves `GET /quote`, and
+  `startQuoteHub()`, `startQuoteApp()`, `fetchUntilCompleteSnapshot()` and `shutDownQuoteApp()` run it.
+- `src/fake-hub/` — the fake hub, run as its own process: `main.ts` serves, and `startHub()` and the Fastify example's
   `dev:hub` run it by that path, `connection.ts` answers one app and prints
   what it sends, `breakpoints.ts` reads the breakpoints to set.
 
@@ -38,5 +41,5 @@ breakpoints to set, prints every message it receives as one JSON line, the messa
 | `HUB_BREAKPOINTS`      | JSON array of breakpoints sent after `welcome`; wins over `HUB_BREAKPOINTS_FILE` |
 | `HUB_BREAKPOINTS_FILE` | path of a file that holds that JSON array; neither set → no breakpoints          |
 
-To try an app by hand, `pnpm --filter @micafox/node-basic dev:hub` starts it with node-basic's sample breakpoint:
-[node-basic](../../examples/node-basic/README.md#run-it-locally).
+To try an app by hand, `pnpm --filter @micafox/example-fastify dev:hub` starts it with the Fastify example's sample
+breakpoint: [Fastify](../../examples/frameworks/fastify/README.md#run-it-locally).
