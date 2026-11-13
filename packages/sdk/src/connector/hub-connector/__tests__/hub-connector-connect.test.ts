@@ -3,7 +3,7 @@ import { hostname } from "node:os";
 import { describe, expect, it, vi } from "vitest";
 
 import { useFakeHubs } from "../../../../test/connector/fake-hub.js";
-import { createHarness, parseFrame, settle } from "../../../../test/connector/harness.js";
+import { createHarness, parseFrame, settle, withModules } from "../../../../test/connector/harness.js";
 import type { HubConnectorOptions } from "../../options/index.js";
 import { SDK_VERSION } from "../../session/version.js";
 
@@ -257,5 +257,85 @@ describe("HubConnector connect() with an invalid target", () => {
     const request = await hub.nextRequest();
 
     expect(request.url).toBe("/micafox");
+  });
+});
+
+describe("HubConnector modules", () => {
+  const hubs = useFakeHubs();
+
+  it('sends the modules handed over under Symbol.for("micafox.modules") in the hello', async () => {
+    const hub = await hubs.start();
+    const { connector } = createHarness(hubs, withModules(hub.url, ["debugger", "errors"]));
+
+    connector.connect();
+    const frame = await (await hub.nextConnection()).nextFrame();
+
+    expect(parseFrame(frame).modules).toEqual(["debugger", "errors"]);
+  });
+
+  it("warns once and sends debugger when the handed modules are not a non-empty array of strings", async () => {
+    const hub = await hubs.start();
+    const { connector, messagesAt } = createHarness(hubs, withModules(hub.url, []));
+
+    connector.connect();
+    const frame = await (await hub.nextConnection()).nextFrame();
+
+    expect({ modules: parseFrame(frame).modules, warnings: messagesAt("warn") }).toEqual({
+      modules: ["debugger"],
+      warnings: [
+        'the value under Symbol.for("micafox.modules") is not a non-empty array of strings; using ["debugger"]',
+      ],
+    });
+  });
+
+  it("logs no module warning when the hub accepts every module", async () => {
+    const hub = await hubs.start();
+    const { connector, nextStatus, messagesAt } = createHarness(hubs, { url: hub.url });
+    const connected = nextStatus("connected");
+    connector.connect();
+    const connection = await hub.nextConnection();
+    await connection.nextFrame();
+
+    connection.sendWelcome({ modules: ["debugger"] });
+    await connected;
+
+    expect(messagesAt("warn")).toEqual([]);
+  });
+
+  it("warns for each hello module the hub left out, and still connects", async () => {
+    const hub = await hubs.start();
+    const { connector, nextStatus, messagesAt } = createHarness(
+      hubs,
+      withModules(hub.url, ["debugger", "errors", "logpoints"]),
+    );
+    const connected = nextStatus("connected");
+    connector.connect();
+    const connection = await hub.nextConnection();
+    await connection.nextFrame();
+
+    connection.sendWelcome({ modules: ["errors", "metrics", 7] });
+    await connected;
+
+    expect(messagesAt("warn")).toEqual([
+      "the hub did not accept the module debugger; its messages are dropped",
+      "the hub did not accept the module logpoints; its messages are dropped",
+    ]);
+  });
+
+  it("reaches connected on a welcome with no modules and warns that the debugger was left out", async () => {
+    const hub = await hubs.start();
+    const { connector, statuses, nextStatus, messagesAt } = createHarness(hubs, { url: hub.url });
+    const connected = nextStatus("connected");
+    connector.connect();
+    const connection = await hub.nextConnection();
+    await connection.nextFrame();
+
+    connection.sendWelcome({ modules: [] });
+    await connected;
+
+    expect({ statuses, warnings: messagesAt("warn") }).toEqual({
+      statuses: ["connecting", "connected"],
+      warnings: ["the hub did not accept the module debugger; its messages are dropped"],
+    });
   });
 });

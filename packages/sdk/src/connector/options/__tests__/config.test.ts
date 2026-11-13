@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createLogger, SdkLogger, type Logger } from "../../../logger/index.js";
-import { LOGGER_KEY, resolveConnectorConfig } from "../config.js";
+import { LOGGER_KEY, MODULES_KEY, resolveConnectorConfig } from "../config.js";
 
 type Call = [level: string, ...args: unknown[]];
 
@@ -236,6 +236,7 @@ describe("resolveConnectorConfig with hostile options", () => {
         "labels",
         "reconnect",
         "closeTimeoutMs",
+        "Symbol(micafox.modules)",
       ].map((name) => `[micafox] connector: ${name} could not be read; it is ignored`),
     });
   });
@@ -427,6 +428,67 @@ describe("resolveConnectorConfig labels", () => {
       labels: {},
       warnings: ["[micafox] connector: labels must be an object of strings; using no labels"],
     });
+  });
+});
+
+// Index 1 is a hole, which `every` would skip
+const HOLEY = new Array<unknown>(3);
+HOLEY[0] = "debugger";
+HOLEY[2] = "errors";
+
+describe("resolveConnectorConfig modules", () => {
+  it("uses debugger when the app created the connector", () => {
+    const { config, warnings } = resolve({});
+
+    expect({ modules: config.modules, warnings }).toEqual({ modules: ["debugger"], warnings: [] });
+  });
+
+  it("uses the modules handed over, as a copy", () => {
+    const handed = ["debugger", "errors"];
+
+    const { config, warnings } = resolve({ [MODULES_KEY]: handed });
+    handed.push("logpoints");
+
+    expect({ modules: config.modules, warnings }).toEqual({ modules: ["debugger", "errors"], warnings: [] });
+  });
+
+  it.each([
+    { name: "a string", value: "debugger" },
+    { name: "an empty array", value: [] },
+    { name: "an array with a number", value: ["debugger", 1] },
+    { name: "an array with a hole", value: HOLEY },
+    { name: "null", value: null },
+    { name: "an object", value: { 0: "debugger", length: 1 } },
+  ])("warns and uses debugger when the handed value is $name", ({ value }) => {
+    const { config, warnings } = resolve({ [MODULES_KEY]: value });
+
+    expect({ modules: config.modules, warnings }).toEqual({
+      modules: ["debugger"],
+      warnings: [
+        '[micafox] connector: the value under Symbol.for("micafox.modules") is not a non-empty array of strings; using ["debugger"]',
+      ],
+    });
+  });
+
+  it("warns and uses debugger when reading the handed array throws", () => {
+    const hostile = new Proxy(["debugger"], {
+      get: () => {
+        throw new Error("hostile get");
+      },
+    });
+
+    const { config, warnings } = resolve({ [MODULES_KEY]: hostile });
+
+    expect({ modules: config.modules, warnings: warnings.length }).toEqual({ modules: ["debugger"], warnings: 1 });
+  });
+
+  it("lets two connectors hold lists of their own", () => {
+    const first = resolve({ [MODULES_KEY]: ["errors"] }).config;
+    const second = resolve({}).config;
+
+    first.modules.push("x");
+
+    expect(second.modules).toEqual(["debugger"]);
   });
 });
 

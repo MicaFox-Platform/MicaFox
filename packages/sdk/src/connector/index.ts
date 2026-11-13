@@ -5,6 +5,7 @@ export { HubConnector } from "./hub-connector/index.js";
 export {
   isRecord,
   LOGGER_KEY,
+  MODULES_KEY,
   readEnv,
   readField,
   resolveOptions,

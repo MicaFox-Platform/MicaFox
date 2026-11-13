@@ -7,11 +7,18 @@ import { describeClose, describeError, describeStatus, type AttemptFailure } fro
 import { Heartbeat } from "./heartbeat.js";
 import type { HubTarget } from "./hub-url.js";
 import { readErrorCode } from "../../logger/index.js";
-import { checkFirstFrame, readHubFrame, type HubFrame, type IgnoredFrame } from "../session/index.js";
+import {
+  checkFirstFrame,
+  readHubFrame,
+  type HubFrame,
+  type IgnoredFrame,
+  type ModuleAgreement,
+} from "../session/index.js";
 
 /** What an attempt tells its connector. */
 export interface AttemptEvents {
-  onWelcome(): void;
+  /** The hub has accepted the session; `modules` says which of the `hello` modules it carries. */
+  onWelcome(modules: ModuleAgreement): void;
   /** A message from the hub after `welcome`, of a type the hub sends. */
   onMessage(message: Message): void;
   /** A frame after `welcome` that is dropped; the connector logs it. */
@@ -82,7 +89,8 @@ export class Attempt {
   private readonly socket: WebSocket;
   private readonly heartbeat: Heartbeat;
   private hasEnded = false;
-  private isWelcomed = false;
+  // The modules the session carries; set by `welcome`
+  private agreed: ReadonlySet<string> | undefined;
   private welcomeTimer: NodeJS.Timeout | undefined;
 
   /** Opens the socket; throws only when ws rejects the options, before any I/O. */
@@ -179,7 +187,7 @@ export class Attempt {
         resolve();
       });
     });
-    if (this.socket.readyState === WebSocket.OPEN && this.isWelcomed) {
+    if (this.socket.readyState === WebSocket.OPEN && this.isWelcomed()) {
       this.socket.close(1000);
     } else if (this.socket.readyState !== WebSocket.CLOSING) {
       this.socket.terminate();
@@ -217,6 +225,10 @@ export class Attempt {
     this.events.onEnd(failure);
   }
 
+  private isWelcomed(): boolean {
+    return this.agreed !== undefined;
+  }
+
   private clearTimers(): void {
     clearTimeout(this.welcomeTimer);
     this.heartbeat.stop();
@@ -229,7 +241,7 @@ export class Attempt {
       return;
     }
 
-    if (this.isWelcomed) {
+    if (this.isWelcomed()) {
       this.end(describeError("warn", "the connection to the hub dropped", { key: "hub-dropped", error }));
       return;
     }
@@ -273,20 +285,20 @@ export class Attempt {
 
     this.heartbeat.onActivity();
     const text = toText(data, isBinary);
-    if (this.isWelcomed) {
-      this.onHubFrame(readHubFrame(text));
+    if (this.agreed !== undefined) {
+      this.onHubFrame(readHubFrame(text, this.agreed));
       return;
     }
 
-    const check = checkFirstFrame(text);
+    const check = checkFirstFrame(text, this.settings.hello.modules);
     if (!check.ok) {
       this.rejectSession(check.reason);
       return;
     }
 
-    this.isWelcomed = true;
+    this.agreed = check.agreed;
     clearTimeout(this.welcomeTimer);
-    this.events.onWelcome();
+    this.events.onWelcome({ agreed: check.agreed, refused: check.refused });
   }
 
   private onHubFrame(frame: HubFrame): void {

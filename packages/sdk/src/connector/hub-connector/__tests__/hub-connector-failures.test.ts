@@ -39,6 +39,8 @@ describe("HubConnector failures before welcome", () => {
     { name: "a message other than welcome", frame: '{"version":1,"type":"breakpoints","breakpoints":[]}' },
     { name: "a frame that is not JSON", frame: "hello hub" },
     { name: "a welcome of another protocol version", frame: '{"version":2,"type":"welcome"}' },
+    { name: "a welcome without modules", frame: '{"version":1,"type":"welcome"}' },
+    { name: "a welcome whose modules are not an array", frame: '{"version":1,"type":"welcome","modules":"debugger"}' },
   ])("closes with protocolError, logs an error and waits the longest delay after $name", async ({ frame }) => {
     const hub = await hubs.start();
     const { harness, connection } = await connectAndHello(hub);

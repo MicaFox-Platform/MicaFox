@@ -13,7 +13,7 @@ import {
 } from "../connection/index.js";
 import { resolveConnectorConfig, type HubConnectorOptions, type ResolvedConnectorOptions } from "../options/index.js";
 import { Batcher } from "../outbound/index.js";
-import { buildHello } from "../session/index.js";
+import { buildHello, type ModuleAgreement } from "../session/index.js";
 
 const COMPONENT = "connector";
 
@@ -25,6 +25,8 @@ const doNothing = (): void => {
 export class HubConnector implements Connector {
   private readonly options: ResolvedConnectorOptions;
   private readonly logger: SdkLogger;
+  // What `hello` lists, the same on every connection
+  private readonly modules: readonly string[];
   // One per connector, the same across reconnects, so the hub can tell a reconnect from a new instance
   private readonly instanceId = randomUUID();
   private readonly backoff: Backoff;
@@ -33,6 +35,8 @@ export class HubConnector implements Connector {
   private readonly attemptEvents: AttemptEvents;
   private readonly batcher: Batcher;
   private status: ConnectorStatus = "disconnected";
+  // The modules the current session carries, from its `welcome`
+  private agreedModules: ReadonlySet<string> = new Set();
   private hasStarted = false;
   private target: HubTarget | undefined;
   private attempt: Attempt | undefined;
@@ -43,9 +47,10 @@ export class HubConnector implements Connector {
 
   /** Resolves the options once; does no I/O until `connect()`. */
   constructor(options?: HubConnectorOptions) {
-    const { options: resolved, logger } = resolveConnectorConfig(options);
+    const { options: resolved, logger, modules } = resolveConnectorConfig(options);
     this.options = resolved;
     this.logger = logger;
+    this.modules = modules;
     this.backoff = new Backoff(resolved.reconnect.minDelayMs, resolved.reconnect.maxDelayMs);
     this.statusHandlers = new HandlerList((error) => {
       this.logger.log("error", "a status handler threw", { component: COMPONENT, error });
@@ -61,8 +66,8 @@ export class HubConnector implements Connector {
       },
     });
     this.attemptEvents = {
-      onWelcome: () => {
-        this.onWelcome();
+      onWelcome: (agreement) => {
+        this.onWelcome(agreement);
       },
       onMessage: (message) => {
         this.deliver(message);
@@ -181,7 +186,7 @@ export class HubConnector implements Connector {
       this.endFlush = resolve;
     });
     try {
-      await Promise.race([this.batcher.drain(attempt), cutOff]);
+      await Promise.race([this.batcher.drain(attempt, this.agreedModules), cutOff]);
     } finally {
       clearTimeout(timer);
       this.endFlush = undefined;
@@ -218,7 +223,7 @@ export class HubConnector implements Connector {
     }
 
     const { token, service, labels } = this.options;
-    const hello = buildHello({ instanceId: this.instanceId, service, labels });
+    const hello = buildHello({ instanceId: this.instanceId, service, labels, modules: this.modules });
     this.log("debug", `connecting to the hub at ${this.target.description}`, "connecting");
     try {
       this.attempt = new Attempt({ target: this.target, token, hello }, this.attemptEvents);
@@ -230,17 +235,26 @@ export class HubConnector implements Connector {
     }
   }
 
-  private onWelcome(): void {
+  private onWelcome({ agreed, refused }: ModuleAgreement): void {
     if (this.isClosing()) {
       return;
     }
 
+    this.agreedModules = agreed;
     this.backoff.reset();
+    for (const module of refused) {
+      this.log(
+        "warn",
+        `the hub did not accept the module ${module}; its messages are dropped`,
+        `module-refused:${module}`,
+      );
+    }
+
     this.log("info", `connected to the hub at ${this.target?.description ?? "?"}`, "connected");
     this.setStatus("connected");
     // A status handler may have called close()
     if (!this.isClosing() && this.attempt !== undefined) {
-      this.batcher.attach(this.attempt);
+      this.batcher.attach(this.attempt, this.agreedModules);
     }
   }
 
@@ -262,6 +276,7 @@ export class HubConnector implements Connector {
     }
 
     this.attempt = undefined;
+    this.agreedModules = new Set();
     this.batcher.detach();
     try {
       this.log(failure.level, failure.message, failure.key);

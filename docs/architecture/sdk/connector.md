@@ -85,10 +85,11 @@ packages/sdk/src/connector/
 │   ├── attempt-failure.ts  why an attempt ended, without secrets
 │   ├── hub-url.ts          checks the URL and the token before any connect
 │   └── heartbeat.ts        liveness pings and the dead-connection timeout
-├── session/                what is said on a connection: the handshake and the version check
+├── session/                what is said on a connection: the handshake, the version check and the modules
 │   ├── hello.ts            the hello sent first on every connection
 │   ├── version.ts          the SDK version sent in hello
-│   ├── welcome.ts          checks the first frame from the hub
+│   ├── modules.ts          the modules the SDK knows, their message types, and the agreement on a session's modules
+│   ├── welcome.ts          checks the first frame from the hub and agrees on the session's modules
 │   └── inbound.ts          reads every later frame from the hub
 └── outbound/               messages on their way to the hub
     ├── batcher.ts          serializes, queues and writes batches under the rate limit
@@ -166,7 +167,8 @@ other folder.
    `modules` array, closes the socket with `protocolError`, logs an error and counts as a failed attempt: the delay
    jumps to `reconnect.maxDelayMs`. From `welcome.modules` the connector keeps, for the session, the first 32
    entries that are strings and names its `hello` listed; for each module of its `hello` left out it logs one
-   warning. `welcome` is not passed to handlers; a later one is ignored at `debug`.
+   warning per session; the [logger](logger.md#collapsing-repeats) collapses the repeats of reconnects close together.
+   `welcome` is not passed to handlers; a later one is ignored at `debug`.
 3. After `welcome`, a binary frame, a frame that is not valid JSON, or has no numeric `version` or no string `type`
    is logged as a warning and ignored.
 4. A message whose `version` is not `PROTOCOL_VERSION` closes the session with `protocolError` and an error, like a

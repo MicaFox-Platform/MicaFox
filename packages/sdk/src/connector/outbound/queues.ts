@@ -5,6 +5,8 @@ import { Fifo } from "./fifo.js";
 /** One serialized message waiting to be sent. */
 export interface QueuedMessage {
   text: string;
+  /** The message's `module`; `undefined` when it has none, so no session carries it. */
+  module: string | undefined;
   /** UTF-8 size of `text`. */
   bytes: number;
 }
@@ -28,9 +30,12 @@ export interface OutgoingFrame {
   bytes: number;
 }
 
+// `controlCount` and `dataCount` count the messages the batch takes out of the queues, those of modules the session
+// did not agree on included; `sentCount` and `bytes` are what is written
 interface BatchPlan {
   controlCount: number;
   dataCount: number;
+  sentCount: number;
   bytes: number;
 }
 
@@ -67,6 +72,9 @@ const takeFirstControl = (queue: Map<string, QueuedMessage>, count: number): Que
 
 const takeFirstData = (queue: Fifo<QueuedMessage>, count: number): QueuedMessage[] =>
   Array.from({ length: count }, () => queue.shift()).filter((message) => message !== undefined);
+
+const isAgreed = (message: QueuedMessage, modules: ReadonlySet<string>): boolean =>
+  message.module !== undefined && modules.has(message.module);
 
 const sumBytes = (messages: readonly QueuedMessage[]): number =>
   messages.reduce((total, message) => total + message.bytes, 0);
@@ -151,14 +159,22 @@ export class SendQueues {
     return count;
   }
 
-  /** The size of the frame `takeBatch()` would return now; `undefined` when nothing is waiting. */
-  peekBatchBytes(): number | undefined {
-    return this.planBatch()?.bytes;
+  /**
+   * The size of the frame `takeBatch()` would return now for a session that carries `modules`; `undefined` when
+   * nothing of those modules is waiting.
+   */
+  peekBatchBytes(modules: ReadonlySet<string>): number | undefined {
+    const plan = this.planBatch(modules);
+    return plan === undefined || plan.sentCount === 0 ? undefined : plan.bytes;
   }
 
-  /** Removes the next batch from the queues: control messages first, then data, up to the batch limits. */
-  takeBatch(): OutgoingFrame | undefined {
-    const plan = this.planBatch();
+  /**
+   * Removes the next batch from the queues: control messages first, then data, up to the batch limits. A message of a
+   * module outside `modules` is removed and left out of the frame (ADR 0017); `undefined` when nothing is left to
+   * send, which also removes everything that is waiting when none of it is of those modules.
+   */
+  takeBatch(modules: ReadonlySet<string>): OutgoingFrame | undefined {
+    const plan = this.planBatch(modules);
     if (plan === undefined) {
       return undefined;
     }
@@ -167,28 +183,40 @@ export class SendQueues {
     const data = takeFirstData(this.data, plan.dataCount);
     this.controlBytes -= sumBytes(control);
     this.dataBytes -= sumBytes(data);
-    const texts = [...control, ...data].map((message) => message.text);
+    const texts = [...control, ...data].filter((message) => isAgreed(message, modules)).map((message) => message.text);
+    if (texts.length === 0) {
+      return undefined;
+    }
+
     const text = texts.length === 1 ? texts.join("") : `${FRAME_START}${texts.join(",")}${FRAME_END}`;
     return { text, bytes: plan.bytes };
   }
 
   // A batch is a prefix of the control queue, then a prefix of the data buffer: it stops at the first message that
-  // does not fit. The first message always fits, so one larger than `batch.maxBytes` goes on its own. O(batch size).
-  private planBatch(): BatchPlan | undefined {
-    const plan: BatchPlan = { controlCount: 0, dataCount: 0, bytes: 0 };
+  // does not fit. The first message always fits, so one larger than `batch.maxBytes` goes on its own. A message of a
+  // module the session did not agree on is part of the prefix but takes no room. O(skipped prefix + batch size),
+  // at most the queues' limits: the skipped messages are removed by the next takeBatch().
+  private planBatch(modules: ReadonlySet<string>): BatchPlan | undefined {
+    const plan: BatchPlan = { controlCount: 0, dataCount: 0, sentCount: 0, bytes: 0 };
     let messageBytes = 0;
     for (const [queue, field] of [
       [this.control.values(), "controlCount"],
       [this.data, "dataCount"],
     ] as const) {
       for (const message of queue) {
-        const count = plan.controlCount + plan.dataCount + 1;
+        if (!isAgreed(message, modules)) {
+          plan[field] += 1;
+          continue;
+        }
+
+        const count = plan.sentCount + 1;
         const bytes = toFrameBytes(count, messageBytes + message.bytes);
         if (count > 1 && (count > this.batch.maxMessages || bytes > this.batch.maxBytes)) {
           return plan;
         }
 
         plan[field] += 1;
+        plan.sentCount = count;
         plan.bytes = bytes;
         messageBytes += message.bytes;
       }

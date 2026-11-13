@@ -5,10 +5,21 @@ import { createLogger, SdkLogger, type Environment, type Logger } from "../../lo
 /** The key under which the debugger hands its logger to the `HubConnector` it creates; not in `HubConnectorOptions`. */
 export const LOGGER_KEY: unique symbol = Symbol.for("micafox.logger");
 
-/** The connector's options and logger, resolved once when it is created. */
+/**
+ * The key under which the debugger hands the modules it runs to the `HubConnector` it creates, which sends them in
+ * `hello`; not in `HubConnectorOptions`.
+ */
+export const MODULES_KEY: unique symbol = Symbol.for("micafox.modules");
+
+/** The modules a `HubConnector` sends in `hello` when the app created it, or when the SDK handed over something else. */
+const DEFAULT_MODULES: readonly string[] = ["debugger"];
+
+/** The connector's options, logger and modules, resolved once when it is created. */
 export interface ConnectorConfig {
   options: ResolvedConnectorOptions;
   logger: SdkLogger;
+  /** The modules `hello` lists. */
+  modules: string[];
 }
 
 /** What `resolveConnectorConfig()` needs from outside. */
@@ -55,6 +66,39 @@ const chooseLogger = (
   return logger;
 };
 
+// A copy of `value` when it is a non-empty array of strings. Reading it may throw when it is a Proxy or has a getter;
+// Array.from turns a hole into `undefined`, which `every` would skip.
+const copyModuleList = (value: unknown): string[] | undefined => {
+  try {
+    if (!Array.isArray(value)) {
+      return undefined;
+    }
+
+    const entries: unknown[] = Array.from(value);
+    return entries.length > 0 && entries.every((entry): entry is string => typeof entry === "string")
+      ? entries
+      : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+// Anything but a non-empty array of strings falls back to the default
+const chooseModules = (options: object | undefined, warn: Warn): string[] => {
+  const handed = readField(options, MODULES_KEY, warn);
+  if (handed === undefined) {
+    return [...DEFAULT_MODULES];
+  }
+
+  const modules = copyModuleList(handed);
+  if (modules === undefined) {
+    warn('the value under Symbol.for("micafox.modules") is not a non-empty array of strings; using ["debugger"]');
+    return [...DEFAULT_MODULES];
+  }
+
+  return modules;
+};
+
 /**
  * Resolves `HubConnectorOptions` and sets up the connector's logger. Never throws: an invalid value logs a warning
  * and its default is used. Changes to `env` or to the options afterwards have no effect.
@@ -83,5 +127,5 @@ export const resolveConnectorConfig = (
     warn(message);
   }
 
-  return { options: resolveOptions(fields, { env, warn }), logger };
+  return { options: resolveOptions(fields, { env, warn }), logger, modules: chooseModules(fields, warn) };
 };

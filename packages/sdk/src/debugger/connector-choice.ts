@@ -5,6 +5,7 @@ import {
   checkHubTarget,
   isRecord,
   LOGGER_KEY,
+  MODULES_KEY,
   readField,
   resolveOptions,
   type HubConnectorOptions,
@@ -14,6 +15,8 @@ import {
 import type { Environment, SdkLogger } from "../logger/index.js";
 
 const COMPONENT = "debugger";
+// The module this SDK part runs, which the connector sends in `hello`
+const MODULE = "debugger";
 
 /** The connector one `run()` uses, and what the "started" line calls it. */
 export interface ConnectorChoice {
@@ -60,7 +63,7 @@ const readTuning = (value: unknown, warn: Warn): Record<string, unknown> => {
 
 /**
  * The options of the `HubConnector` that `run()` creates: the hub fields as configured, the tuning of `hubConnector`
- * and the debugger's logger under the key the connector reads (docs/architecture/sdk/logger.md#interactions).
+ * and the debugger's logger and its module under the keys the connector reads (docs/architecture/sdk/logger.md#interactions).
  */
 const createHubOptions = (options: ConfiguredOptions, { logger, warn }: ChoiceContext): HubConnectorOptions => {
   const hubOptions = {
@@ -70,6 +73,7 @@ const createHubOptions = (options: ConfiguredOptions, { logger, warn }: ChoiceCo
     service: options.service,
     labels: options.labels,
     [LOGGER_KEY]: logger,
+    [MODULES_KEY]: [MODULE],
   };
   // Safe: the fields are as the app passed them, and the connector validates each one itself
   return hubOptions as HubConnectorOptions;

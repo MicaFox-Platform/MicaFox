@@ -34,8 +34,9 @@ export interface BatcherDependencies {
 type Serialized = { ok: true; text: string } | { ok: false; code: string | undefined };
 
 const COMPONENT = "connector";
-// Snapshots are data; every other type, including one added later, is control
-const DATA_TYPES: ReadonlySet<string> = new Set(["snapshot"]);
+// The debugger's snapshots are data; every other message, including one a module adds later, is control. Types are
+// unique within a module only, so the module is part of the name.
+const DATA_MESSAGES: ReadonlySet<string> = new Set(["debugger/snapshot"]);
 
 // Read defensively: an app in plain JavaScript can pass anything
 const readMessageField = (message: unknown, name: string): unknown =>
@@ -61,6 +62,8 @@ export class Batcher {
   private readonly queues: SendQueues;
   private readonly bucket: TokenBucket;
   private target: BatchTarget | undefined;
+  // The modules the attached session carries; what a batch takes from other modules is dropped
+  private modules: ReadonlySet<string> = new Set();
   private timer: NodeJS.Timeout | undefined;
   private immediate: NodeJS.Immediate | undefined;
   private isWaitingForWrite = false;
@@ -91,25 +94,32 @@ export class Batcher {
       return;
     }
 
-    const queued = { text: serialized.text, bytes: Buffer.byteLength(serialized.text) };
-    if (typeof type === "string" && DATA_TYPES.has(type)) {
+    const module = readMessageField(message, "module");
+    const queued = {
+      text: serialized.text,
+      module: typeof module === "string" ? module : undefined,
+      bytes: Buffer.byteLength(serialized.text),
+    };
+    if (typeof module === "string" && typeof type === "string" && DATA_MESSAGES.has(`${module}/${type}`)) {
       this.reportData(this.queues.addData(queued));
     } else {
-      this.reportControl(this.queues.addControl(this.toControlKey(message, type), queued));
+      this.reportControl(this.queues.addControl(this.toControlKey(message, queued.module, type), queued));
     }
 
     this.schedule();
   }
 
-  /** Starts writing to `target`, the attempt the hub has just welcomed. */
-  attach(target: BatchTarget): void {
+  /** Starts writing to `target`, the attempt the hub has just welcomed; only messages of `modules` are sent. */
+  attach(target: BatchTarget, modules: ReadonlySet<string>): void {
     this.target = target;
+    this.modules = modules;
     this.schedule();
   }
 
   /** Stops writing: queued messages wait for the next `attach()`, and a pending `drain()` resolves. */
   detach(): void {
     this.target = undefined;
+    this.modules = new Set();
     this.isWaitingForWrite = false;
     this.clearTimers();
     this.onDrained?.();
@@ -120,10 +130,11 @@ export class Batcher {
    * For `close()`: writes everything queued to `target` at once, within the rate limit and the socket's backpressure.
    * Resolves once nothing is left or the socket is no longer open; the caller bounds how long it waits.
    */
-  drain(target: BatchTarget): Promise<void> {
+  drain(target: BatchTarget, modules: ReadonlySet<string>): Promise<void> {
     this.clearTimers();
     this.isWaitingForWrite = false;
     this.target = target;
+    this.modules = modules;
     return new Promise((resolve) => {
       this.onDrained = resolve;
       this.flushSafely();
@@ -136,10 +147,10 @@ export class Batcher {
   }
 
   // A breakpoint's newer status takes the place of its queued one; every other control message is kept on its own
-  private toControlKey(message: Message, type: unknown): string {
+  private toControlKey(message: Message, module: string | undefined, type: unknown): string {
     const breakpointId = type === "breakpointStatus" ? readMessageField(message, "breakpointId") : undefined;
-    if (typeof breakpointId === "string") {
-      return `breakpointStatus:${breakpointId}`;
+    if (module !== undefined && typeof breakpointId === "string") {
+      return `${module}/breakpointStatus:${breakpointId}`;
     }
 
     this.nextControlId += 1;
@@ -232,8 +243,10 @@ export class Batcher {
       return false;
     }
 
-    const bytes = this.queues.peekBatchBytes();
+    const bytes = this.queues.peekBatchBytes(this.modules);
     if (bytes === undefined) {
+      // Nothing of the session's modules is waiting; taking drops what is left, which none of them own
+      this.queues.takeBatch(this.modules);
       return false;
     }
 
@@ -244,7 +257,7 @@ export class Batcher {
       return false;
     }
 
-    const frame = this.queues.takeBatch();
+    const frame = this.queues.takeBatch(this.modules);
     if (frame === undefined) {
       return false;
     }

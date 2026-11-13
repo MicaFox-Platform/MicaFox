@@ -5,6 +5,7 @@ import { createLogger, type Logger } from "../../../logger/index.js";
 import { Batcher, type BatchTarget, type BatcherSettings } from "../batcher.js";
 
 const PREFIX = "[micafox] connector: ";
+const DEBUGGER: ReadonlySet<string> = new Set(["debugger"]);
 
 /** A socket stand-in: records each frame with the fake time it was written, and finishes writes on demand. */
 interface FakeTarget extends BatchTarget {
@@ -100,6 +101,9 @@ const snapshot = (breakpointId: string, bytes = 200): Message => {
   return { ...base, variables: [{ name: "x".repeat(padding), value: { type: "undefined" } }] };
 };
 
+// A message of another module than the debugger's, with the same type and breakpointId
+const inModule = (message: Message, module: string): Message => ({ ...message, module }) as unknown as Message;
+
 const enqueueAll = (batcher: Batcher, messages: readonly Message[]): void => {
   for (const message of messages) {
     batcher.enqueue(message);
@@ -135,7 +139,7 @@ describe("Batcher queueing", () => {
       },
     };
     batcher.enqueue(message);
-    batcher.attach(createTarget());
+    batcher.attach(createTarget(), DEBUGGER);
 
     vi.advanceTimersByTime(1000);
 
@@ -145,7 +149,7 @@ describe("Batcher queueing", () => {
   it("writes nothing from enqueue() itself, even when a batch is full", () => {
     const { batcher } = createBatcher({ batch: { maxMessages: 1 } });
     const target = createTarget();
-    batcher.attach(target);
+    batcher.attach(target, DEBUGGER);
 
     batcher.enqueue(status("bp-1"));
 
@@ -157,7 +161,7 @@ describe("Batcher queueing", () => {
   it("drops a hello with a warning: the connector sends its own", () => {
     const { batcher, lines } = createBatcher();
     const target = createTarget();
-    batcher.attach(target);
+    batcher.attach(target, DEBUGGER);
     const hello = { version: 1, type: "hello" } as unknown as Message;
 
     batcher.enqueue(hello);
@@ -185,7 +189,7 @@ describe("Batcher queueing", () => {
   ])("drops a message it cannot serialize, with $name, and logs an error", ({ message, line }) => {
     const { batcher, lines } = createBatcher();
     const target = createTarget();
-    batcher.attach(target);
+    batcher.attach(target, DEBUGGER);
 
     batcher.enqueue(message as unknown as Message);
 
@@ -202,7 +206,7 @@ describe("Batcher queueing", () => {
     batcher.enqueue(status("bp-1"));
     vi.advanceTimersByTime(1000);
 
-    batcher.attach(target);
+    batcher.attach(target, DEBUGGER);
 
     vi.advanceTimersByTime(1000);
     expect(target.frames).toEqual([{ atMs: 1100, ids: ["bp-1"] }]);
@@ -212,13 +216,13 @@ describe("Batcher queueing", () => {
     const { batcher } = createBatcher();
     const first = createTarget();
     const second = createTarget();
-    batcher.attach(first);
+    batcher.attach(first, DEBUGGER);
     batcher.enqueue(status("bp-1"));
     vi.advanceTimersByTime(100);
     batcher.detach();
     batcher.enqueue(status("bp-2"));
 
-    batcher.attach(second);
+    batcher.attach(second, DEBUGGER);
 
     vi.advanceTimersByTime(100);
     expect({ first: first.frames, second: second.frames }).toEqual({
@@ -230,7 +234,7 @@ describe("Batcher queueing", () => {
   it("lets a newer status of a breakpoint take the place of its queued one", () => {
     const { batcher } = createBatcher();
     const target = createTarget();
-    batcher.attach(target);
+    batcher.attach(target, DEBUGGER);
 
     enqueueAll(batcher, [status("bp-1", "pending"), status("bp-2", "pending"), status("bp-1", "active")]);
 
@@ -241,8 +245,8 @@ describe("Batcher queueing", () => {
   it("sends every type but snapshot as control, before data queued earlier", () => {
     const { batcher } = createBatcher();
     const target = createTarget();
-    batcher.attach(target);
-    const custom = { version: 1, type: "custom" } as unknown as Message;
+    batcher.attach(target, DEBUGGER);
+    const custom = { version: 1, module: "debugger", type: "custom" } as unknown as Message;
 
     enqueueAll(batcher, [snapshot("snap-1"), custom, status("bp-1")]);
 
@@ -284,7 +288,7 @@ describe("Batcher batching and pacing", () => {
   it("writes a batch batch.flushIntervalMs after the first queued message", () => {
     const { batcher } = createBatcher();
     const target = createTarget();
-    batcher.attach(target);
+    batcher.attach(target, DEBUGGER);
     batcher.enqueue(status("bp-1"));
     vi.advanceTimersByTime(60);
 
@@ -297,7 +301,7 @@ describe("Batcher batching and pacing", () => {
   it("writes at once from setImmediate when batch.maxBytes are queued", () => {
     const { batcher } = createBatcher({ batch: { maxBytes: 300 } });
     const target = createTarget();
-    batcher.attach(target);
+    batcher.attach(target, DEBUGGER);
     batcher.enqueue(snapshot("snap-1"));
 
     batcher.enqueue(snapshot("snap-2"));
@@ -312,7 +316,7 @@ describe("Batcher batching and pacing", () => {
   it("waits while the socket has batch.maxBytes unsent, and resumes once it writes them", () => {
     const { batcher } = createBatcher({ batch: { maxMessages: 1, maxBytes: 1000 } });
     const target = createTarget();
-    batcher.attach(target);
+    batcher.attach(target, DEBUGGER);
     batcher.enqueue(status("bp-1"));
     vi.advanceTimersByTime(100);
     target.unsent = 1000;
@@ -332,7 +336,7 @@ describe("Batcher batching and pacing", () => {
     // 1000 bytes per second is one byte per millisecond
     const { batcher } = createBatcher({ batch: { maxMessages: 1 }, bytesPerSecond: 1000 });
     const target = createTarget();
-    batcher.attach(target);
+    batcher.attach(target, DEBUGGER);
 
     enqueueAll(batcher, [snapshot("snap-600", 600), snapshot("snap-2500", 2500), snapshot("snap-200", 200)]);
 
@@ -349,7 +353,7 @@ describe("Batcher batching and pacing", () => {
   it("sends a control message queued during a rate wait before the data that was waiting", () => {
     const { batcher } = createBatcher({ batch: { maxMessages: 1 }, bytesPerSecond: 1000 });
     const target = createTarget();
-    batcher.attach(target);
+    batcher.attach(target, DEBUGGER);
     enqueueAll(batcher, [snapshot("snap-1", 600), snapshot("snap-2", 600)]);
     vi.advanceTimersByTime(150);
 
@@ -364,12 +368,12 @@ describe("Batcher batching and pacing", () => {
     const closing = createTarget();
     const next = createTarget();
     closing.open = false;
-    batcher.attach(closing);
+    batcher.attach(closing, DEBUGGER);
     batcher.enqueue(status("bp-1"));
     vi.advanceTimersByTime(1000);
     batcher.detach();
 
-    batcher.attach(next);
+    batcher.attach(next, DEBUGGER);
 
     vi.advanceTimersByTime(100);
     expect({ closing: closing.frames, next: next.frames }).toEqual({
@@ -382,13 +386,13 @@ describe("Batcher batching and pacing", () => {
     const { batcher } = createBatcher({ batch: { maxMessages: 1, maxBytes: 1000 } });
     const full = createTarget();
     const next = createTarget();
-    batcher.attach(full);
+    batcher.attach(full, DEBUGGER);
     full.unsent = 1000;
     batcher.enqueue(status("bp-1"));
     vi.advanceTimersByTime(1000);
     batcher.detach();
 
-    batcher.attach(next);
+    batcher.attach(next, DEBUGGER);
 
     vi.advanceTimersByTime(100);
     full.finishWrites();
@@ -399,7 +403,7 @@ describe("Batcher batching and pacing", () => {
   it("writes nothing after detach()", () => {
     const { batcher } = createBatcher();
     const target = createTarget();
-    batcher.attach(target);
+    batcher.attach(target, DEBUGGER);
     batcher.enqueue(status("bp-1"));
 
     batcher.detach();
@@ -411,18 +415,116 @@ describe("Batcher batching and pacing", () => {
   it("reports an error thrown by the socket instead of throwing from the timer", () => {
     const { batcher, internalErrors } = createBatcher();
     const failure = Object.assign(new Error("write failed"), { code: "ERR_TEST_WRITE" });
-    batcher.attach({
-      isOpen: () => true,
-      unsentBytes: () => 0,
-      write: () => {
-        throw failure;
+    batcher.attach(
+      {
+        isOpen: () => true,
+        unsentBytes: () => 0,
+        write: () => {
+          throw failure;
+        },
       },
-    });
+      DEBUGGER,
+    );
     batcher.enqueue(status("bp-1"));
 
     vi.advanceTimersByTime(100);
 
     expect(internalErrors).toEqual([failure]);
+  });
+});
+
+describe("Batcher modules", () => {
+  it("keeps a status of the same breakpoint in another module apart from the debugger's", () => {
+    const { batcher } = createBatcher();
+    const target = createTarget();
+    batcher.attach(target, new Set(["debugger", "errors"]));
+
+    enqueueAll(batcher, [status("bp-1", "pending"), inModule(status("bp-1", "pending"), "errors"), status("bp-1")]);
+
+    vi.advanceTimersByTime(100);
+    expect(target.frames).toEqual([{ atMs: 100, ids: ["bp-1", "bp-1"] }]);
+  });
+
+  it("sends only a debugger snapshot as data: the same type in another module is control", () => {
+    const { batcher } = createBatcher();
+    const target = createTarget();
+    batcher.attach(target, new Set(["debugger", "errors"]));
+
+    enqueueAll(batcher, [snapshot("snap-1"), inModule(snapshot("snap-2"), "errors")]);
+
+    vi.advanceTimersByTime(100);
+    expect(target.frames).toEqual([{ atMs: 100, ids: ["snap-2", "snap-1"] }]);
+  });
+
+  it("drops what a batch takes of a module the session did not agree on, without a log line", () => {
+    const { batcher, lines } = createBatcher();
+    const target = createTarget();
+    batcher.attach(target, DEBUGGER);
+
+    enqueueAll(batcher, [inModule(status("bp-1"), "errors"), status("bp-2"), inModule(snapshot("snap-1"), "errors")]);
+
+    vi.advanceTimersByTime(1000);
+    expect({ frames: target.frames, lines, left: batcher.discard() }).toEqual({
+      frames: [{ atMs: 100, ids: ["bp-2"] }],
+      lines: [],
+      left: 0,
+    });
+  });
+
+  it("sends a message queued before the welcome once the session carries its module", () => {
+    const { batcher } = createBatcher();
+    const target = createTarget();
+    enqueueAll(batcher, [inModule(status("bp-1"), "errors"), status("bp-2")]);
+
+    batcher.attach(target, new Set(["debugger", "errors"]));
+
+    vi.advanceTimersByTime(100);
+    expect(target.frames).toEqual([{ atMs: 100, ids: ["bp-1", "bp-2"] }]);
+  });
+
+  it("sends nothing and empties the queues for a session with no modules", () => {
+    const { batcher } = createBatcher();
+    const target = createTarget();
+    batcher.attach(target, new Set());
+
+    enqueueAll(batcher, [status("bp-1"), snapshot("snap-1")]);
+
+    vi.advanceTimersByTime(1000);
+    expect({ frames: target.frames, left: batcher.discard() }).toEqual({ frames: [], left: 0 });
+  });
+
+  it("resolves a drain that has only messages of other modules left, without waiting", async () => {
+    const { batcher } = createBatcher();
+    const target = createTarget();
+    enqueueAll(batcher, [inModule(status("bp-1"), "errors"), status("bp-2")]);
+
+    await batcher.drain(target, DEBUGGER);
+
+    expect({ frames: target.frames, left: batcher.discard() }).toEqual({
+      frames: [{ atMs: 0, ids: ["bp-2"] }],
+      left: 0,
+    });
+  });
+
+  it("resolves a drain for a session with no modules without writing", async () => {
+    const { batcher } = createBatcher();
+    const target = createTarget();
+    enqueueAll(batcher, [status("bp-1"), snapshot("snap-1")]);
+
+    await batcher.drain(target, new Set());
+
+    expect({ frames: target.frames, left: batcher.discard() }).toEqual({ frames: [], left: 0 });
+  });
+
+  it("drops a message without a module when a batch takes it", () => {
+    const { batcher } = createBatcher();
+    const target = createTarget();
+    batcher.attach(target, DEBUGGER);
+
+    batcher.enqueue({ version: 1, type: "breakpointStatus", breakpointId: "bp-1" } as unknown as Message);
+
+    vi.advanceTimersByTime(1000);
+    expect({ frames: target.frames, left: batcher.discard() }).toEqual({ frames: [], left: 0 });
   });
 });
 
@@ -432,7 +534,7 @@ describe("Batcher drain()", () => {
     const target = createTarget();
     enqueueAll(batcher, [snapshot("bp-1"), status("bp-2"), status("bp-3")]);
 
-    await batcher.drain(target);
+    await batcher.drain(target, DEBUGGER);
 
     expect(target.frames).toEqual([
       { atMs: 0, ids: ["bp-2", "bp-3"] },
@@ -445,7 +547,7 @@ describe("Batcher drain()", () => {
     const target = createTarget();
     enqueueAll(batcher, [snapshot("bp-1"), snapshot("bp-2")]);
 
-    const drained = batcher.drain(target);
+    const drained = batcher.drain(target, DEBUGGER);
     await vi.advanceTimersByTimeAsync(1000);
     await drained;
 
@@ -461,7 +563,7 @@ describe("Batcher drain()", () => {
     target.open = false;
     batcher.enqueue(status("bp-1"));
 
-    await batcher.drain(target);
+    await batcher.drain(target, DEBUGGER);
 
     expect(target.frames).toEqual([]);
   });
@@ -476,7 +578,7 @@ describe("Batcher drain()", () => {
       target.unsent = 100;
     };
     enqueueAll(batcher, [status("bp-1"), status("bp-2")]);
-    const drained = batcher.drain(target);
+    const drained = batcher.drain(target, DEBUGGER);
 
     target.open = false;
     target.finishWrites();
@@ -492,7 +594,7 @@ describe("Batcher drain()", () => {
     const { batcher } = createBatcher({ batch: { maxMessages: 1 }, bytesPerSecond: 200 });
     const target = createTarget();
     enqueueAll(batcher, [snapshot("bp-1"), snapshot("bp-2")]);
-    const drained = batcher.drain(target);
+    const drained = batcher.drain(target, DEBUGGER);
 
     batcher.detach();
     await drained;
@@ -506,7 +608,7 @@ describe("Batcher drain()", () => {
     const target = createTarget();
     target.open = false;
     enqueueAll(batcher, [status("bp-1"), snapshot("bp-2")]);
-    await batcher.drain(target);
+    await batcher.drain(target, DEBUGGER);
 
     const dropped = batcher.discard();
 

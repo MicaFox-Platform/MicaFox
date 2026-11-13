@@ -9,6 +9,8 @@ export interface HelloFields {
   instanceId: string;
   service: string | undefined;
   labels: Labels;
+  /** The modules this instance runs. */
+  modules: readonly string[];
 }
 
 const SDK_NAME = "@micafox/sdk";
@@ -23,7 +25,7 @@ const readHostname = (): string => {
 };
 
 /** Builds the `hello` the connector sends as the first frame of every connection (ADR 0009). */
-export const buildHello = ({ instanceId, service, labels }: HelloFields): Hello => ({
+export const buildHello = ({ instanceId, service, labels, modules }: HelloFields): Hello => ({
   version: PROTOCOL_VERSION,
   type: "hello",
   instanceId,
@@ -33,5 +35,5 @@ export const buildHello = ({ instanceId, service, labels }: HelloFields): Hello 
   pid: process.pid,
   sdk: { name: SDK_NAME, version: SDK_VERSION },
   runtime: { name: "node", version: process.versions.node },
-  modules: ["debugger"],
+  modules: [...modules],
 });

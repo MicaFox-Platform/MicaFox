@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WebSocket } from "ws";
 
 import { useFakeHubs } from "../../../../test/connector/fake-hub.js";
-import { connectFully, createHarness, parseFrame, settle } from "../../../../test/connector/harness.js";
+import { connectFully, createHarness, parseFrame, settle, withModules } from "../../../../test/connector/harness.js";
 import type { HubConnector } from "../hub-connector.js";
 
 const status = (breakpointId: string): Message => ({
@@ -110,6 +110,32 @@ describe("HubConnector close() flush", () => {
     expect({ received: parseFrame(await connection.nextFrame()), closeCode: await connection.closed }).toEqual({
       received: status("bp-1"),
       closeCode: 1000,
+    });
+  });
+
+  it("flushes only the messages of the modules the session carries", async () => {
+    const hub = await hubs.start();
+    const harness = createHarness(
+      hubs,
+      withModules(hub.url, ["debugger", "errors"], { batch: { flushIntervalMs: 60_000 } }),
+    );
+    harness.connector.connect();
+    const connected = harness.nextStatus("connected");
+    const connection = await hub.nextConnection();
+    await connection.nextFrame();
+    connection.sendWelcome({ modules: ["errors"] });
+    await connected;
+    harness.connector.send(status("bp-1"));
+    harness.connector.send({ ...status("bp-2"), module: "errors" } as unknown as Message);
+
+    await harness.connector.close();
+
+    expect({
+      sent: connection.frames.slice(1).map((frame) => parseFrame(frame)),
+      warnings: harness.messagesAt("warn"),
+    }).toEqual({
+      sent: [{ ...status("bp-2"), module: "errors" }],
+      warnings: ["the hub did not accept the module debugger; its messages are dropped"],
     });
   });
 
