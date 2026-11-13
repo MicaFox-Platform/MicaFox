@@ -288,7 +288,7 @@ export const createBreakpoints = (options: { isSecret?: (name: string) => boolea
     failures,
     lines,
     apply: (...entries) => {
-      breakpoints.apply({ version: 1, type: "breakpoints", breakpoints: entries });
+      breakpoints.apply({ version: 1, module: "debugger", type: "breakpoints", breakpoints: entries });
     },
     messagesAt: (level) => lines.filter((line) => line.level === level).map((line) => line.message),
     waitForLine,

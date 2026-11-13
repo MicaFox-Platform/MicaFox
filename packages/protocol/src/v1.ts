@@ -15,12 +15,18 @@ export interface Hello {
   pid: number;
   sdk: { name: string; version: string };
   runtime: { name: string; version: string };
+  /** The SDK modules this instance runs, such as `["debugger"]`. */
+  modules: string[];
+  /** The commit the instance runs, a lowercase hexadecimal hash of 7 to 64 characters; left out when unknown. */
+  commit?: string;
 }
 
 /** The hub's reply to `hello`: it accepts the session. */
 export interface Welcome {
   version: 1;
   type: "welcome";
+  /** The modules of the `hello` the hub accepts for this session. */
+  modules: string[];
 }
 
 /** A frame from the SDK to the hub that carries several messages in order. */
@@ -33,6 +39,7 @@ export interface Batch {
 /** From the hub: the complete list of breakpoints the instance should have. */
 export interface Breakpoints {
   version: 1;
+  module: "debugger";
   type: "breakpoints";
   breakpoints: Breakpoint[];
 }
@@ -42,6 +49,8 @@ export interface Breakpoint {
   id: string;
   file: string;
   line: number;
+  /** The milliseconds the breakpoint has left, an integer of at least 0. */
+  expiresInMs: number;
   limits?: CaptureLimits;
 }
 
@@ -55,15 +64,17 @@ export interface CaptureLimits {
 /** From the SDK: the state of one breakpoint. */
 export interface BreakpointStatus {
   version: 1;
+  module: "debugger";
   type: "breakpointStatus";
   breakpointId: string;
-  status: "pending" | "active" | "rateLimited" | "error";
+  status: "pending" | "active" | "rateLimited" | "expired" | "error";
   message?: string;
 }
 
 /** From the SDK: the state of the app at one hit of a breakpoint. */
 export interface Snapshot {
   version: 1;
+  module: "debugger";
   type: "snapshot";
   breakpointId: string;
   time: number;

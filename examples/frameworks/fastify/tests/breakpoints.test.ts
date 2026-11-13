@@ -9,7 +9,7 @@ describe("breakpoints under tsx", { timeout: E2E_TEST_TIMEOUT_MS }, () => {
   it("sets a breakpoint on pricing.ts and captures a snapshot at its line with the local variables", async () => {
     const hub = await startHub();
     const app = await startApp({ hubPort: hub.port });
-    await waitForStatus(hub.run, "bp-quote", (status) => status.status === "active");
+    const active = await waitForStatus(hub.run, "bp-quote", (status) => status.status === "active");
 
     const response = await fetch(toAppUrl(app.port, "/price?sku=sku-2&quantity=3"));
     const [snapshot] = await hub.run.waitForMessages("snapshot");
@@ -17,11 +17,13 @@ describe("breakpoints under tsx", { timeout: E2E_TEST_TIMEOUT_MS }, () => {
 
     expect({
       status: response.status,
+      modules: [active.module, snapshot?.module],
       file: top?.file,
       line: top?.line,
       variables: snapshot?.variables,
     }).toEqual({
       status: 200,
+      modules: ["debugger", "debugger"],
       file: expect.stringMatching(/\/examples\/frameworks\/fastify\/src\/pricing\.ts$/) as unknown,
       line: PRICING_LINE,
       variables: expect.arrayContaining([

@@ -16,7 +16,13 @@ connector.onMessage((message) => {
 
 connector.connect();
 // buffered until the hub accepts the session
-connector.send({ version: PROTOCOL_VERSION, type: "breakpointStatus", breakpointId: "bp-1", status: "active" });
+connector.send({
+  version: PROTOCOL_VERSION,
+  module: "debugger",
+  type: "breakpointStatus",
+  breakpointId: "bp-1",
+  status: "active",
+});
 
 // the connector does not keep the process alive: your app's server or work does
 process.once("SIGTERM", () => {

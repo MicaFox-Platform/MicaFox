@@ -15,7 +15,7 @@ export interface HubOptions {
   port?: number;
   /** `HUB_TOKEN`. */
   token?: string;
-  /** `HUB_BREAKPOINTS`, as JSON. */
+  /** `HUB_BREAKPOINTS`, as JSON; an entry's `expiresInMs` counts down from the hub's start, 1 h when it is left out. */
   breakpoints?: unknown[];
 }
 

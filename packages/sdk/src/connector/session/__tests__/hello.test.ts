@@ -26,6 +26,7 @@ describe("buildHello", () => {
       pid: process.pid,
       sdk: { name: "@micafox/sdk", version: SDK_VERSION },
       runtime: { name: "node", version: process.versions.node },
+      modules: ["debugger"],
     });
   });
 

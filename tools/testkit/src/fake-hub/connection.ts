@@ -4,6 +4,8 @@
 import { CLOSE_CODES, PROTOCOL_VERSION } from "@micafox/protocol";
 import type { RawData, WebSocket } from "ws";
 
+import { acceptModules } from "./modules.js";
+
 /** Prints one line of the hub's output, which tests read line by line. */
 export const print = (line: string): void => {
   process.stdout.write(`${line}\n`);
@@ -29,20 +31,27 @@ const unwrapBatch = (message: unknown): unknown[] => {
   return Array.isArray(messages) ? messages : [message];
 };
 
-// Answers the first hello: welcome in the hello's version, then the full breakpoint state
-const answerHello = (socket: WebSocket, hello: unknown, breakpoints: unknown[]): void => {
+// Answers the first hello: welcome in the hello's version with the modules it accepts, then, when that includes the
+// debugger, the full breakpoint state
+const answerHello = (socket: WebSocket, hello: unknown, listBreakpoints: () => unknown[]): void => {
   const version = readField(hello, "version");
   if (version !== PROTOCOL_VERSION) {
     socket.close(CLOSE_CODES.incompatibleVersion);
     return;
   }
 
-  socket.send(JSON.stringify({ version, type: "welcome" }));
-  socket.send(JSON.stringify({ version, type: "breakpoints", breakpoints }));
+  const modules = acceptModules(readField(hello, "modules"));
+  socket.send(JSON.stringify({ version, type: "welcome", modules }));
+  if (modules.includes("debugger")) {
+    socket.send(JSON.stringify({ version, module: "debugger", type: "breakpoints", breakpoints: listBreakpoints() }));
+  }
 };
 
-/** Serves one app: prints what it sends and answers its hello with welcome and `breakpoints`. */
-export const onConnection = (socket: WebSocket, breakpoints: unknown[]): void => {
+/**
+ * Serves one app: prints what it sends and answers its hello with welcome and `breakpoints`. `listBreakpoints` builds
+ * the list on every call, so each send carries the time the breakpoints have left at that moment.
+ */
+export const onConnection = (socket: WebSocket, listBreakpoints: () => unknown[]): void => {
   let isWelcomed = false;
   socket.on("message", (data, isBinary) => {
     const frame = parseFrame(data, isBinary);
@@ -57,7 +66,7 @@ export const onConnection = (socket: WebSocket, breakpoints: unknown[]): void =>
 
     if (!isWelcomed && readField(frame, "type") === "hello") {
       isWelcomed = true;
-      answerHello(socket, frame, breakpoints);
+      answerHello(socket, frame, listBreakpoints);
     }
   });
   // `close` comes after the last `message` of the socket

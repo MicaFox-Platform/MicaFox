@@ -6,15 +6,22 @@ import { SendQueues, type QueuedMessage, type QueueLimits } from "../queues.js";
 const LARGE: QueueLimits = { maxMessages: 1000, maxBytes: 1_048_576 };
 
 const status = (breakpointId: string, state = "active"): QueuedMessage => {
-  const text = JSON.stringify({ version: 1, type: "breakpointStatus", breakpointId, status: state });
+  const text = JSON.stringify({
+    version: 1,
+    module: "debugger",
+    type: "breakpointStatus",
+    breakpointId,
+    status: state,
+  });
   return { text, bytes: Buffer.byteLength(text) };
 };
 
 // A snapshot whose serialized size is exactly `bytes`
 const snapshot = (name: string, bytes = 100): QueuedMessage => {
-  const empty = JSON.stringify({ version: 1, type: "snapshot", breakpointId: name, pad: "" });
+  const empty = JSON.stringify({ version: 1, module: "debugger", type: "snapshot", breakpointId: name, pad: "" });
   const text = JSON.stringify({
     version: 1,
+    module: "debugger",
     type: "snapshot",
     breakpointId: name,
     pad: "x".repeat(bytes - empty.length),

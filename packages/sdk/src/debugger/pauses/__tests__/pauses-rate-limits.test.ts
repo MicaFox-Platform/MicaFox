@@ -41,6 +41,7 @@ const entry = (id: string, line: number, limits?: object) => ({
 
 const status = (breakpointId: string, value: BreakpointStatus["status"]): BreakpointStatus => ({
   version: 1,
+  module: "debugger",
   type: "breakpointStatus",
   breakpointId,
   status: value,

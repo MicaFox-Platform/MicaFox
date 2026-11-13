@@ -112,7 +112,7 @@ const createConnection = (socket: WebSocket, request: IncomingMessage): HubConne
     nextFrame: () => arrivals.next(),
     closed,
     sendWelcome: (version = PROTOCOL_VERSION) => {
-      socket.send(JSON.stringify({ version, type: "welcome" }));
+      socket.send(JSON.stringify({ version, type: "welcome", modules: ["debugger"] }));
     },
   };
 };

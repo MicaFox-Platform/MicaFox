@@ -4,7 +4,7 @@ import { checkFirstFrame } from "../welcome.js";
 
 describe("checkFirstFrame", () => {
   it("accepts a welcome of the SDK's protocol version", () => {
-    expect(checkFirstFrame('{"version":1,"type":"welcome"}')).toEqual({ ok: true });
+    expect(checkFirstFrame('{"version":1,"type":"welcome","modules":["debugger"]}')).toEqual({ ok: true });
   });
 
   it("rejects a binary frame", () => {

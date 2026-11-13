@@ -33,4 +33,5 @@ export const buildHello = ({ instanceId, service, labels }: HelloFields): Hello 
   pid: process.pid,
   sdk: { name: SDK_NAME, version: SDK_VERSION },
   runtime: { name: "node", version: process.versions.node },
+  modules: ["debugger"],
 });

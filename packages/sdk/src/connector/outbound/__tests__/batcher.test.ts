@@ -82,12 +82,20 @@ const createBatcher = ({ buffer, batch, bytesPerSecond = 1_048_576 }: SettingsOv
 
 const status = (breakpointId: string, state: "pending" | "active" = "active", message?: string): Message =>
   message === undefined
-    ? { version: 1, type: "breakpointStatus", breakpointId, status: state }
-    : { version: 1, type: "breakpointStatus", breakpointId, status: state, message };
+    ? { version: 1, module: "debugger", type: "breakpointStatus", breakpointId, status: state }
+    : { version: 1, module: "debugger", type: "breakpointStatus", breakpointId, status: state, message };
 
 // A snapshot whose serialized size is exactly `bytes`
 const snapshot = (breakpointId: string, bytes = 200): Message => {
-  const base: Snapshot = { version: 1, type: "snapshot", breakpointId, time: 0, stack: [], variables: [] };
+  const base: Snapshot = {
+    version: 1,
+    module: "debugger",
+    type: "snapshot",
+    breakpointId,
+    time: 0,
+    stack: [],
+    variables: [],
+  };
   const padding = bytes - JSON.stringify({ ...base, variables: [{ name: "", value: { type: "undefined" } }] }).length;
   return { ...base, variables: [{ name: "x".repeat(padding), value: { type: "undefined" } }] };
 };
