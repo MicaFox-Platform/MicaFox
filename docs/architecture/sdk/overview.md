@@ -46,7 +46,7 @@ debugger imports the connector and the logger, the connector imports only the lo
 module, so the connector and the logger can move out together.
 
 The package is built as ES modules (`dist/esm`) and as CommonJS (`dist/cjs`), and `exports` serves one to `import` and
-the other to `require()`, see [ADR 0013](../../adr/0013-publish-the-packages-as-es-modules-and-commonjs.md). The
+the other to `require()`, see [ADR 0013](../../adr/packages/0013-publish-the-packages-as-es-modules-and-commonjs.md). The
 CommonJS build rejects top-level `await` and `import.meta`, so the sources use neither. Every copy, either build or
 another install, shares [one debugger per process](debugger.md#boundaries).
 
@@ -65,12 +65,12 @@ another install, shares [one debugger per process](debugger.md#boundaries).
 
 ## Decisions
 
-- [0001. Keep the protocol in its own package](../../adr/0001-keep-the-protocol-in-its-own-package.md)
-- [0002. Ship the default connector inside the SDK](../../adr/0002-ship-the-default-connector-inside-the-sdk.md)
-- [0003. Configure the SDK from options, then env](../../adr/0003-configure-the-sdk-from-options-then-env.md)
-- [0008. Use WebSocket for the hub connection](../../adr/0008-use-websocket-for-the-hub-connection.md)
-- [0013. Publish the packages as ES modules and CommonJS](../../adr/0013-publish-the-packages-as-es-modules-and-commonjs.md)
-- [0017. Tag messages with their module and agree on modules](../../adr/0017-tag-messages-with-their-module-and-agree-on-modules.md)
+- [0001. Keep the protocol in its own package](../../adr/packages/0001-keep-the-protocol-in-its-own-package.md)
+- [0002. Ship the default connector inside the SDK](../../adr/sdk/0002-ship-the-default-connector-inside-the-sdk.md)
+- [0003. Configure the SDK from options, then env](../../adr/sdk/0003-configure-the-sdk-from-options-then-env.md)
+- [0008. Use WebSocket for the hub connection](../../adr/protocol/0008-use-websocket-for-the-hub-connection.md)
+- [0013. Publish the packages as ES modules and CommonJS](../../adr/packages/0013-publish-the-packages-as-es-modules-and-commonjs.md)
+- [0017. Tag messages with their module and agree on modules](../../adr/protocol/0017-tag-messages-with-their-module-and-agree-on-modules.md)
 
 Decisions of one component: [debugger](debugger.md#decisions), [connector](connector.md#decisions),
 [logger](logger.md#decisions).

@@ -14,7 +14,9 @@ const { quote } = require("./quote.js");
 const app = express();
 app.get("/quote", quote);
 
-const server = app.listen(Number(process.env.PORT ?? "0"), "127.0.0.1", () => {
+// An empty HOST counts as unset: listen() would take "" as every interface
+const host = process.env.HOST ?? "";
+const server = app.listen(Number(process.env.PORT ?? "0"), host === "" ? "127.0.0.1" : host, () => {
   console.log(`listening on port ${String(server.address().port)}`);
 });
 

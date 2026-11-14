@@ -1,0 +1,134 @@
+# The fake hub and every example app, each in its own container, on the ports of README.md. Settings come from the
+# apps' `.env.example` files; only the hub's address changes, since it is no longer on localhost. `pnpm docker:up`
+# starts it, `pnpm docker:down` stops it. NODE_IMAGE=node:22-alpine pnpm docker:up runs it on another base image.
+# Ports are published on the host's loopback only. No `init`: each app is PID 1, as in a typical production image.
+
+name: micafox-examples
+
+x-build: &build
+  context: ..
+  dockerfile: examples/Dockerfile
+  args:
+    NODE_IMAGE: ${NODE_IMAGE:-node:22-slim}
+
+x-app: &app
+  depends_on:
+    - hub
+  environment: &app-environment
+    MICAFOX_HUB_URL: ws://hub:8787/micafox
+
+services:
+  hub:
+    build:
+      <<: *build
+      target: hub
+    image: micafox-example-hub
+    env_file: ../tools/testkit/.env.example
+    ports:
+      - "127.0.0.1:8787:8787"
+
+  fastify:
+    <<: *app
+    build:
+      <<: *build
+      target: fastify
+    image: micafox-example-fastify
+    env_file: frameworks/fastify/.env.example
+    ports:
+      - "127.0.0.1:3000:3000"
+
+  express:
+    <<: *app
+    build:
+      <<: *build
+      target: express
+    image: micafox-example-express
+    env_file: frameworks/express/.env.example
+    ports:
+      - "127.0.0.1:3001:3001"
+
+  nestjs:
+    <<: *app
+    build:
+      <<: *build
+      target: nestjs
+    image: micafox-example-nestjs
+    env_file: frameworks/nestjs/.env.example
+    ports:
+      - "127.0.0.1:3002:3002"
+
+  nextjs:
+    <<: *app
+    build:
+      <<: *build
+      target: nextjs
+    image: micafox-example-nextjs
+    env_file: frameworks/nextjs/.env.example
+    ports:
+      - "127.0.0.1:3003:3003"
+
+  # The five formats apps share one .env.example, which sets no PORT: each service sets its own
+  formats-cjs:
+    <<: *app
+    build:
+      <<: *build
+      target: formats-cjs
+    image: micafox-example-formats-cjs
+    env_file: formats/.env.example
+    environment:
+      <<: *app-environment
+      PORT: "3101"
+    ports:
+      - "127.0.0.1:3101:3101"
+
+  formats-esm:
+    <<: *app
+    build:
+      <<: *build
+      target: formats-esm
+    image: micafox-example-formats-esm
+    env_file: formats/.env.example
+    environment:
+      <<: *app-environment
+      PORT: "3102"
+    ports:
+      - "127.0.0.1:3102:3102"
+
+  formats-tsc-cjs:
+    <<: *app
+    build:
+      <<: *build
+      target: formats-tsc-cjs
+    image: micafox-example-formats-tsc-cjs
+    env_file: formats/.env.example
+    environment:
+      <<: *app-environment
+      PORT: "3103"
+    ports:
+      - "127.0.0.1:3103:3103"
+
+  formats-tsc-esm:
+    <<: *app
+    build:
+      <<: *build
+      target: formats-tsc-esm
+    image: micafox-example-formats-tsc-esm
+    env_file: formats/.env.example
+    environment:
+      <<: *app-environment
+      PORT: "3104"
+    ports:
+      - "127.0.0.1:3104:3104"
+
+  formats-bundled:
+    <<: *app
+    build:
+      <<: *build
+      target: formats-bundled
+    image: micafox-example-formats-bundled
+    env_file: formats/.env.example
+    environment:
+      <<: *app-environment
+      PORT: "3105"
+    ports:
+      - "127.0.0.1:3105:3105"

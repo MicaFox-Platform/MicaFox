@@ -18,6 +18,12 @@ const readPort = (): number => {
   return port === "" ? DEFAULT_PORT : Number(port);
 };
 
+// An empty HOST counts as unset: listen() would take "" as every interface
+const readHost = (): string => {
+  const host = process.env.HOST ?? "";
+  return host === "" ? "127.0.0.1" : host;
+};
+
 const isAuthorized = (request: IncomingMessage, token: string): boolean =>
   token === "" || request.headers.authorization === `Bearer ${token}`;
 
@@ -49,7 +55,7 @@ const main = (): void => {
     console.error("fake hub failed:", error.message);
     process.exitCode = 1;
   });
-  server.listen(readPort(), "127.0.0.1", () => {
+  server.listen(readPort(), readHost(), () => {
     // listen() with a port and a host always gives an AddressInfo
     print(`listening on port ${String((server.address() as AddressInfo).port)}`);
   });

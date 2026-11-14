@@ -20,15 +20,22 @@ timeouts, limits, defaults, module layout. Choices that cannot be made separatel
 get one each. A detail of an existing decision is not a new ADR. Never merge, squash or delete an accepted ADR that
 is on `staging`: supersede it.
 
-- File `docs/adr/NNNN-kebab-title.md`, next free number, no gaps. Copy `.claude/templates/adr.md` and keep its
-  sections in order: Status, Context, Decision, Alternatives, Consequences.
+- File `docs/adr/<component>/NNNN-kebab-title.md`, in the folder of the component the choice belongs to, named like
+  its architecture doc: `protocol/`, `sdk/connector/`, `sdk/debugger/`, `sdk/logger/`; `sdk/` for the SDK as a whole,
+  `packages/` for package boundaries and publishing. A new component gets a new folder. The number is the next free
+  one across all folders, no gaps. Copy `.claude/templates/adr.md` and keep its sections in order: Status, Context,
+  Decision, Alternatives, Consequences.
+- `docs/adr/overview.md` is the only file in the root: it lists every ADR under its component, newest last. Add the
+  new ADR there in the same PR.
 - First heading `# NNNN. Title`; the title is ≤ 60 chars and names the decision, not the topic.
 - Status line: `<status> · YYYY-MM-DD`, where status is `Proposed`, `Accepted`, `Deprecated` or
-  `Superseded by [NNNN](NNNN-title.md)`.
+  `Superseded by [NNNN](../<component>/NNNN-title.md)`.
 - Context: the requirements and constraints that made the choice necessary.
 - Decision: one or two sentences in active voice: "We use X for Y."
 - Alternatives: every rejected option with the concrete reason it lost.
-- Never rewrite an accepted ADR: write a new one and mark the old one superseded.
+- Never rewrite an accepted ADR: write a new one and mark the old one superseded. Superseding, in the same PR:
+  `git mv` the old file to `superseded_NNNN-kebab-title.md` in its folder, set its status, move its line in
+  `overview.md` to Superseded, and fix every link to it.
 
 ```md
 <!-- Bad: topic as title, no alternatives -->

@@ -72,5 +72,6 @@ finish; fix what they report instead of arguing with it.
 - `docs/architecture/` — decided design only: `overview.md`, one file per component, a folder per package with
   several large components (`sdk/`).
 - `docs/adr/` — why, only for choices that meet the bar in `.claude/rules/adr.md`; from `.claude/templates/adr.md`.
+  `overview.md` lists them by component; one folder per component; superseded ones get the `superseded_` prefix.
 - `docs/api/` — public API: `overview.md`, one file per package, a folder per package with several large parts
   (`sdk/`); from `.claude/templates/api.md`.

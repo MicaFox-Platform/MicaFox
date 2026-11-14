@@ -8,7 +8,10 @@ import { ChildProcessRun, type ChildProcessOptions } from "./child-process-run.j
 /** The timeout of each test: two process starts, a reconnect and a few requests fit well within it. */
 export const E2E_TEST_TIMEOUT_MS = 10_000;
 
-/** The variables of the test runner's environment a process must not inherit, besides `MICAFOX_*`, `HUB_*` and `PORT`. */
+/**
+ * The variables of the test runner's environment a process must not inherit, besides `MICAFOX_*`, `HUB_*`, `PORT` and
+ * `HOST`.
+ */
 export interface InheritedFilter {
   /** Name prefixes, such as `NEXT_`. */
   readonly prefixes?: readonly string[];
@@ -16,12 +19,13 @@ export interface InheritedFilter {
 }
 
 /**
- * The environment of a process: the test runner's, without the developer's own `MICAFOX_*`, `HUB_*`, `PORT` and the
- * variables of `prefixes` and `names`, since each test sets its own. `PORT` is 0, so the process picks a free port.
+ * The environment of a process: the test runner's, without the developer's own `MICAFOX_*`, `HUB_*`, `PORT`, `HOST`
+ * and the variables of `prefixes` and `names`, since each test sets its own. `PORT` is 0, so the process picks a free
+ * port.
  */
 export const createEnvironment = ({ prefixes = [], names = [] }: InheritedFilter = {}): Record<string, string> => {
   const droppedPrefixes = ["MICAFOX_", "HUB_", ...prefixes];
-  const droppedNames = ["PORT", ...names];
+  const droppedNames = ["PORT", "HOST", ...names];
   const inherited = Object.entries(process.env).filter(
     (entry): entry is [string, string] =>
       entry[1] !== undefined &&

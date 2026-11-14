@@ -23,7 +23,7 @@ depending on the others.
 - Constraints:
   - Types and constants only: no runtime logic, no side effects, no dependencies, no Node-only APIs.
   - Built as ES modules and CommonJS, like the SDK:
-    [ADR 0013](../adr/0013-publish-the-packages-as-es-modules-and-commonjs.md).
+    [ADR 0013](../adr/packages/0013-publish-the-packages-as-es-modules-and-commonjs.md).
   - Every export is public API of MicaFox and is documented in `docs/api/`.
   - Changes are backward-compatible or bump `PROTOCOL_VERSION`.
 
@@ -66,7 +66,7 @@ users import `@micafox/protocol`. None of them imports another to get a protocol
 
 1. `hello`, `welcome` and `batch` are session frames: they carry no `module`, and no module uses their type names.
 2. Every other message carries its `module`, and a peer routes it by `module`, then `type`; type names are unique
-   within a module only. Why: [ADR 0017](../adr/0017-tag-messages-with-their-module-and-agree-on-modules.md).
+   within a module only. Why: [ADR 0017](../adr/protocol/0017-tag-messages-with-their-module-and-agree-on-modules.md).
 3. A message of a module the session did not agree on, or that the peer does not know, is ignored; so is an unknown
    type within a known module. Exact rules: [`Message`](../api/protocol.md#message).
 
@@ -84,18 +84,18 @@ users import `@micafox/protocol`. None of them imports another to get a protocol
 
 ## Decisions
 
-- [0001. Keep the protocol in its own package](../adr/0001-keep-the-protocol-in-its-own-package.md)
-- [0004. Use handler functions in the Connector interface](../adr/0004-use-handler-functions-in-the-connector-interface.md)
-- [0005. Batch and rate-limit messages in the connector](../adr/0005-batch-and-rate-limit-messages-in-the-connector.md)
-- [0006. Authenticate to the hub with a bearer token](../adr/0006-authenticate-to-the-hub-with-a-bearer-token.md)
-- [0007. Deliver messages to the hub at most once](../adr/0007-deliver-messages-to-the-hub-at-most-once.md)
-- [0008. Use WebSocket for the hub connection](../adr/0008-use-websocket-for-the-hub-connection.md)
-- [0009. Run the hub handshake in the connector](../adr/0009-run-the-hub-handshake-in-the-connector.md)
-- [0010. Send the full breakpoint set on every change](../adr/0010-send-the-full-breakpoint-set-on-every-change.md)
-- [0011. Encode snapshot values as a nested tree](../adr/0011-encode-snapshot-values-as-a-nested-tree.md)
-- [0012. Redact secrets by name inside the SDK](../adr/0012-redact-secrets-by-name-inside-the-sdk.md)
-- [0013. Publish the packages as ES modules and CommonJS](../adr/0013-publish-the-packages-as-es-modules-and-commonjs.md)
-- [0016. Use the hello's protocol version for the session](../adr/0016-use-the-hellos-protocol-version-for-the-session.md)
-- [0017. Tag messages with their module and agree on modules](../adr/0017-tag-messages-with-their-module-and-agree-on-modules.md)
-- [0018. Expire breakpoints in the SDK by a time left from the hub](../adr/0018-expire-breakpoints-in-the-sdk-by-a-time-left-from-the-hub.md)
-- [0019. Report the deployed commit in hello](../adr/0019-report-the-deployed-commit-in-hello.md)
+- [0001. Keep the protocol in its own package](../adr/packages/0001-keep-the-protocol-in-its-own-package.md)
+- [0004. Use handler functions in the Connector interface](../adr/protocol/0004-use-handler-functions-in-the-connector-interface.md)
+- [0005. Batch and rate-limit messages in the connector](../adr/sdk/connector/0005-batch-and-rate-limit-messages-in-the-connector.md)
+- [0006. Authenticate to the hub with a bearer token](../adr/sdk/connector/0006-authenticate-to-the-hub-with-a-bearer-token.md)
+- [0007. Deliver messages to the hub at most once](../adr/protocol/0007-deliver-messages-to-the-hub-at-most-once.md)
+- [0008. Use WebSocket for the hub connection](../adr/protocol/0008-use-websocket-for-the-hub-connection.md)
+- [0009. Run the hub handshake in the connector](../adr/sdk/connector/0009-run-the-hub-handshake-in-the-connector.md)
+- [0010. Send the full breakpoint set on every change](../adr/protocol/0010-send-the-full-breakpoint-set-on-every-change.md)
+- [0011. Encode snapshot values as a nested tree](../adr/protocol/0011-encode-snapshot-values-as-a-nested-tree.md)
+- [0012. Redact secrets by name inside the SDK](../adr/sdk/debugger/0012-redact-secrets-by-name-inside-the-sdk.md)
+- [0013. Publish the packages as ES modules and CommonJS](../adr/packages/0013-publish-the-packages-as-es-modules-and-commonjs.md)
+- [0016. Use the hello's protocol version for the session](../adr/protocol/0016-use-the-hellos-protocol-version-for-the-session.md)
+- [0017. Tag messages with their module and agree on modules](../adr/protocol/0017-tag-messages-with-their-module-and-agree-on-modules.md)
+- [0018. Expire breakpoints in the SDK by a time left from the hub](../adr/sdk/debugger/0018-expire-breakpoints-in-the-sdk-by-a-time-left-from-the-hub.md)
+- [0019. Report the deployed commit in hello](../adr/protocol/0019-report-the-deployed-commit-in-hello.md)

@@ -25,7 +25,9 @@ const server = createServer((request, response) => {
 micafox.configure({ hubConnector: { reconnect: RECONNECT } });
 // Before listen(), so the hub's breakpoints can be set before the first request
 micafox.run();
-server.listen(Number(process.env.PORT ?? "0"), "127.0.0.1", () => {
+// An empty HOST counts as unset: listen() would take "" as every interface
+const host = process.env.HOST ?? "";
+server.listen(Number(process.env.PORT ?? "0"), host === "" ? "127.0.0.1" : host, () => {
   // listen() with a port and a host always gives an AddressInfo
   console.log(`listening on port ${String((server.address() as AddressInfo).port)}`);
 });

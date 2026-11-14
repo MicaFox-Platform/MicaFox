@@ -21,7 +21,8 @@ they are.
 - `src/fake-hub/` — the fake hub, run as its own process: `main.ts` serves, and `startHub()` and the `start:hub` script
   run it by that path, `connection.ts` answers one app and prints what it sends, `modules.ts` picks the modules of its
   `welcome`, `breakpoints.ts` reads the breakpoints to set and counts their time left down.
-- `test/` — `env-examples.test.ts`: the `.env.example` files and `start` scripts of the examples.
+- `test/` — `env-examples.test.ts`: the `.env.example` files and `start` scripts of the examples; `docker.test.ts`:
+  their Dockerfile and `compose.yaml` against those files, and the hub's `HOST`.
 - `.env.example` — the hub's port and one breakpoint for each example app.
 
 `readBreakpoints()`, `startCountdown()`, `acceptModules()` and how `onConnection()` answers a `hello` have unit tests in
@@ -38,11 +39,12 @@ none of them gets an empty list and no breakpoints), prints every message it rec
 a batch one by one, and prints `disconnected` once a connection closes, after its last message. It never prints headers
 or the token.
 
-| Variable          | Meaning                                                                   |
-| ----------------- | ------------------------------------------------------------------------- |
-| `PORT`            | port, default `8787`; `0` picks a free one and prints it                  |
-| `HUB_TOKEN`       | when set, an upgrade without `Authorization: Bearer <HUB_TOKEN>` gets 401 |
-| `HUB_BREAKPOINTS` | JSON array of breakpoints sent after `welcome`; unset → no breakpoints    |
+| Variable          | Meaning                                                                     |
+| ----------------- | --------------------------------------------------------------------------- |
+| `PORT`            | port, default `8787`; `0` picks a free one and prints it                    |
+| `HOST`            | address it listens on, default `127.0.0.1`; the Docker image sets `0.0.0.0` |
+| `HUB_TOKEN`       | when set, an upgrade without `Authorization: Bearer <HUB_TOKEN>` gets 401   |
+| `HUB_BREAKPOINTS` | JSON array of breakpoints sent after `welcome`; unset → no breakpoints      |
 
 Each entry of `HUB_BREAKPOINTS` may set `expiresInMs`, the time the breakpoint lives, an integer of at least `0`; any
 other value, or none, means 1 h (`3600000`). The hub fixes each deadline when it starts and counts it down: every

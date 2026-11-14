@@ -1,6 +1,6 @@
 <!--
 ADR template, used by /architect.
-Copy to `docs/adr/NNNN-kebab-title.md` and remove this comment. Rules: `.claude/rules/adr.md`.
+Copy to `docs/adr/<component>/NNNN-kebab-title.md`, list it in `docs/adr/overview.md` and remove this comment. Rules: `.claude/rules/adr.md`.
 -->
 
 # NNNN. Use X for Y
