@@ -57,8 +57,8 @@ TypeScript compiled by tsc to CommonJS and to ES modules with `.map` files, and 
 tests run after the build. `examples/frameworks/express`, `nestjs` and `nextjs` run the built SDK in an Express app, a
 NestJS app built by the Nest CLI and a Next.js app served by `next start`, where the SDK runs but breakpoints in the
 bundled route handlers stay `pending`; their tests run after the build too. All the examples start their processes and
-one fake hub through `tools/testkit` (`@micafox/testkit`), a private, never-published kit that only examples depend on:
-[README](../../tools/testkit/README.md).
+one fake hub through `tools/testkit` (`@micafox/testkit`), a private, never-published kit that only examples depend on,
+which also holds `pnpm bench`, the benchmark of the SDK's overhead: [README](../../tools/testkit/README.md).
 
 The protocol and the SDK ship as ES modules and CommonJS, so apps load them with `import` or `require()`.
 

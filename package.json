@@ -11,6 +11,7 @@
     "test": "vitest run",
     "test:build": "pnpm -r test:build",
     "test:docker": "vitest run --root tools/testkit --config vitest.docker.config.ts",
+    "bench": "node --import tsx tools/testkit/bench/main.ts",
     "test:watch": "vitest --coverage",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint . && bash .github/scripts/check-structure.sh",

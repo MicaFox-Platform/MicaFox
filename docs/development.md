@@ -16,7 +16,7 @@ table only, and packages import each other by package name, never by relative pa
 | `packages/configs`            | shared tsconfig, ESLint, Prettier and Vitest presets                      | -                      |
 | `packages/protocol`           | messages, `PROTOCOL_VERSION` and the `Connector` type                     | -                      |
 | `packages/sdk`                | `src/debugger/` and `src/connector/`, run inside the host app             | protocol               |
-| `tools/testkit`               | private kit of the examples' E2E tests: runner and fake hub               | protocol               |
+| `tools/testkit`               | private kit of the examples' E2E tests and benchmark: runner, fake hub    | protocol               |
 | `examples/formats`            | one app per module format, run on the built SDK                           | sdk, protocol, testkit |
 | `examples/frameworks/fastify` | Fastify demo app to try the SDK by hand, with the full debugger E2E suite | sdk, protocol, testkit |
 | `examples/frameworks/<name>`  | `express`, `nestjs` and `nextjs`: one app each, run on the built SDK      | sdk, testkit           |
@@ -56,6 +56,7 @@ pnpm verify:fix   → auto-fix lint and formatting
 pnpm docker:up    → optional, needs Docker: build an image per example app and start them with the fake hub
 pnpm docker:down  → stop and remove them
 pnpm test:docker  → optional, needs Docker: the container tests of every example app; NODE_IMAGE picks the base image
+pnpm bench        → optional, needs Docker: the SDK's overhead in the Fastify example, printed as Markdown
 ```
 
 One package: `pnpm --filter @micafox/sdk test`, `pnpm --filter @micafox/example-fastify start`; to run an example by

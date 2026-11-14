@@ -17,7 +17,7 @@ pnpm monorepo, Node >= 22, TypeScript (strict, NodeNext), Vitest, ESLint, Pretti
 | `packages/configs`            | shared tsconfig / eslint / prettier / vitest   | -                      |
 | `packages/protocol`           | messages, protocol version, `Connector`        | -                      |
 | `packages/sdk`                | debugger and default connector, in host app    | protocol               |
-| `tools/testkit`               | private E2E kit of the examples: runner, hub   | protocol               |
+| `tools/testkit`               | private E2E kit and benchmark of the examples  | protocol               |
 | `examples/formats`            | apps that load the built SDK per module format | sdk, protocol, testkit |
 | `examples/frameworks/fastify` | demo app, full debugger E2E                    | sdk, protocol, testkit |
 | `examples/frameworks/<name>`  | `express`, `nestjs`, `nextjs` on built SDK     | sdk, testkit           |
