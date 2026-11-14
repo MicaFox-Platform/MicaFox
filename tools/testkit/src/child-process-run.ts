@@ -9,11 +9,13 @@ import { stripVTControlCharacters } from "node:util";
 /** How a process ended: its exit code, the signal that ended it, or `undefined` when it could not start. */
 export type Exit = number | NodeJS.Signals | undefined;
 
-/** How a process is started: `node <args>` in `cwd`. */
+/** How a process is started: `<command> <args>` in `cwd`, `node` by default. */
 export interface ChildProcessOptions {
   /** The name failures call the process by, such as `app`. */
   readonly name: string;
-  /** The arguments of `node`; relative paths resolve from `cwd`. */
+  /** The program to run; the running `node` when unset. */
+  readonly command?: string;
+  /** The arguments of `command`; relative paths resolve from `cwd`. */
   readonly args: readonly string[];
   readonly env: Record<string, string>;
   readonly cwd: string;
@@ -40,9 +42,9 @@ export class ChildProcessRun {
   private exit: Exit;
   private readonly kill: (signal: NodeJS.Signals) => void;
 
-  constructor({ name, args, env, cwd }: ChildProcessOptions) {
+  constructor({ name, command = process.execPath, args, env, cwd }: ChildProcessOptions) {
     this.name = name;
-    const child = spawn(process.execPath, args, { cwd, env, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(command, args, { cwd, env, stdio: ["ignore", "pipe", "pipe"] });
     this.kill = (signal) => child.kill(signal);
     for (const stream of [child.stdout, child.stderr]) {
       stream.on("error", () => {

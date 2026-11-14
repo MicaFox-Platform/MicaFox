@@ -4,13 +4,13 @@
 import { LISTENING, type QuoteApp } from "@micafox/testkit";
 import path from "node:path";
 
-/** NestJS compiled by the Nest CLI; Nest ends the process by the signal it received, after its shutdown hooks. */
+/** NestJS compiled by the Nest CLI; on SIGTERM main.ts closes Nest, which runs its shutdown hooks, and it exits with 0. */
 export const NESTJS_APP: QuoteApp = {
   name: "NestJS",
   directory: path.join(import.meta.dirname, ".."),
   args: ["dist/main.js"],
   quoteSource: "src/quote.controller.ts",
   ready: LISTENING,
-  exitOnSigterm: "SIGTERM",
+  exitOnSigterm: 0,
   stopMarker: "micafox stopped",
 };

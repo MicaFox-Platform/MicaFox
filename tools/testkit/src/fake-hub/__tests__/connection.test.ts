@@ -21,9 +21,9 @@ class FakeSocket extends EventEmitter {
 
 const BREAKPOINT = { id: "bp-quote", file: "src/pricing.ts", line: 33, expiresInMs: 60_000 };
 
-const connect = (): FakeSocket => {
+const connect = (breakpoints: unknown[] = [BREAKPOINT]): FakeSocket => {
   const socket = new FakeSocket();
-  onConnection(socket as unknown as WebSocket, () => [BREAKPOINT]);
+  onConnection(socket as unknown as WebSocket, () => breakpoints);
   return socket;
 };
 
@@ -49,6 +49,23 @@ describe("onConnection", () => {
       { version: 1, type: "welcome", modules: ["debugger"] },
       { version: 1, module: "debugger", type: "breakpoints", breakpoints: [BREAKPOINT] },
     ]);
+  });
+
+  it("sends an app only the breakpoints of its hello's service and those of none, without their service", () => {
+    const socket = connect([
+      { ...BREAKPOINT, id: "bp-fastify", service: "fastify" },
+      { ...BREAKPOINT, id: "bp-express", service: "express" },
+      BREAKPOINT,
+    ]);
+
+    socket.emit("message", helloWith({ service: "fastify", modules: ["debugger"] }), false);
+
+    expect(socket.sent[1]).toEqual({
+      version: 1,
+      module: "debugger",
+      type: "breakpoints",
+      breakpoints: [{ ...BREAKPOINT, id: "bp-fastify" }, BREAKPOINT],
+    });
   });
 
   it("welcomes a hello without a modules array with no modules and sends no breakpoints", () => {

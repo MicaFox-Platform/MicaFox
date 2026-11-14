@@ -18,6 +18,7 @@
     "examples/frameworks/*/tests",
     "tools/*/vitest*.config.ts",
     "tools/*/src",
+    "tools/*/docker",
     "tools/*/test"
   ]
 }

@@ -1,0 +1,76 @@
+# What `pnpm test:docker` adds to examples/compose.yaml: every container runs as in a locked-down production deployment,
+# with a read-only root filesystem, a writable /tmp only and a 256 MB memory limit. A healthcheck reports a container
+# healthy once its server accepts connections, so `docker compose up --wait` returns when every app serves. The apps
+# log only the SDK's errors, so any `[micafox]` line they print is one.
+#
+# Each app reports its compose service as MICAFOX_SERVICE, and the hub's HUB_BREAKPOINTS, which stack.ts builds from
+# apps.ts, gives each breakpoint the service it is for. Every app then gets only its own: the SDK matches a file by
+# the end of its path, so a breakpoint on formats/src/cjs/quote.js would also resolve to express's src/quote.js.
+
+x-locked-down: &locked-down
+  read_only: true
+  tmpfs:
+    - /tmp
+  mem_limit: 256m
+  healthcheck:
+    # A TCP connection, not a request: the fake hub answers no plain HTTP, and no request may hit an app's breakpoint
+    test:
+      - CMD
+      - node
+      - -e
+      - require("node:net").connect(process.env.PORT, "127.0.0.1").on("connect", () => process.exit(0)).on("error", () =>
+        process.exit(1))
+    interval: 1s
+    timeout: 2s
+    retries: 60
+
+services:
+  hub:
+    <<: *locked-down
+    environment:
+      HUB_BREAKPOINTS: ${HUB_BREAKPOINTS:?stack.ts sets it}
+  fastify:
+    <<: *locked-down
+    environment:
+      MICAFOX_SERVICE: fastify
+      MICAFOX_LOG_LEVEL: error
+  express:
+    <<: *locked-down
+    environment:
+      MICAFOX_SERVICE: express
+      MICAFOX_LOG_LEVEL: error
+  nestjs:
+    <<: *locked-down
+    environment:
+      MICAFOX_SERVICE: nestjs
+      MICAFOX_LOG_LEVEL: error
+  nextjs:
+    <<: *locked-down
+    environment:
+      MICAFOX_SERVICE: nextjs
+      MICAFOX_LOG_LEVEL: error
+  formats-cjs:
+    <<: *locked-down
+    environment:
+      MICAFOX_SERVICE: formats-cjs
+      MICAFOX_LOG_LEVEL: error
+  formats-esm:
+    <<: *locked-down
+    environment:
+      MICAFOX_SERVICE: formats-esm
+      MICAFOX_LOG_LEVEL: error
+  formats-tsc-cjs:
+    <<: *locked-down
+    environment:
+      MICAFOX_SERVICE: formats-tsc-cjs
+      MICAFOX_LOG_LEVEL: error
+  formats-tsc-esm:
+    <<: *locked-down
+    environment:
+      MICAFOX_SERVICE: formats-tsc-esm
+      MICAFOX_LOG_LEVEL: error
+  formats-bundled:
+    <<: *locked-down
+    environment:
+      MICAFOX_SERVICE: formats-bundled
+      MICAFOX_LOG_LEVEL: error

@@ -7,7 +7,7 @@ import { QuoteController } from "./quote.controller.js";
 
 @Module({ controllers: [QuoteController] })
 export class AppModule implements OnApplicationShutdown {
-  // Nest calls it on SIGTERM after the HTTP server has closed, as main.ts enables shutdown hooks
+  // Nest calls it after the HTTP server has closed, when main.ts closes the app on SIGTERM
   async onApplicationShutdown(): Promise<void> {
     await micafox.stop();
     console.log("micafox stopped");

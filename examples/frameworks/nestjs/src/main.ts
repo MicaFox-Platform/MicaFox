@@ -13,8 +13,16 @@ micafox.run();
 
 const main = async (): Promise<void> => {
   const app = await NestFactory.create(AppModule, { logger: ["error", "warn"] });
-  // On SIGTERM Nest closes the server, runs AppModule.onApplicationShutdown() and then ends by the same signal
-  app.enableShutdownHooks();
+  // close() stops the server and runs AppModule.onApplicationShutdown(); the process then ends with code 0 once nothing
+  // is left. Not enableShutdownHooks(): it ends the process by re-sending the signal, which a container's PID 1 ignores
+  for (const signal of ["SIGTERM", "SIGINT"] as const) {
+    process.once(signal, () => {
+      app.close().catch((error: unknown) => {
+        console.error("failed to shut down:", error);
+        process.exitCode = 1;
+      });
+    });
+  }
   // An empty HOST counts as unset: listen() would take "" as every interface
   const host = process.env.HOST ?? "";
   await app.listen(Number(process.env.PORT ?? "0"), host === "" ? "127.0.0.1" : host);
