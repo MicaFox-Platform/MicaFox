@@ -111,6 +111,7 @@ describe("Pauses reading odd pause events", () => {
       send: () => undefined,
       fail,
       onRemoved: () => undefined,
+      now: () => 0,
     });
     const pauses = new Pauses({
       session: inspector,

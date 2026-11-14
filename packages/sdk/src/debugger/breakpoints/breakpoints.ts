@@ -1,42 +1,34 @@
 import type { BreakpointStatus } from "@micafox/protocol";
 
+import { DebuggerDomain, type DomainInspector } from "./domain.js";
 import {
-  isSameEntry,
+  diffList,
   isSameStatus,
   isUnresolved,
+  keepsDomainOn,
   summarizeOutcomes,
   toStatus,
+  type Applied,
   type ListedEntry,
   type Outcome,
   type Placed,
   type ValidEntry,
 } from "./entry.js";
+import { Expiry } from "./expiry.js";
 import { placeAgain, placeEntry, releaseEntry, type PlaceContext } from "./place-entry.js";
 import { readBreakpointList } from "./read-list.js";
-import { V8Breakpoints, type V8Inspector } from "./v8-breakpoints.js";
+import { V8Breakpoints } from "./v8-breakpoints.js";
 import type { SdkLogger } from "../../logger/index.js";
 import type { PausedLocation, SnapshotTarget } from "../capture/index.js";
-import {
-  ScriptRegistry,
-  isMapped,
-  mayResolveTo,
-  toSegments,
-  type MappedRecord,
-  type ScriptRecord,
-} from "../location/index.js";
+import { isMapped, mayResolveTo, toSegments, type MappedRecord, type ScriptRecord } from "../location/index.js";
 import { SourceMaps, locateFrame, type FrameLocation, type MapView } from "../source-maps/index.js";
 
 const COMPONENT = "debugger";
 
-/** The inspector session as `Breakpoints` uses it; an `InspectorSession` fits. */
-export interface BreakpointsInspector extends V8Inspector {
-  /** Calls `handler` with the params of every `event`; returns a function that stops it. */
-  on(event: string, handler: (params: unknown) => void): () => void;
-}
-
 /** What `Breakpoints` needs from the debugger. */
 export interface BreakpointsDependencies {
-  session: BreakpointsInspector;
+  /** The inspector session; an `InspectorSession` fits. */
+  session: DomainInspector;
   logger: SdkLogger;
   /** Sends a status to the hub; it never throws. */
   send: (status: BreakpointStatus) => void;
@@ -44,22 +36,12 @@ export interface BreakpointsDependencies {
   fail: (error: unknown) => void;
   /** Called with the id of an entry the latest list no longer has. */
   onRemoved: (id: string) => void;
-}
-
-/** The inspector refused a command the breakpoints cannot work without. */
-class BreakpointsError extends Error {
-  override readonly name = "BreakpointsError";
-}
-
-/** An entry of the latest list and what became of it. */
-interface Applied {
-  entry: ListedEntry;
-  /** The segments of the entry's `file`; empty for an invalid entry. */
-  segments: string[];
-  outcome: Outcome;
+  /** The monotonic clock in milliseconds, such as `performance.now()`: the entries' time left counts down on it. */
+  now: () => number;
 }
 
 const UNREAD: MapView = { kind: "unread" };
+const EXPIRED: Outcome = { status: "expired" };
 
 /**
  * The breakpoints the hub listed, set in V8 in the loaded scripts, through their source maps where they have one.
@@ -69,12 +51,11 @@ const UNREAD: MapView = { kind: "unread" };
  */
 export class Breakpoints {
   private readonly applied = new Map<string, Applied>();
-  private readonly scripts = new ScriptRegistry();
+  private readonly domain: DebuggerDomain;
   private readonly v8: V8Breakpoints;
   private readonly sourceMaps: SourceMaps<MappedRecord>;
   private readonly placing: PlaceContext;
-  private readonly unsubscribes: Array<() => void> = [];
-  private isDomainOn = false;
+  private readonly expiry: Expiry;
   private isStopped = false;
   /**
    * Every breakpoint is off in V8 for the process's rate limit, so a newly set entry is `rateLimited`. The domain
@@ -94,24 +75,37 @@ export class Breakpoints {
       },
       fail: dependencies.fail,
     });
+    this.domain = new DebuggerDomain({
+      session: dependencies.session,
+      logger: dependencies.logger,
+      isStopped: () => this.isStopped,
+      onScript: (script) => {
+        this.onScript(script);
+      },
+      onCleared: () => {
+        this.sourceMaps.clear();
+      },
+      fail: dependencies.fail,
+    });
     this.placing = {
-      scripts: this.scripts,
+      scripts: this.domain.scripts,
       sourceMaps: this.sourceMaps,
       v8: this.v8,
       logger: dependencies.logger,
     };
+    this.expiry = new Expiry({
+      now: dependencies.now,
+      onDue: (ids) => {
+        this.onExpired(ids);
+      },
+      fail: dependencies.fail,
+    });
   }
 
   /** Listens to the inspector's events; none arrives while the `Debugger` domain is off. */
   start(): void {
     this.isStopped = false;
-    this.unsubscribes.push(
-      this.dependencies.session.on("Debugger.scriptParsed", (params) => {
-        this.guard(() => {
-          this.onScriptParsed(params);
-        });
-      }),
-    );
+    this.domain.listen();
   }
 
   /** Makes the breakpoints match a `breakpoints` message and sends the status of each listed one; may throw. */
@@ -126,7 +120,7 @@ export class Breakpoints {
       this.log("warn", warning);
     }
 
-    this.update(list.entries);
+    this.update(list.entries, this.dependencies.now());
     // A handler of an event V8 sent inside a command may have stopped the debugger; that stop logged why
     if (this.isStopped) {
       return;
@@ -142,7 +136,7 @@ export class Breakpoints {
    * a breakpoint is set through it, else the script's own path and position. Never throws.
    */
   locateFrame(frame: PausedLocation): FrameLocation {
-    const script = this.scripts.findFrameScript(frame.scriptId);
+    const script = this.domain.scripts.findFrameScript(frame.scriptId);
     const view = script?.record !== undefined && isMapped(script.record) ? this.sourceMaps.view(script.record) : UNREAD;
     return locateFrame(script?.url, view, { line: frame.lineNumber, column: frame.columnNumber });
   }
@@ -206,9 +200,7 @@ export class Breakpoints {
   /** Forgets the V8 breakpoints and scripts after `Debugger.disable` turned the domain off from outside. */
   forgetDomain(): void {
     this.v8.forgetAll();
-    this.scripts.clear();
-    this.sourceMaps.clear();
-    this.isDomainOn = false;
+    this.domain.forget();
   }
 
   /** Removes every breakpoint from V8 and turns the `Debugger` domain off; the debugger is stopping. */
@@ -217,53 +209,92 @@ export class Breakpoints {
     // The pause handler stays until the domain is off: a warning logged here runs app code, which may pause
     this.v8.removeAll();
     this.applied.clear();
+    this.expiry.clear();
     this.sourceMaps.clear();
-    this.turnOff();
-    for (const unsubscribe of this.unsubscribes.splice(0)) {
-      unsubscribe();
-    }
+    this.domain.turnOff();
+    this.domain.stopListening();
   }
 
   // docs/architecture/sdk/debugger.md#applying-breakpoints
-  private update(entries: readonly ListedEntry[]): void {
-    const next = new Map(entries.map((entry) => [entry.id, entry]));
-    for (const [id, current] of this.applied) {
-      const replacement = next.get(id);
-      if (replacement === undefined || !isSameEntry(current.entry, replacement)) {
-        this.drop(id, current);
-      }
-
-      // A changed entry keeps its rate limit, so sending the list again does not reset it
-      if (replacement === undefined) {
+  private update(entries: readonly ListedEntry[], arrivedAt: number): void {
+    for (const { id, current, isRemoved } of diffList(this.applied, entries)) {
+      this.drop(id, current);
+      if (isRemoved) {
         this.dependencies.onRemoved(id);
       }
     }
 
-    // Without an entry to set in V8 the domain is off, also for a list of invalid entries
-    if (!entries.some((entry) => entry.kind === "valid")) {
-      this.addAll(entries);
-      this.turnOff();
-      return;
+    // Without an entry to set in V8 the domain is off, also for a list of invalid or expired entries
+    const isLive = entries.some((entry) => keepsDomainOn(entry, this.applied.get(entry.id)?.outcome));
+    if (isLive) {
+      // Turning the domain on makes V8 report every loaded script, so the entries are resolved after it
+      this.domain.turnOn();
+      if (this.isStopped) {
+        return;
+      }
     }
 
-    // Turning the domain on makes V8 report every loaded script, so the entries are resolved after it
-    this.turnOn();
-    if (!this.isStopped) {
-      this.addAll(entries);
+    this.addAll(entries);
+    this.setDeadlines(entries, arrivedAt);
+    if (!isLive) {
+      this.domain.turnOff();
     }
   }
 
   private addAll(entries: readonly ListedEntry[]): void {
     for (const entry of entries) {
       if (!this.applied.has(entry.id)) {
-        this.applied.set(entry.id, this.resolve(entry));
+        // An entry with no time left is never set in V8
+        const isOver = entry.kind === "valid" && entry.expiresInMs === 0;
+        this.applied.set(entry.id, isOver ? { entry, segments: [], outcome: EXPIRED } : this.resolve(entry));
       }
     }
   }
 
+  // Each list sets the deadline of its entries again, to extend or to shorten it; no V8 call
+  private setDeadlines(entries: readonly ListedEntry[], arrivedAt: number): void {
+    for (const entry of entries) {
+      if (entry.kind !== "valid" || this.applied.get(entry.id)?.outcome.status === "expired") {
+        continue;
+      }
+
+      if (entry.expiresInMs === 0) {
+        this.expire(entry.id);
+      } else {
+        this.expiry.set(entry.id, arrivedAt + entry.expiresInMs);
+      }
+    }
+
+    this.expiry.schedule();
+  }
+
   private drop(id: string, current: Applied): void {
     releaseEntry(this.placing, id, current.outcome);
+    this.expiry.delete(id);
     this.applied.delete(id);
+  }
+
+  // The entry loses its V8 breakpoint and its hold on a source map; it stays in the list as expired
+  private expire(id: string): void {
+    const current = this.applied.get(id);
+    if (current !== undefined && current.outcome.status !== "expired") {
+      releaseEntry(this.placing, id, current.outcome);
+      this.expiry.delete(id);
+      this.applied.set(id, { ...current, outcome: EXPIRED });
+    }
+  }
+
+  // The timer: with the last live entry gone the domain goes off, so V8 runs the app as if MicaFox were not there
+  private onExpired(ids: readonly string[]): void {
+    for (const id of ids) {
+      this.expire(id);
+    }
+
+    this.report(ids);
+    this.log("info", `breakpoints expired: ${String(ids.length)}`);
+    if (![...this.applied.values()].some(({ entry, outcome }) => keepsDomainOn(entry, outcome))) {
+      this.domain.turnOff();
+    }
   }
 
   private resolve(entry: ListedEntry): Applied {
@@ -295,13 +326,10 @@ export class Breakpoints {
   }
 
   // A pending entry is resolved again when a script it may resolve to loads; the new status is sent
-  private onScriptParsed(params: unknown): void {
-    const script = this.scripts.record(params);
-    if (script !== undefined) {
-      // A script with the URL of a recorded one replaces it, so the map read for the old one no longer applies
-      this.sourceMaps.forget(script.url);
-      this.resolvePending(script);
-    }
+  private onScript(script: ScriptRecord): void {
+    // A script with the URL of a recorded one replaces it, so the map read for the old one no longer applies
+    this.sourceMaps.forget(script.url);
+    this.resolvePending(script);
   }
 
   // The entries waiting for this map are resolved again; then its index is dropped unless one of them holds it
@@ -331,47 +359,6 @@ export class Breakpoints {
     }
 
     this.report(changed);
-  }
-
-  private turnOn(): void {
-    if (this.isDomainOn) {
-      return;
-    }
-
-    const enabled = this.dependencies.session.post("Debugger.enable");
-    if (!enabled.ok) {
-      throw new BreakpointsError("the inspector could not turn the Debugger domain on", { cause: enabled.error });
-    }
-
-    // Stopped by a scriptParsed handler during the command: the session is disconnected and the domain with it
-    if (this.isStopped) {
-      return;
-    }
-
-    this.isDomainOn = true;
-    this.log("debug", "Debugger domain on");
-  }
-
-  // V8 reports every loaded script again when the domain is turned on, so the records are dropped. When disabling
-  // fails the domain is still on and keeps its scripts, so the next list does not turn it on again
-  private turnOff(): void {
-    if (!this.isDomainOn) {
-      return;
-    }
-
-    const disabled = this.dependencies.session.post("Debugger.disable");
-    if (!disabled.ok) {
-      this.dependencies.logger.log("warn", "the inspector could not turn the Debugger domain off", {
-        component: COMPONENT,
-        error: disabled.error,
-      });
-      return;
-    }
-
-    this.scripts.clear();
-    this.sourceMaps.clear();
-    this.isDomainOn = false;
-    this.log("debug", "Debugger domain off");
   }
 
   private report(ids: readonly string[]): void {

@@ -3,18 +3,16 @@ import { Session, url as readInspectorUrl } from "node:inspector";
 import { performance } from "node:perf_hooks";
 import { isMainThread } from "node:worker_threads";
 
-import { Breakpoints } from "./breakpoints/index.js";
 import { chooseConnector, type ConnectorChoice } from "./connector-choice.js";
-import { ConnectorLink } from "./connector-link.js";
-import { InspectorSession, type InspectorBinding } from "./inspector-session.js";
+import type { InspectorBinding } from "./inspector-session.js";
 import { readConfigureOptions, resolveEnabled, type ConfiguredOptions, type DebuggerOptions } from "./options.js";
-import { Pauses } from "./pauses/index.js";
-import { RateLimiter } from "./rate-limiter/index.js";
 import { resolveRedaction, type RedactionRules } from "./redaction/index.js";
+import { createRunning, type Running } from "./running.js";
 import { HubConnector, type HubConnectorOptions, type Warn } from "../connector/index.js";
 import { createLogger, type Environment, type Logger, type SdkLogger } from "../logger/index.js";
 
 const COMPONENT = "debugger";
+const MODULE = "debugger";
 
 /** What the `Debugger` needs from outside; tests replace the process and the inspector here. */
 export interface DebuggerDependencies {
@@ -27,20 +25,13 @@ export interface DebuggerDependencies {
   createInspectorBinding?: () => InspectorBinding;
   /** Creates the default connector, which `run()` uses when the app sets no `connector`. */
   createHubConnector?: (options: HubConnectorOptions) => Connector;
+  /** The monotonic clock in milliseconds that the rate limits and the breakpoints' time left count on. */
+  now?: () => number;
 }
 
 /** A start step failed: the inspector session could not connect. */
 class DebuggerStartError extends Error {
   override readonly name = "DebuggerStartError";
-}
-
-/** What one `run()` started, so that `stop()` undoes exactly that. */
-interface Running {
-  readonly connector: ConnectorChoice;
-  readonly link: ConnectorLink;
-  readonly session: InspectorSession;
-  readonly breakpoints: Breakpoints;
-  readonly pauses: Pauses;
 }
 
 type State = { kind: "notRunning" } | { kind: "running"; running: Running } | { kind: "stopping"; done: Promise<void> };
@@ -65,6 +56,7 @@ export class MicafoxDebugger implements Debugger {
   private readonly isMainThread: boolean;
   private readonly createInspectorBinding: () => InspectorBinding;
   private readonly createHubConnector: (options: HubConnectorOptions) => Connector;
+  private readonly now: () => number;
   private readonly warn: Warn = (message) => {
     this.logger.log("warn", message, { component: COMPONENT });
   };
@@ -77,6 +69,7 @@ export class MicafoxDebugger implements Debugger {
     this.isMainThread = dependencies.isMainThread ?? isMainThread;
     this.createInspectorBinding = dependencies.createInspectorBinding ?? ((): InspectorBinding => new Session());
     this.createHubConnector = dependencies.createHubConnector ?? ((options): Connector => new HubConnector(options));
+    this.now = dependencies.now ?? ((): number => performance.now());
     // One logger for the debugger's lifetime: configure() and run() only change its target and level
     this.logger = createLogger({ component: COMPONENT, env: this.env, console: dependencies.console ?? console });
   }
@@ -197,38 +190,17 @@ export class MicafoxDebugger implements Debugger {
     return undefined;
   }
 
-  // The parts of one run(); `fail` stops the debugger only while this run is the current one
-  private createRunning(choice: ConnectorChoice, redaction: RedactionRules, fail: (error: unknown) => void): Running {
-    const link = new ConnectorLink(choice.connector, this.logger);
-    const session = new InspectorSession(this.logger, this.createInspectorBinding());
-    const limiter = new RateLimiter(() => performance.now());
-    const send = (message: Message): void => {
-      link.send(message);
-    };
-    const breakpoints = new Breakpoints({
-      session,
-      logger: this.logger,
-      send,
-      fail,
-      onRemoved: (id) => {
-        limiter.forget(id);
-      },
-    });
-    const pauses = new Pauses({
-      session,
-      logger: this.logger,
-      breakpoints,
-      limiter,
-      isSecret: (name) => redaction.isSecret(name),
-      send,
-      fail,
-    });
-    return { connector: choice, link, session, breakpoints, pauses };
-  }
-
   private startWith(choice: ConnectorChoice, redaction: RedactionRules): void {
-    const running = this.createRunning(choice, redaction, (error) => {
-      this.failRunning(running, error);
+    // `fail` stops the debugger only while this run is the current one
+    const running = createRunning({
+      choice,
+      redaction,
+      logger: this.logger,
+      binding: this.createInspectorBinding(),
+      now: this.now,
+      fail: (error) => {
+        this.failRunning(running, error);
+      },
     });
     this.state = { kind: "running", running };
     const isCurrent = (): boolean => this.isCurrent(running);
@@ -293,7 +265,9 @@ export class MicafoxDebugger implements Debugger {
         return;
       }
 
-      if (message.type === "breakpoints") {
+      // The type says `debugger`, but a custom connector passes on what it received
+      const module: unknown = Reflect.get(message, "module");
+      if (message.type === "breakpoints" && module === MODULE) {
         running.breakpoints.apply(message);
         return;
       }
