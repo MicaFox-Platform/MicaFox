@@ -10,7 +10,7 @@ The SDK needs a default transport to the hub, so every user of the SDK gets the 
 another transport implement the `Connector` interface from `@micafox/protocol` and do not need the default
 one. The hub is the other end of the wire and needs only the protocol. The SDK and its default transport change
 together. Beyond the protocol and Node built-ins, the default connector needs only `ws`
-([ADR 0008](0008-use-websocket-for-the-hub-connection.md)) and the SDK's logger.
+([ADR 0008](../protocol/0008-use-websocket-for-the-hub-connection.md)) and the SDK's logger.
 
 ## Decision
 

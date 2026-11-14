@@ -3,7 +3,7 @@
 How to build, test and change MicaFox. To use MicaFox in an app, read the [README](../README.md) instead.
 
 Before you change anything, read the [architecture overview](architecture/overview.md): what the parts are, how a
-debugging session flows through them, and which [decisions](adr/) are already made.
+debugging session flows through them, and which [decisions](adr/overview.md) are already made.
 
 ## Repository
 
@@ -112,7 +112,7 @@ parameters: see the [configs preset](api/configs.md#micafoxconfigseslint). `pnpm
 ## Making a change
 
 1. **Design first.** A change to how parts work together updates [docs/architecture](architecture/overview.md) in
-   the same PR, with an [ADR](adr/) when the choice is costly to reverse for users or peers.
+   the same PR, with an [ADR](adr/overview.md) when the choice is costly to reverse for users or peers.
 2. **Public API.** A change to an export, option or environment variable updates [docs/api](api/overview.md) in the
    same PR.
 3. **Protocol.** A change in `packages/protocol` stays backward-compatible or bumps `PROTOCOL_VERSION`:

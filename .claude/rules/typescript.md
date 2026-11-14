@@ -65,8 +65,8 @@ any other ends with `default`. `for...of` over arrays and `Object.entries()`, ne
 - Throw only `new` typed `Error` subclasses (`class BreakpointError extends Error`); reject promises with them too.
   Rethrow with `{ cause }`. (§ Exceptions, Node BP 2.2)
 - Error messages and `cause` never carry captured values, tokens or URLs with credentials: they end up in logs
-  ([ADR 0006](../../docs/adr/0006-authenticate-to-the-hub-with-a-bearer-token.md),
-  [ADR 0012](../../docs/adr/0012-redact-secrets-by-name-inside-the-sdk.md)).
+  ([ADR 0006](../../docs/adr/sdk/connector/0006-authenticate-to-the-hub-with-a-bearer-token.md),
+  [ADR 0012](../../docs/adr/sdk/debugger/0012-redact-secrets-by-name-inside-the-sdk.md)).
 - Keep a `try` block to the lines that can throw. An empty `catch` holds a comment saying why.
 - Listen to `'error'` on every emitter and stream you create. (Node BP 2.13)
 - In `packages/sdk`, errors stop at the boundary: see [SDK](sdk.md).

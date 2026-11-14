@@ -15,7 +15,7 @@ a `HubConnector` can be created directly, sometimes twice in one process with di
 
 We resolve each option once, from the value passed in code, then its `MICAFOX_*` environment variable, then the
 default: `micafox` options at `micafox.run()`, `HubConnector` options in its constructor. Only values that differ per
-deployment get an environment variable; the list is in the [SDK API](../api/sdk/overview.md#usage).
+deployment get an environment variable; the list is in the [SDK API](../../api/sdk/overview.md#usage).
 
 ## Alternatives
 

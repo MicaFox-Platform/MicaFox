@@ -89,22 +89,5 @@ Changing the contract between peers: [changing the protocol](protocol.md#changin
 
 ## Decisions
 
-- [0001. Keep the protocol in its own package](../adr/0001-keep-the-protocol-in-its-own-package.md)
-- [0002. Ship the default connector inside the SDK](../adr/0002-ship-the-default-connector-inside-the-sdk.md)
-- [0003. Configure the SDK from options, then env](../adr/0003-configure-the-sdk-from-options-then-env.md)
-- [0004. Use handler functions in the Connector interface](../adr/0004-use-handler-functions-in-the-connector-interface.md)
-- [0005. Batch and rate-limit messages in the connector](../adr/0005-batch-and-rate-limit-messages-in-the-connector.md)
-- [0006. Authenticate to the hub with a bearer token](../adr/0006-authenticate-to-the-hub-with-a-bearer-token.md)
-- [0007. Deliver messages to the hub at most once](../adr/0007-deliver-messages-to-the-hub-at-most-once.md)
-- [0008. Use WebSocket for the hub connection](../adr/0008-use-websocket-for-the-hub-connection.md)
-- [0009. Run the hub handshake in the connector](../adr/0009-run-the-hub-handshake-in-the-connector.md)
-- [0010. Send the full breakpoint set on every change](../adr/0010-send-the-full-breakpoint-set-on-every-change.md)
-- [0011. Encode snapshot values as a nested tree](../adr/0011-encode-snapshot-values-as-a-nested-tree.md)
-- [0012. Redact secrets by name inside the SDK](../adr/0012-redact-secrets-by-name-inside-the-sdk.md)
-- [0013. Publish the packages as ES modules and CommonJS](../adr/0013-publish-the-packages-as-es-modules-and-commonjs.md)
-- [0014. Pass SDK logs as a full message and a context](../adr/0014-pass-sdk-logs-as-a-full-message-and-a-context.md)
-- [0015. Filter SDK logs by level before the app's logger](../adr/0015-filter-sdk-logs-by-level-before-the-apps-logger.md)
-- [0016. Use the hello's protocol version for the session](../adr/0016-use-the-hellos-protocol-version-for-the-session.md)
-- [0017. Tag messages with their module and agree on modules](../adr/0017-tag-messages-with-their-module-and-agree-on-modules.md)
-- [0018. Expire breakpoints in the SDK by a time left from the hub](../adr/0018-expire-breakpoints-in-the-sdk-by-a-time-left-from-the-hub.md)
-- [0019. Report the deployed commit in hello](../adr/0019-report-the-deployed-commit-in-hello.md)
+Every ADR, grouped by component, and the superseded ones: [ADR overview](../adr/overview.md). Each
+component doc lists its own under Decisions.

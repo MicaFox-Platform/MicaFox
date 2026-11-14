@@ -48,7 +48,7 @@ module loads. Design:
 - `run()` — starts the debugger and returns at once: it resolves the options, opens an inspector session and
   connects to the hub in the background. Each option is resolved here, once: the value passed to `configure()`,
   then its environment variable, then the default (see
-  [ADR 0003](../../adr/0003-configure-the-sdk-from-options-then-env.md)). Changes to `process.env` take
+  [ADR 0003](../../adr/sdk/0003-configure-the-sdk-from-options-then-env.md)). Changes to `process.env` take
   effect on the next `run()`.
 - `stop()` — removes all breakpoints, closes the inspector session and closes the connector the debugger created,
   which sends buffered snapshots for up to `hubConnector.closeTimeoutMs`. Resolves when done; `run()` may be called
@@ -145,7 +145,7 @@ The options of [`micafox.configure()`](#micafox). Every field is optional.
   removed. Names from the option and from `MICAFOX_REDACT` both apply, at most 100 together; a name is matched on its
   first 256 characters. Default: built-in names only. Rules:
   [redacting secrets](../../architecture/sdk/debugger.md#redacting-secrets),
-  [ADR 0012](../../adr/0012-redact-secrets-by-name-inside-the-sdk.md).
+  [ADR 0012](../../adr/sdk/debugger/0012-redact-secrets-by-name-inside-the-sdk.md).
 - `logger` — [`Logger`](logger.md#logger), used by the debugger and by the default connector. Default: `console`.
 - `logLevel` — [`LogLevel`](logger.md#loglevel), env `MICAFOX_LOG_LEVEL`: the lowest level written, for the debugger
   and the default connector. Default `warn`. A `configure()` call before `run()` applies `logger` and `logLevel`

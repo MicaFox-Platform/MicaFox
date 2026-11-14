@@ -32,7 +32,7 @@ Design: [connector architecture](../../architecture/sdk/connector.md).
 Each option is resolved once, in the constructor: the passed value, then its environment variable, then the
 default. An empty string counts as unset. A passed value that is invalid is ignored with a warning, and its
 environment variable is not read. Only values that differ per deployment have an environment variable. See
-[ADR 0003](../../adr/0003-configure-the-sdk-from-options-then-env.md). Every number option must be a finite
+[ADR 0003](../../adr/sdk/0003-configure-the-sdk-from-options-then-env.md). Every number option must be a finite
 integer of at least 1, and `reconnect.minDelayMs` must not exceed `reconnect.maxDelayMs`.
 
 - `options.url` — `string`, env `MICAFOX_HUB_URL`. The hub's WebSocket URL, `ws://` or `wss://`; userinfo and a
@@ -41,12 +41,12 @@ integer of at least 1, and `reconnect.minDelayMs` must not exceed `reconnect.max
   not followed: the hub must be reachable directly.
 - `options.token` — `string`, env `MICAFOX_TOKEN`. The project key your hub issued, sent as
   `Authorization: Bearer <token>` when connecting; never logged. With a token, `ws://` is allowed only to `localhost`, `127.0.0.0/8` and `[::1]`. No default. See
-  [ADR 0006](../../adr/0006-authenticate-to-the-hub-with-a-bearer-token.md).
+  [ADR 0006](../../adr/sdk/connector/0006-authenticate-to-the-hub-with-a-bearer-token.md).
 - `options.service` — `string`, env `MICAFOX_SERVICE`. The service name the hub targets breakpoints by. No default.
 - `options.commit` — `string`, env `MICAFOX_COMMIT`. The commit hash the app runs, 7 to 64 hexadecimal characters,
   sent lowercased in [`hello`](../protocol.md#hello) so the hub shows the matching source. A value that is not a
   commit hash is left out with a warning. No default. See
-  [ADR 0019](../../adr/0019-report-the-deployed-commit-in-hello.md).
+  [ADR 0019](../../adr/protocol/0019-report-the-deployed-commit-in-hello.md).
 - `options.labels` — `Record<string, string>`, env `MICAFOX_LABELS` as `key=value` pairs separated by commas, such
   as `team=payments,region=eu`. Labels the hub can target breakpoints by. A passed object, even `{}`, replaces the
   env value; an entry whose value is not a string or whose key is empty is skipped with a warning, and one whose
@@ -85,7 +85,7 @@ integer of at least 1, and `reconnect.minDelayMs` must not exceed `reconnect.max
   messages first, paced by the rate limit. A `hello` is dropped with a warning: the connector sends its own. When
   the data buffer is full, the oldest data messages are dropped and a warning is logged. Delivery is at most once:
   messages lost with a dropped connection are not resent. See
-  [ADR 0007](../../adr/0007-deliver-messages-to-the-hub-at-most-once.md).
+  [ADR 0007](../../adr/protocol/0007-deliver-messages-to-the-hub-at-most-once.md).
 - `onMessage(handler)` — calls `handler` with every message from the hub after `welcome`, such as
   `breakpoints`. Handlers run in the order they subscribed. `welcome` itself and ignored frames (see Errors) never
   reach a handler, and nothing does once `close()` is called. Only `version`, `module` and `type` are checked: the message
@@ -98,7 +98,7 @@ integer of at least 1, and `reconnect.minDelayMs` must not exceed `reconnect.max
   closes the socket; otherwise it stops at once and sends nothing. Resolves within `closeTimeoutMs` + 1 s, after
   the status `closed`; a second call returns the same promise. Handlers are not called after it resolves.
 
-Batching and rate limiting: see [ADR 0005](../../adr/0005-batch-and-rate-limit-messages-in-the-connector.md).
+Batching and rate limiting: see [ADR 0005](../../adr/sdk/connector/0005-batch-and-rate-limit-messages-in-the-connector.md).
 
 **Returns** — a connector with status `disconnected`; it does no I/O until `connect()`.
 

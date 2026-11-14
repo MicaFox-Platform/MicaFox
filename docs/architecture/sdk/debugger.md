@@ -336,7 +336,7 @@ and `Breakpoints` through an interface it declares, so the two do not import eac
 4. Every reply to a list holds `expired` for each listed `id` that has expired. An `id` missing from a list is
    forgotten, and so is every expired `id` on `stop()`.
 5. Expiry runs whether or not the hub is reachable. Why:
-   [ADR 0018](../../adr/0018-expire-breakpoints-in-the-sdk-by-a-time-left-from-the-hub.md).
+   [ADR 0018](../../adr/sdk/debugger/0018-expire-breakpoints-in-the-sdk-by-a-time-left-from-the-hub.md).
 
 ### Losing the connection
 
@@ -358,11 +358,11 @@ and `Breakpoints` through an interface it declares, so the two do not import eac
 
 ## Decisions
 
-- [0003. Configure the SDK from options, then env](../../adr/0003-configure-the-sdk-from-options-then-env.md)
-- [0007. Deliver messages to the hub at most once](../../adr/0007-deliver-messages-to-the-hub-at-most-once.md)
-- [0010. Send the full breakpoint set on every change](../../adr/0010-send-the-full-breakpoint-set-on-every-change.md)
-- [0011. Encode snapshot values as a nested tree](../../adr/0011-encode-snapshot-values-as-a-nested-tree.md)
-- [0012. Redact secrets by name inside the SDK](../../adr/0012-redact-secrets-by-name-inside-the-sdk.md)
-- [0013. Publish the packages as ES modules and CommonJS](../../adr/0013-publish-the-packages-as-es-modules-and-commonjs.md)
-- [0017. Tag messages with their module and agree on modules](../../adr/0017-tag-messages-with-their-module-and-agree-on-modules.md)
-- [0018. Expire breakpoints in the SDK by a time left from the hub](../../adr/0018-expire-breakpoints-in-the-sdk-by-a-time-left-from-the-hub.md)
+- [0003. Configure the SDK from options, then env](../../adr/sdk/0003-configure-the-sdk-from-options-then-env.md)
+- [0007. Deliver messages to the hub at most once](../../adr/protocol/0007-deliver-messages-to-the-hub-at-most-once.md)
+- [0010. Send the full breakpoint set on every change](../../adr/protocol/0010-send-the-full-breakpoint-set-on-every-change.md)
+- [0011. Encode snapshot values as a nested tree](../../adr/protocol/0011-encode-snapshot-values-as-a-nested-tree.md)
+- [0012. Redact secrets by name inside the SDK](../../adr/sdk/debugger/0012-redact-secrets-by-name-inside-the-sdk.md)
+- [0013. Publish the packages as ES modules and CommonJS](../../adr/packages/0013-publish-the-packages-as-es-modules-and-commonjs.md)
+- [0017. Tag messages with their module and agree on modules](../../adr/protocol/0017-tag-messages-with-their-module-and-agree-on-modules.md)
+- [0018. Expire breakpoints in the SDK by a time left from the hub](../../adr/sdk/debugger/0018-expire-breakpoints-in-the-sdk-by-a-time-left-from-the-hub.md)

@@ -113,7 +113,7 @@ Logger, buffers, batching, rate limits and the rest: [SDK API](docs/api/sdk/over
 
 - [API](docs/api/overview.md) — every package, option and message.
 - [Architecture](docs/architecture/overview.md) — how MicaFox works inside.
-- [Architecture decisions](docs/adr/) — why it works this way.
+- [Architecture decisions](docs/adr/overview.md) — why it works this way.
 - [Vision](docs/vision.md) — goals and principles.
 - [Examples](examples/README.md) — run each one by hand from a `.env` file: [Fastify](examples/frameworks/fastify/), a minimal app to try MicaFox,
   [formats](examples/formats/), the SDK in CommonJS, ES module, tsc-built and bundled apps, and

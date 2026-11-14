@@ -8,9 +8,9 @@ Accepted · 2026-11-11
 
 A forgotten breakpoint keeps pausing a production app, within the rate limits, for as long as it is set. The hub
 removes breakpoints by sending a new list, but breakpoints stay set while the hub is unreachable
-([ADR 0007](0007-deliver-messages-to-the-hub-at-most-once.md)), so the hub alone cannot bound their life. The hub
+([ADR 0007](../../protocol/0007-deliver-messages-to-the-hub-at-most-once.md)), so the hub alone cannot bound their life. The hub
 sends the full list after every reconnect and on every change
-([ADR 0010](0010-send-the-full-breakpoint-set-on-every-change.md)). App clocks can be wrong: containers with a
+([ADR 0010](../../protocol/0010-send-the-full-breakpoint-set-on-every-change.md)). App clocks can be wrong: containers with a
 skewed clock, VMs resumed from suspend. Every hub, including custom ones, implements the rule. The protocol is not
 published yet, so version 1 can still change.
 

@@ -61,5 +61,5 @@ We could use WebSocket or HTTP. WebSocket is probably better because...
 ## Transport
 
 The connector opens one WebSocket to the hub and keeps it alive with heartbeats. See
-[ADR 0003](../adr/0003-use-websocket-between-the-sdk-and-the-hub.md).
+[ADR 0008](../adr/protocol/0008-use-websocket-for-the-hub-connection.md).
 ```

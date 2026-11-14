@@ -17,8 +17,8 @@ the host app. It does not ship the app's own logs. How to use it: [API](../../ap
 - Does not own:
   - what is logged and at which level: the [debugger](debugger.md) and the [connector](connector.md);
   - keeping secrets out of messages: each call site passes URLs as origin and path only, and never the token or a
-    captured value ([ADR 0006](../../adr/0006-authenticate-to-the-hub-with-a-bearer-token.md),
-    [ADR 0012](../../adr/0012-redact-secrets-by-name-inside-the-sdk.md)).
+    captured value ([ADR 0006](../../adr/sdk/connector/0006-authenticate-to-the-hub-with-a-bearer-token.md),
+    [ADR 0012](../../adr/sdk/debugger/0012-redact-secrets-by-name-inside-the-sdk.md)).
 - Constraints:
   - Never throws and never rejects. A logger method that throws is caught and its error is not logged, so a broken
     logger cannot recurse. A returned thenable gets `then(undefined, noop)` inside the same `try`, so a failing
@@ -87,7 +87,7 @@ packages/sdk/src/logger/
    first line is written, or is `warn`. A `configure()` call that sets `logger` or `logLevel` applies them first,
    so its own warnings already use them.
 2. `run()` resolves both like every option: the value from `configure()`, then `MICAFOX_LOG_LEVEL`, then `warn`. See
-   [ADR 0003](../../adr/0003-configure-the-sdk-from-options-then-env.md) and, for `configure()` at other
+   [ADR 0003](../../adr/sdk/0003-configure-the-sdk-from-options-then-env.md) and, for `configure()` at other
    times, [calls in any order](../../api/sdk/debugger.md#micafox).
 3. `new HubConnector(options)` resolves them the same way in its constructor, unless it got the debugger's logger.
 4. An invalid `logLevel` or `MICAFOX_LOG_LEVEL` logs a warning and `warn` is used. A `logger` that is not an object
@@ -153,6 +153,6 @@ packages/sdk/src/logger/
 
 ## Decisions
 
-- [0003. Configure the SDK from options, then env](../../adr/0003-configure-the-sdk-from-options-then-env.md)
-- [0014. Pass SDK logs as a full message and a context](../../adr/0014-pass-sdk-logs-as-a-full-message-and-a-context.md)
-- [0015. Filter SDK logs by level before the app's logger](../../adr/0015-filter-sdk-logs-by-level-before-the-apps-logger.md)
+- [0003. Configure the SDK from options, then env](../../adr/sdk/0003-configure-the-sdk-from-options-then-env.md)
+- [0014. Pass SDK logs as a full message and a context](../../adr/sdk/logger/0014-pass-sdk-logs-as-a-full-message-and-a-context.md)
+- [0015. Filter SDK logs by level before the app's logger](../../adr/sdk/logger/0015-filter-sdk-logs-by-level-before-the-apps-logger.md)

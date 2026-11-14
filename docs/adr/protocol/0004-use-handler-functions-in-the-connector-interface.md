@@ -33,5 +33,5 @@ rejects.
   handler gets only later changes.
 - Every implementation catches errors from handlers, calls handlers only outside its own methods, never reports a
   status twice in a row and reports `closed` once, only after `close()`, as the
-  [`Connector` contract](../api/protocol.md#connector) lists. The SDK stops its debugger when a connector reports
+  [`Connector` contract](../../api/protocol.md#connector) lists. The SDK stops its debugger when a connector reports
   `closed`.

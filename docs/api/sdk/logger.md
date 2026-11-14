@@ -28,7 +28,7 @@ or to a [`HubConnector`](connector.md#hubconnector). `console`, pino and winston
   `[micafox] connector: hub unreachable, retrying in 4 s: connect ECONNREFUSED`.
 - `context` — [`LogContext`](#logcontext), always passed. Plain values for loggers that store structured fields;
   pino drops it, winston merges it. See
-  [ADR 0014](../../adr/0014-pass-sdk-logs-as-a-full-message-and-a-context.md).
+  [ADR 0014](../../adr/sdk/logger/0014-pass-sdk-logs-as-a-full-message-and-a-context.md).
 
 Only lines at or above [`logLevel`](#loglevel) reach the logger. A problem repeated within 60 s is logged once in
 full, then as one summary line with `count`.
@@ -74,7 +74,7 @@ The lowest level the SDK writes; `silent` writes nothing. Set it as `logLevel` i
 `MICAFOX_LOG_LEVEL`. Default `warn`. Lines below it are dropped inside the SDK, before your logger is called, so
 lower it too when your logger is set to `debug`. Values are matched exactly, in lowercase; an empty
 `MICAFOX_LOG_LEVEL` counts as unset, and an invalid value logs a warning and `warn` is used. See
-[ADR 0015](../../adr/0015-filter-sdk-logs-by-level-before-the-apps-logger.md).
+[ADR 0015](../../adr/sdk/logger/0015-filter-sdk-logs-by-level-before-the-apps-logger.md).
 
 - `error` — MicaFox cannot do its job until something changes, such as a rejected token.
 - `warn` — a problem MicaFox recovers from, or lost data, such as a reconnect or dropped snapshots.

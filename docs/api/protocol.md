@@ -25,7 +25,7 @@ interface Connector {
 
 Carries protocol messages between the SDK and a hub. The SDK ships
 [`HubConnector`](sdk/connector.md#hubconnector); implement this interface for any other transport. Why this shape:
-[ADR 0004](../adr/0004-use-handler-functions-in-the-connector-interface.md).
+[ADR 0004](../adr/protocol/0004-use-handler-functions-in-the-connector-interface.md).
 
 Every implementation keeps this contract:
 
@@ -88,7 +88,7 @@ Until the packages' first release on npm, version 1 still changes in place.
 A session uses the version of its `hello`: `welcome` and every later message in both directions carry it, and a
 message with another version is a protocol error. A hub accepts every version it still has types for and closes
 with `incompatibleVersion` otherwise. The SDK speaks only its own `PROTOCOL_VERSION`. Why:
-[ADR 0016](../adr/0016-use-the-hellos-protocol-version-for-the-session.md).
+[ADR 0016](../adr/protocol/0016-use-the-hellos-protocol-version-for-the-session.md).
 
 ```ts
 import { PROTOCOL_VERSION } from "@micafox/protocol";
@@ -117,7 +117,7 @@ Type names are unique within a module only, so a peer reads a message in this or
    or that the peer does not know, is ignored.
 4. A message whose `type` the peer does not know within its module, or that only the other side sends, is ignored.
 
-Why: [ADR 0017](../adr/0017-tag-messages-with-their-module-and-agree-on-modules.md). With TypeScript, check `module`
+Why: [ADR 0017](../adr/protocol/0017-tag-messages-with-their-module-and-agree-on-modules.md). With TypeScript, check `module`
 before `type` to narrow a message.
 
 ```ts
@@ -147,20 +147,20 @@ interface Hello {
 
 The first message the SDK sends on every connection. `instanceId` is a random UUID that stays the same across
 reconnects of one connector; `service` and `labels` are what the hub targets breakpoints by. Why the connector sends
-it: [ADR 0009](../adr/0009-run-the-hub-handshake-in-the-connector.md).
+it: [ADR 0009](../adr/sdk/connector/0009-run-the-hub-handshake-in-the-connector.md).
 
 - `modules` — the SDK modules this instance runs, such as `["debugger"]`. A hub ignores names it does not know.
   `HubConnector` gets the list from the SDK; a connector you write, or a `HubConnector` you create yourself, sends
   `["debugger"]`.
 - `commit` — the commit the instance runs, as a lowercase hexadecimal hash of 7 to 64 characters; left out when
-  unknown. See [ADR 0019](../adr/0019-report-the-deployed-commit-in-hello.md).
+  unknown. See [ADR 0019](../adr/protocol/0019-report-the-deployed-commit-in-hello.md).
 
 Every connector and hub keeps this handshake:
 
 1. The connector sends the token as `Authorization: Bearer <token>` on the WebSocket upgrade. The token is the
    secret project key the hub issued: the hub finds the project by it, and answers HTTP 401 or 403 when it is
    missing or invalid. A project may have several valid keys, so one can be rotated without downtime. See
-   [ADR 0006](../adr/0006-authenticate-to-the-hub-with-a-bearer-token.md).
+   [ADR 0006](../adr/sdk/connector/0006-authenticate-to-the-hub-with-a-bearer-token.md).
 2. The connector sends `hello` as the first frame and nothing else until it receives `welcome`.
 3. The hub sends nothing before `welcome`, and replies `welcome` within 10 s of the `hello`, or closes with
    [`CLOSE_CODES`](#close_codes) `incompatibleVersion` or `protocolError`.
@@ -214,7 +214,7 @@ other messages only after it.
 - A `welcome` without a `modules` array is invalid: the connector closes with `protocolError`.
 
 The connector logs one warning per session for each module of its `hello` that `welcome` leaves out, and drops that
-module's outgoing messages. Why: [ADR 0017](../adr/0017-tag-messages-with-their-module-and-agree-on-modules.md).
+module's outgoing messages. Why: [ADR 0017](../adr/protocol/0017-tag-messages-with-their-module-and-agree-on-modules.md).
 
 ```ts
 import { PROTOCOL_VERSION, type Welcome } from "@micafox/protocol";
@@ -235,7 +235,7 @@ interface Batch {
 A frame from the SDK to the hub that carries one or more messages; the hub handles them in order, as if they came
 one by one, and each keeps its own `version`. A hub accepts it alongside single messages; a connector may send
 either. A batch never holds `hello` or another batch. Why:
-[ADR 0005](../adr/0005-batch-and-rate-limit-messages-in-the-connector.md).
+[ADR 0005](../adr/sdk/connector/0005-batch-and-rate-limit-messages-in-the-connector.md).
 
 ```ts
 import { PROTOCOL_VERSION, type Batch, type Message } from "@micafox/protocol";
@@ -257,11 +257,11 @@ interface Breakpoints {
 From the hub: the complete list of [breakpoints](#breakpoint) the instance should have, sent right after
 [`welcome`](#welcome) and on every change. The SDK sets the new ones, removes those missing from the list and sends
 a [`breakpointStatus`](#breakpointstatus) for every listed breakpoint. An empty list removes all of them. Why a
-full list: [ADR 0010](../adr/0010-send-the-full-breakpoint-set-on-every-change.md).
+full list: [ADR 0010](../adr/protocol/0010-send-the-full-breakpoint-set-on-every-change.md).
 
 A hub builds the list on every send, with each `expiresInMs` computed at that moment, and never sends a list it
 cached earlier: a replayed list would give every breakpoint its full time back. See
-[ADR 0018](../adr/0018-expire-breakpoints-in-the-sdk-by-a-time-left-from-the-hub.md).
+[ADR 0018](../adr/sdk/debugger/0018-expire-breakpoints-in-the-sdk-by-a-time-left-from-the-hub.md).
 
 A hub sends at most 100 entries. In list order, entries after the 100th get status `error`; entries after the
 200th, entries without a string `id`, and repeats of an `id` get no status.
@@ -305,7 +305,7 @@ One breakpoint in [`breakpoints`](#breakpoints).
   hub extends or shortens a breakpoint by sending a new value; a change of `expiresInMs` alone does not move the
   breakpoint. When the time runs out, the SDK removes the breakpoint and reports `expired`. An expired `id` stays
   expired while it is listed: to set it again, the hub sends it under a new `id`. A hub with no expiry chosen by the
-  user sends 1 h. Why: [ADR 0018](../adr/0018-expire-breakpoints-in-the-sdk-by-a-time-left-from-the-hub.md).
+  user sends 1 h. Why: [ADR 0018](../adr/sdk/debugger/0018-expire-breakpoints-in-the-sdk-by-a-time-left-from-the-hub.md).
 - `limits` — [`CaptureLimits`](#capturelimits) for this breakpoint's snapshots.
 
 ```ts
@@ -496,7 +496,7 @@ type Value =
 ```
 
 One captured value, with its children inline. Why a tree:
-[ADR 0011](../adr/0011-encode-snapshot-values-as-a-nested-tree.md). What the [limits](#capturelimits) cut is
+[ADR 0011](../adr/protocol/0011-encode-snapshot-values-as-a-nested-tree.md). What the [limits](#capturelimits) cut is
 marked in place:
 
 - a `string` keeps at most `maxStringLength` UTF-16 code units, never splitting a surrogate pair; `length` is the
