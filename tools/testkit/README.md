@@ -1,8 +1,9 @@
 # @micafox/testkit
 
-The end-to-end test kit of the examples: it starts their apps and one fake hub as real child processes and waits on what
-each prints. Private and never published; only the examples (`examples/*`, `examples/frameworks/*`) depend on it, and
-ESLint keeps it out of `packages/`. It is never built: it exports its TypeScript sources, which Vitest and tsx run as
+The end-to-end test kit and the benchmark of the examples: it starts their apps and one fake hub as real child
+processes and waits on what each prints, and `pnpm bench` measures the SDK's overhead in the Fastify example. Private
+and never published; only the examples (`examples/*`, `examples/frameworks/*`) depend on it, and ESLint keeps it out
+of `packages/`. It is never built: it exports its TypeScript sources, which Vitest and tsx run as
 they are.
 
 ## Layout
@@ -28,6 +29,9 @@ they are.
   `/tmp`, 256 MB, SDK errors only) and reports it healthy once it serves; `stack.ts` starts, follows, stops and
   removes the stack with the docker CLI; `global-setup.ts` starts it once per run and always removes it; `apps.ts`
   describes each app; `__tests__/containers.test.ts` checks them.
+- `bench/` — the [benchmark](#benchmark) of `pnpm bench`, never run by `pnpm test` or `pnpm verify`: `main.ts` runs the
+  rounds and prints the result, `modes.ts` the four modes, `run.ts` one run of one mode, `load.ts` the load generator,
+  `containers.ts` the docker CLI, `measure.ts` the pure part, unit-tested in `__tests__/`.
 - `.env.example` — the hub's port and one breakpoint for each example app.
 
 `readBreakpoints()`, `startCountdown()`, `acceptModules()` and how `onConnection()` answers a `hello` have unit tests in
@@ -64,3 +68,42 @@ the end of its path, so one app's `quote.js` breakpoint would also resolve in an
 `.env.example` to `.env` first: it sets `HUB_BREAKPOINTS` to one breakpoint for each example app, on the line marked
 `// breakpoint here`, and `test/env-examples.test.ts` fails when one moves. The tests never read `.env`. How to run the
 apps: [the examples' README](../../examples/README.md).
+
+## Benchmark
+
+`pnpm bench` measures what the SDK costs the Fastify example and prints the table of
+[the SDK's overhead](../../docs/api/sdk/overview.md#overhead) as Markdown; copy it into the doc by hand. It needs `docker`
+on `PATH` with BuildKit and at least 7 vCPUs, and takes about 15 minutes.
+
+- **Containers.** It builds the `fastify` and `hub` targets of `examples/Dockerfile` and runs each run on fresh
+  containers on one network, with no published ports. The app gets `--cpus 1` pinned to vCPU 1 and
+  `--memory 512m`, the fake hub vCPU 2, and the load generator, a container of the hub image, vCPUs 3 to 6. The app's
+  output goes to `--log-driver none`: Fastify logs every request, and writing that through Docker would cost CPU outside
+  the app's limits. The requests are still logged, as the example does.
+- **Modes.** SDK off (`MICAFOX_ENABLED=false`: the SDK is loaded but does nothing, so its own memory is in every row);
+  SDK on with no breakpoints; a breakpoint on a line no request runs (`src/values.ts`); a breakpoint on the line of
+  `quote()` every request runs (`src/pricing.ts`), held to 10 snapshots a second by the rate limits. The lines come
+  from their marker comments.
+- **Load.** `GET /price` from 4 worker threads over keep-alive connections. Each run: 10 s of warm-up, 20 s closed
+  loop over 32 connections for the most the app serves, then 20 s at a fixed 15,000 requests a second over 256
+  connections for latency and CPU. That rate is below what the app serves in every mode, also on a slower core, and
+  the connections are far more than the requests in flight, so none waits for a free one. At the fixed rate latency
+  counts from when each request was due, so a slow app cannot hide its delay by slowing the load down. The generator
+  sends on 1 ms timer ticks, so every latency holds up to about a tick of its own schedule: compare rows, not the
+  absolute values with other tools. Requests per second and CPU per second count each thread's own send window, not
+  its start-up.
+- **Measures.** CPU is the app container's cgroup `cpu.stat` over the fixed-rate phase; memory is the peak resident
+  set (`VmHWM`) of the app's PID 1; snapshots are counted in the fake hub's output.
+- **Runs.** Three rounds, each mode once per round, in a rotated order so drift over the run does not always fall on
+  one mode; every cell is the median with the range of the three runs. A difference inside that range is noise. The
+  hot line is also compared with no breakpoints run by run within each round, which shares the host's state.
+- **Checks.** A run fails instead of giving a number when the SDK does not connect to the hub (or connects while it
+  is off); when its breakpoint is not `active` before the load, expires, or the app leaves the hub at any time in the
+  run; when the cold line sends a snapshot or the hot line none; when a request fails or takes over 10 s; or when the
+  load generator uses more than 80% of its vCPUs, so it, not the app, could be the limit. Every docker call has a
+  timeout, so a stalled app fails the run instead of hanging it.
+- **What it cannot show.** The pause time itself. The hot line's slowest request is an upper bound on one pause plus
+  the app's own worst case, which alone reaches 15 to 50 ms here, so it cannot confirm the 10 ms per pause. Its CPU
+  time per second minus that of no breakpoints is an estimate, not a bound, and it also holds what runs after each
+  pause: cutting and sending the snapshot and setting the rate-limited breakpoint again. The run-to-run noise of CPU
+  time is larger than the 20 ms a second budget, so the benchmark cannot resolve it.
