@@ -9,6 +9,7 @@ export interface DebuggerOptions {
   url?: string;
   token?: string;
   service?: string;
+  commit?: string;
   labels?: Record<string, string>;
   redact?: string[];
   logger?: Logger;
@@ -27,6 +28,7 @@ const OPTION_NAMES: readonly OptionName[] = [
   "url",
   "token",
   "service",
+  "commit",
   "labels",
   "redact",
   "logger",
@@ -36,7 +38,7 @@ const OPTION_NAMES: readonly OptionName[] = [
 ];
 
 // The fields only the default connector uses, so a custom connector makes them meaningless
-const HUB_OPTION_NAMES: readonly OptionName[] = ["url", "token", "service", "labels", "hubConnector"];
+const HUB_OPTION_NAMES: readonly OptionName[] = ["url", "token", "service", "commit", "labels", "hubConnector"];
 
 const CONNECTOR_METHODS = ["connect", "send", "onMessage", "onStatus", "close"];
 

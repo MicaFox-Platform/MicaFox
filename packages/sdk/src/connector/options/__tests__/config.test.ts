@@ -34,6 +34,7 @@ const DEFAULT_OPTIONS = {
   url: undefined,
   token: undefined,
   service: undefined,
+  commit: undefined,
   labels: {},
   buffer: { maxMessages: 1000, maxBytes: 1_048_576 },
   batch: { maxMessages: 100, maxBytes: 65_536, flushIntervalMs: 100 },
@@ -185,6 +186,63 @@ describe("resolveConnectorConfig options", () => {
     });
   });
 
+  it("takes the commit from MICAFOX_COMMIT, lowercased, when it is not passed", () => {
+    const { options } = resolve({}, envOf(["MICAFOX_COMMIT", "ABCDEF1"]));
+
+    expect(options.commit).toBe("abcdef1");
+  });
+
+  it("prefers the passed commit, lowercased, over MICAFOX_COMMIT", () => {
+    const { options } = resolve({ commit: "3F9C2E1A7B6D" }, envOf(["MICAFOX_COMMIT", "abcdef1"]));
+
+    expect(options.commit).toBe("3f9c2e1a7b6d");
+  });
+
+  it("accepts the shortest and the longest commit hash", () => {
+    const longest = "a".repeat(64);
+
+    expect({
+      shortest: resolve({ commit: "abc1234" }).options.commit,
+      longest: resolve({ commit: longest }).options.commit,
+    }).toEqual({ shortest: "abc1234", longest });
+  });
+
+  it("treats an empty commit and an empty MICAFOX_COMMIT as unset", () => {
+    const { options, warnings } = resolve({ commit: "" }, envOf(["MICAFOX_COMMIT", ""]));
+
+    expect({ commit: options.commit, warnings }).toEqual({ commit: undefined, warnings: [] });
+  });
+
+  it.each([42, {}, true])("leaves the commit unset with a warning when it is %j, not a string", (value) => {
+    const { options, warnings } = resolve({ commit: value }, envOf(["MICAFOX_COMMIT", "abcdef1"]));
+
+    expect({ commit: options.commit, warnings }).toEqual({
+      commit: undefined,
+      warnings: ["[micafox] connector: commit must be a string; it is ignored"],
+    });
+  });
+
+  it.each(["abcdef", "a".repeat(65), "xyz1234", "abc 1234", "HEAD"])(
+    "leaves the passed commit %j unset with a warning and does not fall back to the environment",
+    (value) => {
+      const { options, warnings } = resolve({ commit: value }, envOf(["MICAFOX_COMMIT", "abcdef1"]));
+
+      expect({ commit: options.commit, warnings }).toEqual({
+        commit: undefined,
+        warnings: ["[micafox] connector: commit must be 7 to 64 hexadecimal characters; it is ignored"],
+      });
+    },
+  );
+
+  it("leaves the commit unset with a warning naming the variable when MICAFOX_COMMIT is not a hash", () => {
+    const { options, warnings } = resolve({}, envOf(["MICAFOX_COMMIT", "main"]));
+
+    expect({ commit: options.commit, warnings }).toEqual({
+      commit: undefined,
+      warnings: ["[micafox] connector: MICAFOX_COMMIT must be 7 to 64 hexadecimal characters; it is ignored"],
+    });
+  });
+
   it.each([
     ["url", 42, "MICAFOX_HUB_URL"],
     ["service", {}, "MICAFOX_SERVICE"],
@@ -233,6 +291,7 @@ describe("resolveConnectorConfig with hostile options", () => {
         "url",
         "token",
         "service",
+        "commit",
         "labels",
         "reconnect",
         "closeTimeoutMs",

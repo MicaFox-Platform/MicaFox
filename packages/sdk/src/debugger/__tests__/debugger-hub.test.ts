@@ -185,14 +185,20 @@ describe("Debugger.run() with the default connector", () => {
     const { created, createHubConnector } = createHub();
     const connector = new FakeConnector();
     const { micafox, messagesAt } = createDebugger({ createHubConnector });
-    micafox.configure({ connector, url: "wss://hub.example.com/micafox", token: "token-1", service: "checkout" });
+    micafox.configure({
+      connector,
+      url: "wss://hub.example.com/micafox",
+      token: "token-1",
+      service: "checkout",
+      commit: "abcdef1",
+    });
 
     micafox.run();
 
     expect({ created: created.length, connects: connector.connectCount, warnings: messagesAt("warn") }).toEqual({
       created: 0,
       connects: 1,
-      warnings: ["url, token, service ignored: a custom connector is set"],
+      warnings: ["url, token, service, commit ignored: a custom connector is set"],
     });
   });
 });

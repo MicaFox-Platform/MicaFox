@@ -17,6 +17,7 @@ describe("buildHello", () => {
     const hello = buildHello({
       instanceId: INSTANCE_ID,
       service: "checkout",
+      commit: "3f9c2e1a7b6d",
       labels: { region: "eu" },
       modules: ["debugger"],
     });
@@ -26,6 +27,7 @@ describe("buildHello", () => {
       type: "hello",
       instanceId: INSTANCE_ID,
       service: "checkout",
+      commit: "3f9c2e1a7b6d",
       labels: { region: "eu" },
       hostname: hostname(),
       pid: process.pid,
@@ -38,16 +40,34 @@ describe("buildHello", () => {
   it("lists the modules it is given, in order, as a copy", () => {
     const modules = ["debugger", "errors"];
 
-    const hello = buildHello({ instanceId: INSTANCE_ID, service: undefined, labels: {}, modules });
+    const hello = buildHello({ instanceId: INSTANCE_ID, service: undefined, commit: undefined, labels: {}, modules });
     modules.push("logpoints");
 
     expect(hello.modules).toEqual(["debugger", "errors"]);
   });
 
   it("leaves service out when it is not set", () => {
-    const hello = buildHello({ instanceId: INSTANCE_ID, service: undefined, labels: {}, modules: ["debugger"] });
+    const hello = buildHello({
+      instanceId: INSTANCE_ID,
+      service: undefined,
+      commit: undefined,
+      labels: {},
+      modules: ["debugger"],
+    });
 
     expect(hello).not.toHaveProperty("service");
+  });
+
+  it("leaves commit out when it is not set", () => {
+    const hello = buildHello({
+      instanceId: INSTANCE_ID,
+      service: "checkout",
+      commit: undefined,
+      labels: {},
+      modules: ["debugger"],
+    });
+
+    expect(hello).not.toHaveProperty("commit");
   });
 
   it("sends unknown as the hostname when the system cannot tell it", () => {
@@ -55,7 +75,13 @@ describe("buildHello", () => {
       throw new Error("uv_os_gethostname returned ENOSYS");
     });
 
-    const hello = buildHello({ instanceId: INSTANCE_ID, service: undefined, labels: {}, modules: ["debugger"] });
+    const hello = buildHello({
+      instanceId: INSTANCE_ID,
+      service: undefined,
+      commit: undefined,
+      labels: {},
+      modules: ["debugger"],
+    });
 
     expect(hello.hostname).toBe("unknown");
   });

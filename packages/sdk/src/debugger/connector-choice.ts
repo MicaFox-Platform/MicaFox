@@ -71,6 +71,7 @@ const createHubOptions = (options: ConfiguredOptions, { logger, warn }: ChoiceCo
     url: options.url,
     token: options.token,
     service: options.service,
+    commit: options.commit,
     labels: options.labels,
     [LOGGER_KEY]: logger,
     [MODULES_KEY]: [MODULE],

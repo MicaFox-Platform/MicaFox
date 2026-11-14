@@ -8,10 +8,16 @@ const hubs = useFakeHubs();
 
 // The real HubConnector against a fake hub: what the fake connector of debugger-hub.test.ts cannot show
 describe("Debugger with the real HubConnector", () => {
-  it("connects to the hub with its service and token and shares its logger with the connector", async () => {
+  it("connects to the hub with its service, commit and token and shares its logger with the connector", async () => {
     const hub = await hubs.start();
     const { micafox, lines } = createDebugger();
-    micafox.configure({ url: hub.url, token: "token-1", service: "checkout", logLevel: "debug" });
+    micafox.configure({
+      url: hub.url,
+      token: "token-1",
+      service: "checkout",
+      commit: "3F9C2E1A7B6D",
+      logLevel: "debug",
+    });
 
     micafox.run();
     const connection = await hub.nextConnection();
@@ -22,8 +28,14 @@ describe("Debugger with the real HubConnector", () => {
     expect({
       authorization: connection.request.headers.authorization,
       service: hello.service,
+      commit: hello.commit,
       connectorLines: lines.some((line) => line.message.startsWith("[micafox] connector: ")),
-    }).toEqual({ authorization: "Bearer token-1", service: "checkout", connectorLines: true });
+    }).toEqual({
+      authorization: "Bearer token-1",
+      service: "checkout",
+      commit: "3f9c2e1a7b6d",
+      connectorLines: true,
+    });
   });
 
   it("closes the hub connection with code 1000 when stop() resolves", async () => {

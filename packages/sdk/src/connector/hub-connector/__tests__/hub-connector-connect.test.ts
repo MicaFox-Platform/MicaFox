@@ -77,6 +77,16 @@ describe("HubConnector connect()", () => {
     });
   });
 
+  it("sends the commit lowercased in the hello", async () => {
+    const hub = await hubs.start();
+    const { connector } = createHarness(hubs, { url: hub.url, commit: "3F9C2E1A7B6D" });
+
+    connector.connect();
+    const frame = await (await hub.nextConnection()).nextFrame();
+
+    expect(parseFrame(frame)).toMatchObject({ type: "hello", commit: "3f9c2e1a7b6d" });
+  });
+
   it("sends nothing but the hello before welcome", async () => {
     const hub = await hubs.start();
     const { connector, nextStatus } = createHarness(hubs, { url: hub.url });
