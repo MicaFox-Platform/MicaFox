@@ -42,9 +42,9 @@ const statusesOf = (connector: FakeConnector): Array<[string, BreakpointStatus["
   );
 
 // A debugger on the real inspector of the test process, running with a custom connector
-const runDebugger = (session = new TracedSession()) => {
+const runDebugger = (session = new TracedSession(), now?: () => number) => {
   const connector = new FakeConnector();
-  const test = createDebugger({ createInspectorBinding: () => session });
+  const test = createDebugger({ createInspectorBinding: () => session, ...(now === undefined ? {} : { now }) });
   test.micafox.configure({ connector });
   test.micafox.run();
   return { ...test, connector, session };
@@ -104,6 +104,44 @@ describe("Debugger applying breakpoints", () => {
     connector.deliver(breakpointsMessage(checkoutEntry("bp-1", 4)));
 
     expect({ methods: session.methods, sent: connector.sent }).toEqual({ methods: [], sent: [] });
+  });
+});
+
+describe("Debugger handling the messages of a connector", () => {
+  it("ignores a breakpoints message whose module is not debugger", async () => {
+    const { connector, micafox, session } = runDebugger();
+    // A custom connector passes on what it received, whatever its module
+    const foreign: unknown = { ...breakpointsMessage(checkoutEntry("bp-1", 4)), module: "logs" };
+
+    connector.deliver(foreign as Message);
+
+    expect({ methods: session.methods, sent: connector.sent }).toEqual({ methods: [], sent: [] });
+    await micafox.stop();
+  });
+});
+
+describe("Debugger expiring breakpoints", () => {
+  it("expires a breakpoint on its clock while the connector is disconnected", async () => {
+    // The debugger's clock is the one it is given: timers move apart from it, so the test moves both
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    let nowMs = 0;
+    fixtures.loadCheckout(fixtures.write("orders/checkout.cjs", CHECKOUT_SOURCE));
+    const session = new TracedSession();
+    const { connector, micafox } = runDebugger(session, () => nowMs);
+    connector.deliver(breakpointsMessage({ ...checkoutEntry("bp-1", 4), expiresInMs: 1000 }));
+    connector.reportStatus("disconnected");
+
+    nowMs = 1000;
+    vi.advanceTimersByTime(1000);
+
+    expect({ statuses: statusesOf(connector), methods: session.methods.slice(-2) }).toEqual({
+      statuses: [
+        ["bp-1", "active"],
+        ["bp-1", "expired"],
+      ],
+      methods: ["Debugger.removeBreakpoint", "Debugger.disable"],
+    });
+    await micafox.stop();
   });
 });
 

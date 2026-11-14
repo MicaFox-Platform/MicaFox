@@ -9,6 +9,8 @@ export interface ValidEntry {
   file: string;
   /** 1-based, as the hub sends it. */
   line: number;
+  /** The milliseconds the entry had left when its list arrived, at most 24 h. */
+  expiresInMs: number;
   limits?: CaptureLimits;
 }
 
@@ -42,6 +44,11 @@ export interface RateLimitedOutcome extends Placed {
   status: "rateLimited";
 }
 
+/** An entry whose time ran out: it holds no V8 breakpoint and stays so while it is listed. */
+export interface ExpiredOutcome {
+  status: "expired";
+}
+
 /**
  * What became of an entry. A retryable error came from a map that could not be used and is resolved again like a
  * pending entry.
@@ -50,7 +57,16 @@ export type Outcome =
   | { status: "pending" }
   | ActiveOutcome
   | RateLimitedOutcome
+  | ExpiredOutcome
   | { status: "error"; message: string; isRetryable?: boolean };
+
+/** An entry of the latest list and what became of it. */
+export interface Applied {
+  entry: ListedEntry;
+  /** The segments of the entry's `file`; empty for an invalid entry. */
+  segments: string[];
+  outcome: Outcome;
+}
 
 /** Whether the entry holds its place and the map that placed it. */
 export const isPlaced = (outcome: Outcome): outcome is ActiveOutcome | RateLimitedOutcome =>
@@ -67,16 +83,17 @@ export const isSameStatus = (first: Outcome, second: Outcome): boolean =>
 
 /**
  * How many of `outcomes` have each status, such as `1 active, 2 pending, 0 error`; rate limited ones are added only
- * when there are any, which happens while every breakpoint is off.
+ * when there are any, which happens while every breakpoint is off, and expired ones likewise.
  */
 export const summarizeOutcomes = (outcomes: readonly Outcome[]): string => {
-  const counts = { active: 0, pending: 0, rateLimited: 0, error: 0 };
+  const counts = { active: 0, pending: 0, rateLimited: 0, expired: 0, error: 0 };
   for (const outcome of outcomes) {
     counts[outcome.status] += 1;
   }
 
   const summary = `${String(counts.active)} active, ${String(counts.pending)} pending, ${String(counts.error)} error`;
-  return counts.rateLimited === 0 ? summary : `${summary}, ${String(counts.rateLimited)} rate limited`;
+  const withRateLimited = counts.rateLimited === 0 ? summary : `${summary}, ${String(counts.rateLimited)} rate limited`;
+  return counts.expired === 0 ? withRateLimited : `${withRateLimited}, ${String(counts.expired)} expired`;
 };
 
 /** The `breakpointStatus` message of an entry's outcome. */
@@ -92,7 +109,7 @@ const isSameLimits = (first: CaptureLimits | undefined, second: CaptureLimits | 
   first?.maxItems === second?.maxItems &&
   first?.maxStringLength === second?.maxStringLength;
 
-/** Tells whether `next` leaves the breakpoint of `current` as it is: the same `file`, `line` and `limits`. */
+/** Tells whether `next` leaves the breakpoint of `current` as it is: the same `file`, `line` and `limits`; the time left is not compared. */
 export const isSameEntry = (current: ListedEntry, next: ListedEntry): boolean => {
   if (current.kind === "invalid" || next.kind === "invalid") {
     return current.kind === "invalid" && next.kind === "invalid" && current.message === next.message;
@@ -100,3 +117,33 @@ export const isSameEntry = (current: ListedEntry, next: ListedEntry): boolean =>
 
   return current.file === next.file && current.line === next.line && isSameLimits(current.limits, next.limits);
 };
+
+/** An applied entry that the latest list removed or changed, and so loses its V8 breakpoint. */
+export interface Dropped {
+  id: string;
+  current: Applied;
+  /** Whether the list no longer has the `id`. */
+  isRemoved: boolean;
+}
+
+/**
+ * The applied entries that a list removes or changes. An expired entry is final while it is listed, whatever its
+ * fields now are.
+ */
+export const diffList = (applied: ReadonlyMap<string, Applied>, entries: readonly ListedEntry[]): Dropped[] => {
+  const next = new Map(entries.map((entry) => [entry.id, entry]));
+  return [...applied].flatMap(([id, current]): Dropped[] => {
+    const replacement = next.get(id);
+    if (replacement === undefined) {
+      return [{ id, current, isRemoved: true }];
+    }
+
+    // A changed entry keeps its rate limit, so sending the list again does not reset it
+    const isChanged = current.outcome.status !== "expired" && !isSameEntry(current.entry, replacement);
+    return isChanged ? [{ id, current, isRemoved: false }] : [];
+  });
+};
+
+/** Whether an entry with this outcome keeps the `Debugger` domain on: it is valid, has time left and has not expired. */
+export const keepsDomainOn = (entry: ListedEntry, outcome: Outcome | undefined): boolean =>
+  entry.kind === "valid" && entry.expiresInMs > 0 && outcome?.status !== "expired";

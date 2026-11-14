@@ -9,6 +9,8 @@ const MAX_READ_ENTRIES = 200;
 const MAX_ENTRIES = 100;
 const MAX_ID_LENGTH = 256;
 const MAX_FILE_LENGTH = 1024;
+/** The longest a breakpoint lives; a larger `expiresInMs` is lowered to this. */
+const MAX_EXPIRES_IN_MS = 24 * 60 * 60 * 1000;
 const LIMIT_NAMES = ["maxDepth", "maxItems", "maxStringLength"] as const;
 
 /** What one `breakpoints` message holds: an entry for each that gets a status, in list order. */
@@ -18,6 +20,8 @@ export interface BreakpointList {
 }
 
 const isPositiveInteger = (value: unknown): value is number => Number.isSafeInteger(value) && (value as number) > 0;
+
+const isNonNegativeInteger = (value: unknown): value is number => Number.isInteger(value) && (value as number) >= 0;
 
 // The caps of the limits are applied when a snapshot is captured; here only their shape is checked
 const readLimits = (limits: unknown): CaptureLimits | string | undefined => {
@@ -75,7 +79,13 @@ const readEntry = (id: string, item: object): ListedEntry => {
     return { kind: "invalid", id, message: limits };
   }
 
-  return limits === undefined ? { kind: "valid", id, file, line } : { kind: "valid", id, file, line, limits };
+  const expiresInMs: unknown = Reflect.get(item, "expiresInMs");
+  if (!isNonNegativeInteger(expiresInMs)) {
+    return { kind: "invalid", id, message: "expiresInMs must be an integer of at least 0" };
+  }
+
+  const valid = { kind: "valid", id, file, line, expiresInMs: Math.min(expiresInMs, MAX_EXPIRES_IN_MS) } as const;
+  return limits === undefined ? valid : { ...valid, limits };
 };
 
 const plural = (count: number, noun: string): string => `${String(count)} ${noun}${count === 1 ? "" : "s"}`;

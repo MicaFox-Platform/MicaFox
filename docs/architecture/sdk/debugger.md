@@ -127,13 +127,16 @@ packages/sdk/src/debugger/
 ├── options.ts                  DebuggerOptions: the fields of a configure() call, enabled, the custom connector check
 ├── connector-choice.ts         chooseConnector: the custom connector, or a HubConnector built from the options
 ├── connector-link.ts           ConnectorLink: subscribes to, connects and sends to a connector; catches its rejections
+├── running.ts                  Running and createRunning: the parts one run() wires together
 ├── inspector-session.ts        InspectorSession: node:inspector calls that answer synchronously and never throw
 ├── breakpoints/                Breakpoints: the hub's list as V8 breakpoints and their statuses
 │   ├── index.ts                the sub-component's only entry: Breakpoints
-│   ├── breakpoints.ts          Breakpoints: applies a list, resolves pending entries, rate-limits and restores, stops
-│   ├── entry.ts                ValidEntry, InvalidEntry, Outcome and Placed, the comparison of two entries, a status
+│   ├── breakpoints.ts          Breakpoints: applies a list, resolves pending entries, rate-limits, expires, stops
+│   ├── domain.ts               DebuggerDomain: Debugger.enable and disable, and the scripts V8 reports while it is on
+│   ├── entry.ts                ValidEntry, InvalidEntry, Outcome, Placed and Applied, what a list changes, a status
 │   ├── read-list.ts            reads and validates the entries of a breakpoints message, with the limits on the list
 │   ├── place-entry.ts          placeEntry, placeAgain, releaseEntry: an entry's V8 breakpoint and the map it holds
+│   ├── expiry.ts               Expiry: the entries' deadlines on the monotonic clock and the one unref'd timer
 │   └── v8-breakpoints.ts       V8Breakpoints: Debugger.setBreakpointByUrl and removeBreakpoint, shared by position
 ├── capture/                    Capture: one pause read into values within the limits, then cut per breakpoint
 │   ├── index.ts                the sub-component's only entry: readPause, cutSnapshot and their types

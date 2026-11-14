@@ -5,7 +5,7 @@ import { readBreakpointList } from "../read-list.js";
 const read = (...breakpoints: unknown[]) =>
   readBreakpointList({ version: 1, module: "debugger", type: "breakpoints", breakpoints });
 
-const checkout = { id: "bp-1", file: "src/orders/checkout.ts", line: 42 };
+const checkout = { id: "bp-1", file: "src/orders/checkout.ts", line: 42, expiresInMs: 3_600_000 };
 
 describe("readBreakpointList", () => {
   it("reads a valid entry with its limits", () => {
@@ -20,8 +20,32 @@ describe("readBreakpointList", () => {
     expect(read(checkout)?.entries).toEqual([{ kind: "valid", ...checkout }]);
   });
 
-  it("reads an entry that carries the time it has left as an entry without it", () => {
-    expect(read({ ...checkout, expiresInMs: 3_600_000 })?.entries).toEqual([{ kind: "valid", ...checkout }]);
+  it.each([
+    ["0, which expires the entry at once", 0, 0],
+    ["a time under 24 h as it is", 86_399_999, 86_399_999],
+    ["exactly 24 h as it is", 86_400_000, 86_400_000],
+    ["a time over 24 h lowered to 24 h", 86_400_001, 86_400_000],
+    ["a huge time lowered to 24 h", 2 ** 60, 86_400_000],
+  ])("reads %s", (_name, expiresInMs, expected) => {
+    expect(read({ ...checkout, expiresInMs })?.entries).toEqual([
+      { kind: "valid", ...checkout, expiresInMs: expected },
+    ]);
+  });
+
+  it.each([
+    ["a missing expiresInMs", undefined],
+    ["a null expiresInMs", null],
+    ["an expiresInMs that is a string", "60000"],
+    ["a fractional expiresInMs", 1.5],
+    ["a negative expiresInMs", -1],
+    ["an infinite expiresInMs", Number.POSITIVE_INFINITY],
+    ["an expiresInMs that is not a number", Number.NaN],
+  ])("gives %s an error", (_name, expiresInMs) => {
+    const list = read({ ...checkout, expiresInMs });
+
+    expect(list?.entries).toEqual([
+      { kind: "invalid", id: "bp-1", message: "expiresInMs must be an integer of at least 0" },
+    ]);
   });
 
   it("returns nothing when breakpoints is not an array", () => {
@@ -114,7 +138,7 @@ describe("readBreakpointList", () => {
   });
 
   it("accepts an id of exactly 256 characters and a file of exactly 1024", () => {
-    const entry = { id: "x".repeat(256), file: "a".repeat(1024), line: 1 };
+    const entry = { id: "x".repeat(256), file: "a".repeat(1024), line: 1, expiresInMs: 1000 };
 
     expect(read(entry)?.entries.map((read) => read.kind)).toEqual(["valid"]);
   });

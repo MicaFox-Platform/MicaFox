@@ -11,6 +11,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { createRecordingLogger, type LoggedLine } from "./fakes.js";
+import { isRecord } from "../../src/connector/index.js";
 import { Breakpoints } from "../../src/debugger/breakpoints/index.js";
 import { InspectorSession, type InspectorBinding } from "../../src/debugger/index.js";
 import { Pauses } from "../../src/debugger/pauses/index.js";
@@ -177,6 +178,9 @@ export class TracedSession implements InspectorBinding {
   }
 }
 
+/** The time left an entry of `apply()` gets when it sets none: far longer than any test runs. */
+const DEFAULT_EXPIRES_IN_MS = 3_600_000;
+
 /**
  * A `Breakpoints` and its `Pauses` on a real inspector session, with the statuses and snapshots they sent and the
  * failures they reported. The rate limits run on `Date.now()`, which fake timers control.
@@ -190,7 +194,7 @@ export interface BreakpointsUnderTest {
   snapshots: Snapshot[];
   failures: unknown[];
   lines: LoggedLine[];
-  /** Delivers a `breakpoints` message with `entries`. */
+  /** Delivers a `breakpoints` message with `entries`; an entry that is an object gets `expiresInMs` of 1 h unless it sets one. */
   apply: (...entries: unknown[]) => void;
   /** The messages logged at `level`. */
   messagesAt: (level: LoggedLine["level"]) => string[];
@@ -242,6 +246,7 @@ const createParts = (inspector: InspectorSession, logger: SdkLogger, isSecret: (
     onRemoved: (id) => {
       limiter.forget(id);
     },
+    now,
   });
   const pauses = new Pauses({
     session: inspector,
@@ -288,7 +293,14 @@ export const createBreakpoints = (options: { isSecret?: (name: string) => boolea
     failures,
     lines,
     apply: (...entries) => {
-      breakpoints.apply({ version: 1, module: "debugger", type: "breakpoints", breakpoints: entries });
+      breakpoints.apply({
+        version: 1,
+        module: "debugger",
+        type: "breakpoints",
+        breakpoints: entries.map((entry) =>
+          isRecord(entry) ? { expiresInMs: DEFAULT_EXPIRES_IN_MS, ...entry } : entry,
+        ),
+      });
     },
     messagesAt: (level) => lines.filter((line) => line.level === level).map((line) => line.message),
     waitForLine,
