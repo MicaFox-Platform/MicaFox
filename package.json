@@ -19,6 +19,8 @@
     "verify": "pnpm lint && pnpm format && pnpm typecheck && pnpm build && pnpm test:build && pnpm test:coverage",
     "verify:brief": "bash .claude/scripts/verify-brief.sh",
     "verify:fix": "pnpm lint:fix && pnpm format:fix",
+    "docker:up": "docker compose -f examples/compose.yaml up --build",
+    "docker:down": "docker compose -f examples/compose.yaml down",
     "prepare": "git config core.hooksPath .githooks || true"
   },
   "keywords": [],

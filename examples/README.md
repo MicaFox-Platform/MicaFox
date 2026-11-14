@@ -41,3 +41,32 @@ Next.js apps stay `pending`: bundled output is not supported
 ([compatibility](../docs/api/sdk/overview.md#compatibility)).
 
 Node 22.9 to 23.x prints `.env not found. Continuing without it.` when there is no `.env`; the app starts anyway.
+
+## Docker
+
+Docker runs the same apps the way most Node apps run in production: one image per app, built from the workspace with
+the built SDK, the app as the non-root `node` user and as PID 1, with no init process. It is optional: install
+[Docker](https://docs.docker.com/get-docker/) with Compose v2, nothing else.
+
+```sh
+pnpm docker:up     # build every image and start the hub and the nine apps; Ctrl+C stops them
+pnpm docker:down   # remove the containers and the network
+```
+
+[`compose.yaml`](compose.yaml) starts the hub and every app on the ports above, published on `127.0.0.1` only, with the
+settings of their `.env.example` files; only `MICAFOX_HUB_URL` changes, to `ws://hub:8787/micafox`. A `.env` is never
+read. The hub's output, with each `breakpointStatus` and `snapshot`, is the output of `pnpm docker:up`; call an app with
+the `curl` line from the table. `docker:up` always builds, so a change to `packages/sdk` or to an app is in the next
+run.
+
+[`Dockerfile`](Dockerfile) has one target per app; `NODE_IMAGE` picks the base image, `node:22-slim` by default:
+
+```sh
+NODE_IMAGE=node:22-alpine pnpm docker:up
+docker build -f examples/Dockerfile --target express -t micafox-example-express .
+```
+
+Inside a container every app runs its built output, Fastify included, and listens on every interface: the images
+set `HOST=0.0.0.0`, and the Next.js image passes `--hostname 0.0.0.0` itself. By hand the apps and the hub listen on
+`HOST`, `127.0.0.1` when it is unset or empty; a shell that exports `HOST` as its machine name makes them listen there,
+so unset it or set it in `.env`.

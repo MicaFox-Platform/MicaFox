@@ -48,6 +48,7 @@ App:
 | Variable            | Meaning                                                                       |
 | ------------------- | ----------------------------------------------------------------------------- |
 | `PORT`              | HTTP port, default `3000`; `0` picks a free one                               |
+| `HOST`              | address to listen on, default `127.0.0.1`; the Docker image sets `0.0.0.0`    |
 | `MICAFOX_HUB_URL`   | the hub's WebSocket URL; unset → the SDK logs an error and the app runs on    |
 | `MICAFOX_TOKEN`     | sent as `Authorization: Bearer <token>`                                       |
 | `MICAFOX_SERVICE`   | service name in the `hello`                                                   |

@@ -29,6 +29,12 @@ const readPort = (): number => {
   return port === "" ? DEFAULT_PORT : Number(port);
 };
 
+// An empty HOST counts as unset: listen() would take "" as every interface
+const readHost = (): string => {
+  const host = process.env.HOST ?? "";
+  return host === "" ? "127.0.0.1" : host;
+};
+
 const createServer = (): FastifyInstance => {
   const server = Fastify({ logger: true });
   server.get("/health", () => ({ ok: true }));
@@ -61,7 +67,7 @@ const main = async (): Promise<void> => {
   // Before listen(), so the hub's breakpoints can be set before the first request
   micafox.run();
   // A failed listen() needs no stop(): the debugger never keeps the process alive by itself
-  await server.listen({ host: "127.0.0.1", port: readPort() });
+  await server.listen({ host: readHost(), port: readPort() });
 
   for (const signal of ["SIGTERM", "SIGINT"] as const) {
     process.once(signal, () => void shutDown(server));

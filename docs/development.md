@@ -53,18 +53,20 @@ pnpm test:build   → tests of the built output: packages loaded with import and
 pnpm verify       → lint → format → typecheck → build → test:build → test:coverage (≥ 80%), stops at the first failure
 pnpm verify:brief → the same steps, one line per green step and the start of a failure (for AI agents)
 pnpm verify:fix   → auto-fix lint and formatting
+pnpm docker:up    → optional, needs Docker: build an image per example app and start them with the fake hub
+pnpm docker:down  → stop and remove them
 ```
 
 One package: `pnpm --filter @micafox/sdk test`, `pnpm --filter @micafox/example-fastify start`; to run an example by
-hand with the fake hub, see [the examples](../examples/README.md). CI runs
-the same scripts on every pull request: see [Checks](#checks).
+hand with the fake hub, or in Docker containers, see [the examples](../examples/README.md#docker). Docker is optional:
+`pnpm verify` and CI do not use it. CI runs the same scripts on every pull request: see [Checks](#checks).
 
 ## Testing
 
 - Unit tests live in the `__tests__/` folder of the folder that holds their module, so folders list only code.
   Tests that are not about one module (doc examples, lint boundaries, end-to-end) live in `packages/<name>/test/`, or in
   `examples/<name>/tests/` and `examples/frameworks/<name>/tests/` for the whole system; the configs package keeps all
-  its tests there, and `tools/testkit/test/` the checks of the examples' `.env.example` files.
+  its tests there, and `tools/testkit/test/` the checks of the examples' `.env.example` files and Docker setup.
   Coverage of `packages/*/src` must stay ≥ 80% in lines, branches and functions; a line no meaningful test can
   reach is excluded in `vitest.config.ts` with the reason, never covered by a hollow test.
 - Test behavior through the public surface. Mock only at the boundaries: the WebSocket, time and `node:inspector`.

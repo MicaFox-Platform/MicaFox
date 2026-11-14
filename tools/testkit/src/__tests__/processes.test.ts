@@ -29,6 +29,14 @@ describe("createEnvironment", () => {
     expect(environment.PORT).toBe("0");
   });
 
+  it("drops the developer's HOST, so every app listens on its default address", () => {
+    vi.stubEnv("HOST", "0.0.0.0");
+
+    const environment = createEnvironment();
+
+    expect(environment.HOST).toBeUndefined();
+  });
+
   it("drops the variables of the given prefixes and names", () => {
     vi.stubEnv("NEXT_TELEMETRY_DISABLED", "0");
     vi.stubEnv("PRICING_API_KEY", "developer-key");
