@@ -51,6 +51,7 @@ the built SDK, the app as the non-root `node` user and as PID 1, with no init pr
 ```sh
 pnpm docker:up     # build every image and start the hub and the nine apps; Ctrl+C stops them
 pnpm docker:down   # remove the containers and the network
+pnpm test:docker   # the container tests: build, start their own stack, check every app, remove it
 ```
 
 [`compose.yaml`](compose.yaml) starts the hub and every app on the ports above, published on `127.0.0.1` only, with the

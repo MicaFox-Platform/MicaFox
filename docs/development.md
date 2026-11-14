@@ -55,11 +55,18 @@ pnpm verify:brief → the same steps, one line per green step and the start of a
 pnpm verify:fix   → auto-fix lint and formatting
 pnpm docker:up    → optional, needs Docker: build an image per example app and start them with the fake hub
 pnpm docker:down  → stop and remove them
+pnpm test:docker  → optional, needs Docker: the container tests of every example app; NODE_IMAGE picks the base image
 ```
 
 One package: `pnpm --filter @micafox/sdk test`, `pnpm --filter @micafox/example-fastify start`; to run an example by
 hand with the fake hub, or in Docker containers, see [the examples](../examples/README.md#docker). Docker is optional:
-`pnpm verify` and CI do not use it. CI runs the same scripts on every pull request: see [Checks](#checks).
+`pnpm verify` does not use it. CI runs the same scripts on every pull request, and `pnpm test:docker` in a job of its
+own: see [Checks](#checks).
+
+`pnpm test:docker` builds the images, starts its own stack (project `micafox-docker-test`, on the ports of
+`pnpm docker:up`, so stop that first) with a read-only root filesystem, a writable `/tmp` and 256 MB per container, and
+checks each app: its breakpoint, a snapshot at the right line, HTTP, no SDK error, and `docker stop`. It removes the
+stack afterwards, also after a failure. `NODE_IMAGE=node:22-alpine pnpm test:docker` runs it on another base image.
 
 ## Testing
 
@@ -201,6 +208,10 @@ legs pass. Steps, in order:
 | Build           | `pnpm build` fails, or `pnpm test:build` fails on the built output                          |
 
 Only the Node 22.13 leg runs the name steps and the coverage run (`pnpm test:coverage`).
+
+On pull requests into `staging` the `docker` job runs `pnpm test:docker` once per base image (`node:22-slim`,
+`node:22-alpine`, `node:24-slim`), in parallel, within 10 minutes each, and fails when the run left containers or
+networks behind; `docker-result` passes when all three pass. It is not a required check yet.
 
 The `dependency-review` job fails when the pull request adds a dependency with a known vulnerability of high
 severity or worse. Dependabot pull requests skip the name steps.

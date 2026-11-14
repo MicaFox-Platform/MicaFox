@@ -4,6 +4,7 @@
 import { CLOSE_CODES, PROTOCOL_VERSION } from "@micafox/protocol";
 import type { RawData, WebSocket } from "ws";
 
+import { selectForService } from "./breakpoints.js";
 import { acceptModules } from "./modules.js";
 
 /** Prints one line of the hub's output, which tests read line by line. */
@@ -32,7 +33,7 @@ const unwrapBatch = (message: unknown): unknown[] => {
 };
 
 // Answers the first hello: welcome in the hello's version with the modules it accepts, then, when that includes the
-// debugger, the full breakpoint state
+// debugger, the full breakpoint state of the hello's service
 const answerHello = (socket: WebSocket, hello: unknown, listBreakpoints: () => unknown[]): void => {
   const version = readField(hello, "version");
   if (version !== PROTOCOL_VERSION) {
@@ -43,7 +44,8 @@ const answerHello = (socket: WebSocket, hello: unknown, listBreakpoints: () => u
   const modules = acceptModules(readField(hello, "modules"));
   socket.send(JSON.stringify({ version, type: "welcome", modules }));
   if (modules.includes("debugger")) {
-    socket.send(JSON.stringify({ version, module: "debugger", type: "breakpoints", breakpoints: listBreakpoints() }));
+    const breakpoints = selectForService(listBreakpoints(), readField(hello, "service"));
+    socket.send(JSON.stringify({ version, module: "debugger", type: "breakpoints", breakpoints }));
   }
 };
 

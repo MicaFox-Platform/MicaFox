@@ -1,6 +1,6 @@
 // The Docker setup of the examples, checked without Docker against the files it must agree with: compose.yaml against
 // the Dockerfile's targets, the ports of examples/README.md and the .env.example files, the Dockerfile's commands
-// against the apps' start scripts and its paths against the hub's breakpoints. The container tests build the images.
+// against the apps' start scripts and its paths against the hub's breakpoints. docker/ builds and runs the images.
 
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -8,6 +8,7 @@ import path from "node:path";
 import { parseEnv } from "node:util";
 import { describe, expect, it } from "vitest";
 
+import { DOCKER_APPS } from "../docker/apps.js";
 import { createEnvironment, E2E_TEST_TIMEOUT_MS } from "../src/processes.js";
 
 const ROOT = path.join(import.meta.dirname, "..", "..", "..");
@@ -24,6 +25,7 @@ const readScripts = (directory: string): Record<string, string> =>
   (JSON.parse(readText(`${directory}/package.json`)) as { scripts?: Record<string, string> }).scripts ?? {};
 
 const dockerfile = readText("examples/Dockerfile");
+const testCompose = readText("tools/testkit/docker/compose.test.yaml");
 const compose = readText("examples/compose.yaml");
 const hubEnvironment = parseEnv(readText("tools/testkit/.env.example"));
 const hubPort = Number(hubEnvironment.PORT);
@@ -93,6 +95,22 @@ describe("examples/compose.yaml", () => {
 
   it("points the apps at the hub's service on the port of the hub's .env.example", () => {
     expect(compose).toContain(`MICAFOX_HUB_URL: ws://hub:${String(hubPort)}/micafox`);
+  });
+});
+
+describe("the container tests of tools/testkit/docker/", () => {
+  it("cover every app service of compose.yaml on its published port", () => {
+    const composeApps = services
+      .filter((service) => Number(service.published) !== hubPort)
+      .map((service) => `${service.target}:${String(service.published)}`);
+
+    expect(DOCKER_APPS.map((app) => `${app.service}:${String(app.port)}`).sort()).toEqual(composeApps.sort());
+  });
+
+  it("lock down every service of compose.yaml", () => {
+    const lockedDown = [...testCompose.matchAll(/^ {2}(\S+):\n {4}<<: \*locked-down$/gm)].map((match) => match[1]);
+
+    expect(lockedDown.sort()).toEqual(services.map((service) => service.target).sort());
   });
 });
 

@@ -105,3 +105,60 @@ jobs:
         run: |
           echo "verify: $RESULT"
           test "$RESULT" = success
+
+  # Every example app in its container on each supported base image: PID 1, non-root, musl, a read-only root filesystem
+  # and 256 MB. Not a required check yet: it joins the ruleset once it has proven stable
+  docker:
+    name: docker (${{ matrix.image }})
+    # A rename re-runs only the title check; the images need no rebuild for it
+    if: ${{ github.base_ref == 'staging' && github.event.action != 'edited' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [node:22-slim, node:22-alpine, node:24-slim]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.2
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Containers
+        env:
+          NODE_IMAGE: ${{ matrix.image }}
+        run: pnpm test:docker
+
+      # The test run removes its stack, also after a failure; this fails the job when it did not
+      - name: Nothing left behind
+        if: ${{ always() }}
+        run: |
+          left=$(docker ps --all --quiet --filter label=com.docker.compose.project=micafox-docker-test)
+          networks=$(docker network ls --quiet --filter label=com.docker.compose.project=micafox-docker-test)
+          echo "containers: ${left:-none}; networks: ${networks:-none}"
+          test -z "$left$networks"
+
+  # One name for the whole matrix, to add to the ruleset once `docker` is stable
+  docker-result:
+    needs: docker
+    if: ${{ always() && github.base_ref == 'staging' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: All base images passed
+        env:
+          RESULT: ${{ needs.docker.result }}
+        run: |
+          echo "docker: $RESULT"
+          test "$RESULT" = success

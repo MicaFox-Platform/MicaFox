@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_EXPIRES_IN_MS, readBreakpoints, startCountdown } from "../breakpoints.js";
+import { DEFAULT_EXPIRES_IN_MS, readBreakpoints, selectForService, startCountdown } from "../breakpoints.js";
 
 const SAMPLE = [{ id: "bp-quote", file: "examples/frameworks/fastify/src/pricing.ts", line: 33 }];
 
@@ -145,5 +145,29 @@ describe("startCountdown", () => {
     const list = startCountdown([], createClock(0).now);
 
     expect(list()).toEqual([]);
+  });
+});
+
+describe("selectForService", () => {
+  const forCjs = { id: "bp-cjs", file: "examples/formats/src/cjs/quote.js", line: 9, service: "formats-cjs" };
+  const forEsm = { id: "bp-esm", file: "examples/formats/src/esm/quote.js", line: 9, service: "formats-esm" };
+  const forAll = { id: "bp-quote", file: "examples/frameworks/fastify/src/pricing.ts", line: 33 };
+
+  it("keeps the entries of the app's service and those of none, without their service", () => {
+    const selected = selectForService([forCjs, forEsm, forAll], "formats-cjs");
+
+    expect(selected).toEqual([{ id: "bp-cjs", file: "examples/formats/src/cjs/quote.js", line: 9 }, forAll]);
+  });
+
+  it("drops every entry of a service when the hello names no service", () => {
+    const selected = selectForService([forCjs, forAll], undefined);
+
+    expect(selected).toEqual([forAll]);
+  });
+
+  it("passes an entry that is not an object on to every app", () => {
+    const selected = selectForService(["bp-bad"], "formats-cjs");
+
+    expect(selected).toEqual(["bp-bad"]);
   });
 });

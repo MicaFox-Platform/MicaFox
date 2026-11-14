@@ -23,6 +23,11 @@ they are.
   `welcome`, `breakpoints.ts` reads the breakpoints to set and counts their time left down.
 - `test/` — `env-examples.test.ts`: the `.env.example` files and `start` scripts of the examples; `docker.test.ts`:
   their Dockerfile and `compose.yaml` against those files, and the hub's `HOST`.
+- `docker/` — the container tests of `pnpm test:docker`, run by `vitest.docker.config.ts` only, never by `pnpm test`:
+  `compose.test.yaml` locks down every service of `examples/compose.yaml` (read-only root filesystem, a writable
+  `/tmp`, 256 MB, SDK errors only) and reports it healthy once it serves; `stack.ts` starts, follows, stops and
+  removes the stack with the docker CLI; `global-setup.ts` starts it once per run and always removes it; `apps.ts`
+  describes each app; `__tests__/containers.test.ts` checks them.
 - `.env.example` — the hub's port and one breakpoint for each example app.
 
 `readBreakpoints()`, `startCountdown()`, `acceptModules()` and how `onConnection()` answers a `hello` have unit tests in
@@ -50,6 +55,10 @@ Each entry of `HUB_BREAKPOINTS` may set `expiresInMs`, the time the breakpoint l
 other value, or none, means 1 h (`3600000`). The hub fixes each deadline when it starts and counts it down: every
 `breakpoints` message it sends carries the time left at that moment, never less than `0`, so an app that connects
 later, or reconnects, gets a shorter time. Restart the hub to start the countdown again.
+
+An entry may also set `service`: the hub then sends it only to apps whose `hello` has that `service`, without the
+field. Entries without it go to every app. The container tests use it, since the SDK matches a breakpoint's file by
+the end of its path, so one app's `quote.js` breakpoint would also resolve in another app's `quote.js`.
 
 `pnpm --filter @micafox/testkit start:hub` runs it by hand and reads a `.env` in this folder, if there is one. Copy
 `.env.example` to `.env` first: it sets `HUB_BREAKPOINTS` to one breakpoint for each example app, on the line marked

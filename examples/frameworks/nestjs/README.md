@@ -11,7 +11,9 @@ The app serves `GET /quote`, and its handler is the code to debug: a breakpoint 
 ## What NestJS needs
 
 Set `"sourceMap": true` in the tsconfig the Nest CLI builds with, so breakpoints on `.ts` lines resolve. Call
-`app.enableShutdownHooks()` and `await micafox.stop()` in `onApplicationShutdown()`. The example builds with
+`await micafox.stop()` in `onApplicationShutdown()`, and `app.close()` on `SIGTERM` and `SIGINT`, which runs it.
+`app.enableShutdownHooks()` ends the process by sending the signal again, which a container's PID 1 ignores, so the
+process would never exit. The example builds with
 `@nestjs/cli` 11: `@nestjs/cli` 12 fails to start on Node.js 22.13, a bug of the CLI, not of NestJS.
 
 ## Layout

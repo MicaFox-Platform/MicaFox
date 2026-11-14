@@ -1,5 +1,6 @@
 // The breakpoints the fake hub sends after welcome: those of HUB_BREAKPOINTS, a JSON array, or none. Each entry's
-// `expiresInMs` is the time it has left, counted down from when the hub started.
+// `expiresInMs` is the time it has left, counted down from when the hub started; an entry with a `service` goes only to
+// the apps of that service.
 
 /** What an entry of HUB_BREAKPOINTS gets when its `expiresInMs` is not an integer of at least 0: 1 h. */
 export const DEFAULT_EXPIRES_IN_MS = 3_600_000;
@@ -47,3 +48,17 @@ export const startCountdown = (breakpoints: readonly unknown[], now: () => numbe
     );
   };
 };
+
+/**
+ * The entries of `breakpoints` for an app of `service`: those without a `service` and those of that service, without the
+ * field, which is the hub's and not the protocol's. An entry that is not an object goes to every app.
+ */
+export const selectForService = (breakpoints: readonly unknown[], service: unknown): unknown[] =>
+  breakpoints.flatMap((entry) => {
+    if (!isObject(entry) || !("service" in entry)) {
+      return [entry];
+    }
+
+    const { service: entryService, ...rest } = entry;
+    return entryService === service ? [rest] : [];
+  });
