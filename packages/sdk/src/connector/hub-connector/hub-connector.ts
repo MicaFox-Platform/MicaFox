@@ -222,8 +222,8 @@ export class HubConnector implements Connector {
       return;
     }
 
-    const { token, service, labels } = this.options;
-    const hello = buildHello({ instanceId: this.instanceId, service, labels, modules: this.modules });
+    const { token, service, commit, labels } = this.options;
+    const hello = buildHello({ instanceId: this.instanceId, service, commit, labels, modules: this.modules });
     this.log("debug", `connecting to the hub at ${this.target.description}`, "connecting");
     try {
       this.attempt = new Attempt({ target: this.target, token, hello }, this.attemptEvents);

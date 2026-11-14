@@ -7,6 +7,8 @@ export interface ResolvedConnectorOptions {
   url: string | undefined;
   token: string | undefined;
   service: string | undefined;
+  /** Lowercase, 7 to 64 hexadecimal characters; `undefined` when not set or not valid. */
+  commit: string | undefined;
   labels: Labels;
   buffer: { maxMessages: number; maxBytes: number };
   batch: { maxMessages: number; maxBytes: number; flushIntervalMs: number };
@@ -60,6 +62,31 @@ const resolveStringOption = (
   // The value itself is never logged: it may be the token
   warn(`${name} must be a string; it is ignored`);
   return undefined;
+};
+
+const COMMIT_ENV = "MICAFOX_COMMIT";
+const COMMIT_PATTERN = /^[0-9a-f]{7,64}$/i;
+
+// Like a string option, but only a commit hash is kept, lowercased (ADR 0019); the value is never logged
+const resolveCommit = (options: object | undefined, { env, warn }: Source): string | undefined => {
+  const option = readOption(options, "commit", warn);
+  if (option !== undefined && typeof option !== "string") {
+    warn("commit must be a string; it is ignored");
+    return undefined;
+  }
+
+  const name = option === undefined ? COMMIT_ENV : "commit";
+  const value = option ?? readEnv(env, COMMIT_ENV);
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (!COMMIT_PATTERN.test(value)) {
+    warn(`${name} must be 7 to 64 hexadecimal characters; it is ignored`);
+    return undefined;
+  }
+
+  return value.toLowerCase();
 };
 
 // An option group such as `buffer`: anything but an object logs a warning, and its defaults are used
@@ -122,6 +149,7 @@ export const resolveOptions = (options: object | undefined, source: Source): Res
     url: resolveStringOption(options, "url", source),
     token: resolveStringOption(options, "token", source),
     service: resolveStringOption(options, "service", source),
+    commit: resolveCommit(options, source),
     labels: resolveLabels(readOption(options, "labels", warn), env, warn),
     buffer: {
       maxMessages: buffer("maxMessages", DEFAULT_BUFFER_MAX_MESSAGES),
@@ -143,6 +171,7 @@ export interface HubConnectorOptions {
   url?: string;
   token?: string;
   service?: string;
+  commit?: string;
   labels?: Record<string, string>;
   logger?: Logger;
   logLevel?: LogLevel;

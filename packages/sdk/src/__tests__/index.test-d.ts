@@ -83,6 +83,7 @@ describe("connector types", () => {
       url?: string;
       token?: string;
       service?: string;
+      commit?: string;
       labels?: Record<string, string>;
       logger?: Logger;
       logLevel?: LogLevel;
@@ -122,6 +123,7 @@ describe("debugger types", () => {
       url?: string;
       token?: string;
       service?: string;
+      commit?: string;
       labels?: Record<string, string>;
       redact?: string[];
       logger?: Logger;

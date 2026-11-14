@@ -8,6 +8,8 @@ import type { Labels } from "../options/index.js";
 export interface HelloFields {
   instanceId: string;
   service: string | undefined;
+  /** A valid commit hash, as `resolveOptions()` returns it. */
+  commit: string | undefined;
   labels: Labels;
   /** The modules this instance runs. */
   modules: readonly string[];
@@ -25,11 +27,12 @@ const readHostname = (): string => {
 };
 
 /** Builds the `hello` the connector sends as the first frame of every connection (ADR 0009). */
-export const buildHello = ({ instanceId, service, labels, modules }: HelloFields): Hello => ({
+export const buildHello = ({ instanceId, service, commit, labels, modules }: HelloFields): Hello => ({
   version: PROTOCOL_VERSION,
   type: "hello",
   instanceId,
   ...(service === undefined ? {} : { service }),
+  ...(commit === undefined ? {} : { commit }),
   labels: { ...labels },
   hostname: readHostname(),
   pid: process.pid,
