@@ -26,8 +26,10 @@ process's limit or the pause time, every breakpoint is `rateLimited` until those
 Every breakpoint expires after the time the hub gives it, at most 24 h, even while the hub is unreachable; it is
 then removed and has status `expired`, see [`Breakpoint`](../protocol.md#breakpoint).
 Capturing stops after 10 ms per pause and at 64 KiB per snapshot;
-a snapshot cut by either limit is `truncated`. An array, `Set` or `Map` with more children than `maxItems` is captured
-with its size only. Details: [capturing a snapshot](../../architecture/sdk/debugger.md#capturing-a-snapshot).
+a snapshot cut by either limit is `truncated`. Every variable of the scopes listed in time is in the snapshot even
+then, as long as it fits the size: one the time left unread keeps its primitive value or its shell, and a handler's own variables are read before
+its parameters, such as `request` and `response`, and before `this`. An array, `Set` or `Map` with more children
+than `maxItems` is captured with its size only. Details: [capturing a snapshot](../../architecture/sdk/debugger.md#capturing-a-snapshot).
 
 The hub sets breakpoints by the file's path in your repository. For TypeScript, ship source maps: inline as a
 `data:` URL or as `.map` files referenced by a relative URL; a map URL with a scheme, such as `file:` or `https:`,

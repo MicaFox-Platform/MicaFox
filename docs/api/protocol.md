@@ -424,8 +424,10 @@ From the SDK: the state of the app at one hit of a breakpoint.
   scope that cannot be read appears as one variable named after its type, such as `<closure scope>`, whose value is
   `unavailable`.
 - `truncated` — `true` when the snapshot reached 64 KiB of JSON or 10 ms. The first value not read by then is
-  `unavailable` with the reason, and the rest is left out: the remaining variables and properties, with `truncated`
-  on their object, and the children of an `array`, `set` or `map`.
+  `unavailable` with the reason, and the rest is left out: the remaining properties, with `truncated` on their
+  object, and the children of an `array`, `set` or `map`. A variable not read by then keeps the value its scope gave:
+  a primitive in full, an `object`, `array`, `set` or `map` without children; a `function` or `error` is
+  `unavailable`. At 64 KiB the remaining variables are left out.
 
 ```ts
 import type { Snapshot, Value } from "@micafox/protocol";

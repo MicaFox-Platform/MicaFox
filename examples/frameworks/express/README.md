@@ -11,10 +11,9 @@ request's values.
 ## What Express needs
 
 Start MicaFox before the app loads its routes, and call `await micafox.stop()` on SIGTERM after the server has
-closed. A handler's `request` and `response` come before its own variables and are large: on a slow machine, reading
-them at the default depth can use up the 10 ms of a pause, and the variables after them are left out. Give a
-breakpoint in a handler `limits: { maxDepth: 1 }` ([`CaptureLimits`](../../../docs/api/protocol.md)), as the tests
-do.
+closed. A handler's `request` and `response` are large, but the default
+[`CaptureLimits`](../../../docs/api/protocol.md) fit: the SDK reads the handler's own variables first, and when the
+10 ms of a pause run out, `request` and `response` are cut, not the variables.
 
 ## Layout
 

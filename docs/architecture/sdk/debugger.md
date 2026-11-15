@@ -284,7 +284,12 @@ and `Breakpoints` through an interface it declares, so the two do not import eac
    V8 keeps breakpoints off across `Debugger.disable`, so only that timer turns them on again. If the inspector
    refuses either call, the debugger stops itself.
 5. `Capture` reads up to 20 frames of the stack, then `this` and the scopes of the innermost frame with synchronous
-   `Runtime.getProperties` calls, depth first, within the largest limits of the allowed entries. V8 names the script
+   `Runtime.getProperties` calls, depth first, within the largest limits of the allowed entries. It reads the
+   variables in two passes, so a large one cannot leave the others out: first every variable gets what costs no
+   call, a primitive in full and an object, array, `Set` or `Map` as its shell without children, checked against the
+   size limit only, though listing each scope is a call and counts against the 10 ms; then the values are read on within both limits. The innermost scope is read on from its last
+   variable to its first, since V8 lists a function's own variables after its parameters, such as a handler's
+   `request` and `response`; then `this`, then the outer scopes, each from its last variable. V8 names the script
    of a frame by id, so `Breakpoints` finds its URL by id and gives the position: the original one where the script's
    map is decoded, else the generated path (from `file://`) or URL. The scopes read are `local`, `block`, `catch`,
    `with`, `eval`, `closure` and `module`; `global` and `script` are left out. An object keeps its own enumerable
@@ -292,9 +297,11 @@ and `Breakpoints` through an interface it declares, so the two do not import eac
    `Map` comes from V8's description of it; with more children than `maxItems` only the size is kept, without
    reading them. A function's name and an error's message and stack cost one call each; a date comes from its
    description, to the second. V8 gives no object identity, so a cycle is read again down to `maxDepth` and
-   `circular` is never produced. At 10 ms or 64 KiB it stops: the first value not read is `unavailable` with the
-   reason, the rest is left out (an object is `truncated`, an array, `Set` or `Map` loses its children) and the
-   snapshot is `truncated`. A name that matches the redaction rules, see [Redacting secrets](#redacting-secrets),
+   `circular` is never produced. At 10 ms or 64 KiB it stops and the snapshot is `truncated`: the first value not
+   read is `unavailable` with the reason, the rest of the object or array it is in is left out (an object is
+   `truncated`, an array, `Set` or `Map` loses its children), a variable not read on keeps its shell, and a function
+   or error not read on is `unavailable` with the reason. The size limit stops the first pass too, which leaves the
+   further variables out. A name that matches the redaction rules, see [Redacting secrets](#redacting-secrets),
    gets the value `redacted` and its children are not read.
 6. The thread resumes, also when the capture threw, and the pause time, from the start of the handler, is charged
    to the budget, also for a pause resumed at once; a budget can go into debt and refills from there. One pause

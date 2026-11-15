@@ -316,26 +316,70 @@ describe("readPause limits of time and size", () => {
     return frame;
   };
 
-  it("makes the values not yet read unavailable at the time limit, and truncates", () => {
+  it("keeps the objects not read by the time limit as their shells, last variable read first, and truncates", () => {
     let elapsedMs = 0;
     const { inspector, dependencies } = setup({ clock: { now: () => elapsedMs, epochMs: () => 0 } });
     const frame = manyObjects(inspector);
-    // Every command takes 3 ms: the scope, then o0, o1 and o2 use 12 ms
+    // Every command takes 3 ms: the scope, o5 and o4 use 9 ms, and the listing of o3 ends past 10 ms
     inspector.onPost = () => {
       elapsedMs += 3;
     };
 
     const pause = readPause(pausedAt(frame), [undefined], dependencies);
 
-    expect({
-      kinds: pause.variables.slice(1).map(({ value }) => value.type),
-      reason: pause.variables.at(-1)?.value,
-      truncated: pause.truncated,
-    }).toEqual({
-      kinds: ["object", "object", "object", "unavailable"],
-      reason: { type: "unavailable", reason: "the pause reached its time limit" },
+    expect({ variables: pause.variables.slice(1), truncated: pause.truncated }).toEqual({
+      variables: [
+        { name: "o0", value: { type: "object", className: "Object" } },
+        { name: "o1", value: { type: "object", className: "Object" } },
+        { name: "o2", value: { type: "object", className: "Object" } },
+        {
+          name: "o3",
+          value: {
+            type: "object",
+            className: "Object",
+            properties: [{ name: "x", value: { type: "unavailable", reason: "the pause reached its time limit" } }],
+            truncated: true,
+          },
+        },
+        {
+          name: "o4",
+          value: {
+            type: "object",
+            className: "Object",
+            properties: [{ name: "x", value: { type: "number", value: 4 } }],
+          },
+        },
+        {
+          name: "o5",
+          value: {
+            type: "object",
+            className: "Object",
+            properties: [{ name: "x", value: { type: "number", value: 5 } }],
+          },
+        },
+      ],
       truncated: true,
     });
+  });
+
+  it("makes a function or error not read by the time limit unavailable with the reason", () => {
+    let elapsedMs = 0;
+    const { inspector, dependencies } = setup({ clock: { now: () => elapsedMs, epochMs: () => 0 } });
+    const frame = withLocals(inspector, [
+      data("failure", reference("failure", { subtype: "error", className: "RangeError" })),
+      data("total", { type: "function", className: "Function", description: "() => 1", objectId: "total" }),
+    ]);
+    inspector.define("total", [data("name", text("total"))]);
+    inspector.onPost = () => {
+      elapsedMs += 5;
+    };
+
+    const { variables } = readPause(pausedAt(frame), [undefined], dependencies);
+
+    expect(variables.slice(1)).toEqual([
+      { name: "failure", value: { type: "unavailable", reason: "the pause reached its time limit" } },
+      { name: "total", value: { type: "function", name: "total" } },
+    ]);
   });
 
   it("makes the values not yet read unavailable at the size limit, and truncates", () => {

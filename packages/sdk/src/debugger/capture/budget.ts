@@ -10,6 +10,8 @@ export interface BudgetLimits {
 /** 10 ms and 64 KiB, the most a pause and a snapshot may take. */
 export const DEFAULT_BUDGET: BudgetLimits = { maxMs: 10, maxBytes: 64 * 1024 };
 
+const SIZE_REASON = "the snapshot reached its size limit";
+
 // The JSON of a node apart from its text: braces, quotes, the keys of its fields and a separator
 const NODE_BYTES = 40;
 
@@ -63,6 +65,11 @@ export class CaptureBudget {
     this.usedBytes += bytes;
   }
 
+  /** Takes back the `bytes` of a value that a fuller one replaces, which counts its own. */
+  refund(bytes: number): void {
+    this.usedBytes -= bytes;
+  }
+
   /** Why nothing more may be read, or undefined while there is budget left. */
   exhaustedReason(): string | undefined {
     if (this.reason !== undefined) {
@@ -70,7 +77,7 @@ export class CaptureBudget {
     }
 
     if (this.usedBytes >= this.limits.maxBytes) {
-      this.reason = "the snapshot reached its size limit";
+      this.reason = SIZE_REASON;
     } else if (this.now() - this.startedMs >= this.limits.maxMs) {
       this.reason = "the pause reached its time limit";
     }
@@ -86,6 +93,20 @@ export class CaptureBudget {
     }
 
     return reason;
+  }
+
+  /**
+   * Like `stopReason`, for the size limit only: a value that costs no inspector call is added whatever the time, as
+   * long as the snapshot has room.
+   */
+  sizeStopReason(): string | undefined {
+    if (this.usedBytes < this.limits.maxBytes) {
+      return undefined;
+    }
+
+    this.reason ??= SIZE_REASON;
+    this.isCut = true;
+    return SIZE_REASON;
   }
 
   /** Whether any value was left unread because the budget ran out. */

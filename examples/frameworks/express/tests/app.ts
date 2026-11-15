@@ -13,7 +13,4 @@ export const EXPRESS_APP: QuoteApp = {
   ready: LISTENING,
   exitOnSigterm: 0,
   stopMarker: "micafox stopped",
-  // The handler's `request` and `response` come first in its scope and are large: at the default depth of 3, reading
-  // them can take the 10 ms of a pause on a slow machine, and the locals after them are left out of the snapshot
-  limits: { maxDepth: 1 },
 };

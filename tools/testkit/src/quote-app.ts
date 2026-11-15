@@ -2,7 +2,7 @@
 // `// breakpoint here` captures the request's values. An example describes its app as a QuoteApp; starting the fake hub
 // and the app, and waiting on what they print, come from here.
 
-import type { BreakpointStatus, CaptureLimits, Snapshot } from "@micafox/protocol";
+import type { BreakpointStatus, Snapshot } from "@micafox/protocol";
 import path from "node:path";
 
 import { readType, type ChildProcessRun, type Exit } from "./child-process-run.js";
@@ -36,8 +36,6 @@ export interface QuoteApp {
   readonly stopMarker: string;
   /** Environment variables the app needs, by name. */
   readonly env?: ReadonlyMap<string, string>;
-  /** The capture limits of the breakpoint the hub sets on the handler, when the defaults do not fit. */
-  readonly limits?: CaptureLimits;
 }
 
 /** The path of the handler's source in the repository, with `/` separators, as a hub sets a breakpoint on it. */
@@ -60,7 +58,6 @@ export const startQuoteHub = (app: QuoteApp): Promise<ListeningRun> => {
     id: QUOTE_BREAKPOINT_ID,
     file: toQuoteRepositoryPath(app),
     line: findQuoteLine(app),
-    ...(app.limits === undefined ? {} : { limits: app.limits }),
   };
   return startHub({ breakpoints: [breakpoint] });
 };
@@ -78,23 +75,22 @@ export const toQuoteUrl = (port: number, pathname = "/quote?sku=SKU-2&quantity=3
   `http://127.0.0.1:${String(port)}${pathname}`;
 
 /**
- * Sends GET requests to `url`, one at a time, until the fake hub has printed a snapshot that is not `truncated`, and
- * resolves with it. The first pause of a freshly started process can take the whole 10 ms of a pause on a slow machine,
- * such as a CI runner, before it reads a variable, and slow pauses use up the 20 ms a second the app may be paused, so
- * the snapshots of the next requests in that second are not taken. Requests go on until a warm pause reads them all.
+ * Sends GET requests to `url`, one at a time, until the fake hub has printed a snapshot, and resolves with it. Slow
+ * pauses, such as the first of a freshly started process on a CI runner, use up the 20 ms a second the app may be
+ * paused, so the next requests in that second capture nothing. A snapshot the 10 ms cut short still holds the
+ * handler's own variables: the SDK reads them before its `request` and `response`.
  */
-export const fetchUntilCompleteSnapshot = async (url: string, hub: ChildProcessRun): Promise<Snapshot> => {
-  const isComplete = (line: string): boolean =>
-    readType(line) === "snapshot" && (JSON.parse(line) as Snapshot).truncated !== true;
+export const fetchUntilSnapshot = async (url: string, hub: ChildProcessRun): Promise<Snapshot> => {
+  const isSnapshot = (line: string): boolean => readType(line) === "snapshot";
   const state = { isSettled: false };
-  const found = hub.waitForLines(isComplete).finally(() => {
+  const found = hub.waitForLines(isSnapshot).finally(() => {
     state.isSettled = true;
   });
   while (!state.isSettled) {
     await fetchInARow(url, 1);
   }
   const [line = ""] = await found;
-  // isComplete() has accepted the line as a snapshot
+  // isSnapshot() has accepted the line as a snapshot
   return JSON.parse(line) as Snapshot;
 };
 

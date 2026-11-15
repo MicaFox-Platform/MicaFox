@@ -21,7 +21,7 @@ import {
 import { followHub, readServiceLines, stopService } from "../stack.js";
 
 const REQUESTS = 20;
-// Requests fetchUntilCompleteSnapshot() sends at most: a test that fails keeps no loop running into the next ones
+// Requests fetchUntilSnapshot() sends at most: a test that fails keeps no loop running into the next ones
 const MAX_SNAPSHOT_ATTEMPTS = 200;
 const SDK_LOG_PREFIX = "[micafox]";
 
@@ -60,13 +60,13 @@ const waitUntilActive = async (app: DockerApp): Promise<void> => {
 };
 
 /**
- * Sends requests until the hub has printed a snapshot of `app` that is not truncated. A fresh process's first pauses can
- * use up its pause budget, so the snapshots of those requests are skipped or cut short.
+ * Sends requests until the hub has printed a snapshot of `app`. A fresh process's first pauses can use up its pause
+ * budget, so those requests capture nothing; a snapshot cut short still has its stack.
  */
-const fetchUntilCompleteSnapshot = async (app: DockerApp): Promise<Snapshot | undefined> => {
+const fetchUntilSnapshot = async (app: DockerApp): Promise<Snapshot | undefined> => {
   const state = { isSettled: false };
   const found = hub
-    .waitForLines((line) => isSnapshotOf(app, line) && readSnapshot(line)?.truncated !== true)
+    .waitForLines((line) => isSnapshotOf(app, line))
     .finally(() => {
       state.isSettled = true;
     });
@@ -74,7 +74,7 @@ const fetchUntilCompleteSnapshot = async (app: DockerApp): Promise<Snapshot | un
     await fetchInARow(toQuoteUrl(app), 1);
   }
   if (!state.isSettled) {
-    throw new Error(`no complete snapshot of ${app.breakpointId} after ${String(MAX_SNAPSHOT_ATTEMPTS)} requests`);
+    throw new Error(`no snapshot of ${app.breakpointId} after ${String(MAX_SNAPSHOT_ATTEMPTS)} requests`);
   }
   const [line = ""] = await found;
   return readSnapshot(line);
@@ -104,7 +104,7 @@ describe.each(CAPTURING_APPS)("the $service container's breakpoint", (app) => {
   it("captures a snapshot whose top frame is the marked line and keeps serving", async () => {
     await waitForStatus(hub, app.breakpointId, (status) => status.status === "active");
 
-    const snapshot = await fetchUntilCompleteSnapshot(app);
+    const snapshot = await fetchUntilSnapshot(app);
     const statuses = await fetchInARow(toQuoteUrl(app), REQUESTS);
 
     expect({ file: snapshot?.stack[0]?.file, line: snapshot?.stack[0]?.line, statuses }).toEqual({
