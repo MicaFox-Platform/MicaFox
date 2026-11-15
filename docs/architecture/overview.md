@@ -53,10 +53,10 @@ The exact limits: [SDK API](../api/sdk/overview.md#installation).
 `examples/frameworks/fastify` is a demo app to try the SDK by hand: a Fastify server debugged by `micafox` under tsx,
 with the kit's fake hub setting a sample breakpoint, and its end-to-end tests run both as real processes.
 `examples/formats` runs the built SDK in one small app per format: plain JavaScript with `require()` and with `import`,
-TypeScript compiled by tsc to CommonJS and to ES modules with `.map` files, and a bundle, which is not supported; its
+TypeScript compiled by tsc to CommonJS and to ES modules with `.map` files, and an esbuild bundle with one `.map`; its
 tests run after the build. `examples/frameworks/express`, `nestjs` and `nextjs` run the built SDK in an Express app, a
-NestJS app built by the Nest CLI and a Next.js app served by `next start`, where the SDK runs but breakpoints in the
-bundled route handlers stay `pending`; their tests run after the build too. All the examples start their processes and
+NestJS app built by the Nest CLI and a Next.js app whose route handlers `next build` bundles, served by `next start`;
+their tests run after the build too. All the examples start their processes and
 one fake hub through `tools/testkit` (`@micafox/testkit`), a private, never-published kit that only examples depend on,
 which also holds `pnpm bench`, the benchmark of the SDK's overhead: [README](../../tools/testkit/README.md).
 
