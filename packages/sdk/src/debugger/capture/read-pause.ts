@@ -1,10 +1,10 @@
-import type { CaptureLimits, StackFrame, Variable } from "@micafox/protocol";
+import type { CaptureLimits, StackFrame, Value, Variable } from "@micafox/protocol";
 import { performance } from "node:perf_hooks";
 
 import { CaptureBudget, DEFAULT_BUDGET, type BudgetLimits } from "./budget.js";
 import { largestLimits } from "./limits.js";
 import { ValueReader, type CaptureInspector, type Listed } from "./read-value.js";
-import { readRemoteObject, type RemoteObject } from "./remote-object.js";
+import { readRemoteObject, type Property, type RemoteObject } from "./remote-object.js";
 import { isRecord } from "../../connector/index.js";
 import type { FrameLocation } from "../source-maps/index.js";
 
@@ -119,57 +119,99 @@ const readCallFrames = (params: unknown): CallFrame[] => {
   return frames;
 };
 
-interface VariableList {
-  variables: Variable[];
+// A variable in the snapshot: its value so far, and the object to read on while that value is not final
+interface Slot {
+  name: string;
+  value: Value;
+  pending: RemoteObject | undefined;
+}
+
+interface SlotList {
+  scopes: Slot[][];
   seen: Set<string>;
 }
 
-const unavailableVariable = (name: string, reason: string): Variable => ({
+const unavailableSlot = (name: string, reason: string): Slot => ({
   name,
   value: { type: "unavailable", reason },
+  pending: undefined,
 });
 
-// Adds the variables of one scope; false once the budget is spent, after one unavailable variable that says why,
-// so a scope with thousands of names still fits the snapshot's size
-const addScope = (scope: CallFrame["scopes"][number], reader: ValueReader, list: VariableList): boolean => {
+const peekSlot = (property: Property, reader: ValueReader): Slot => {
+  const { value, isFinal } = reader.peekVariable(property);
+  return { name: property.name, value, pending: isFinal ? undefined : property.value };
+};
+
+// Adds the variables of one scope, each without an inspector call, so whatever the time; false once the snapshot is
+// full, after one unavailable variable that says why, so a scope with thousands of names still fits its size
+const peekScope = (scope: CallFrame["scopes"][number], reader: ValueReader, list: SlotList): boolean => {
   const listed: Listed =
     scope.objectId === undefined
       ? { ok: false, reason: "the inspector could not read the scope" }
       : reader.list(scope.objectId);
   if (!listed.ok) {
     // The names of a scope are unknown when it cannot be listed, so one variable stands for them
-    list.variables.push(unavailableVariable(`<${scope.type} scope>`, listed.reason));
+    list.scopes.push([unavailableSlot(`<${scope.type} scope>`, listed.reason)]);
     return reader.canRead();
   }
 
+  const slots: Slot[] = [];
+  list.scopes.push(slots);
   for (const property of listed.list.properties.filter(({ name }) => !list.seen.has(name))) {
     list.seen.add(property.name);
-    const reason = reader.stopReason();
+    const reason = reader.sizeStopReason();
     if (reason !== undefined) {
-      list.variables.push(unavailableVariable(property.name, reason));
+      slots.push(unavailableSlot(property.name, reason));
       return false;
     }
 
-    list.variables.push(reader.readVariable(property));
+    slots.push(peekSlot(property, reader));
   }
 
   return true;
 };
 
-// `this`, then the scopes from the innermost out; a name that an inner scope has is not repeated by an outer one
-const readVariables = (frame: CallFrame, reader: ValueReader): Variable[] => {
-  const list: VariableList = { variables: [], seen: new Set(["this"]) };
-  if (frame.receiver !== undefined) {
-    list.variables.push({ name: "this", value: reader.readReceiver(frame.receiver) });
-  }
-
+// The scopes from the innermost out, each variable read without an inspector call; a name that an inner scope has
+// is not repeated by an outer one
+const peekScopes = (frame: CallFrame, reader: ValueReader): Slot[][] => {
+  const list: SlotList = { scopes: [], seen: new Set(["this"]) };
   for (const scope of frame.scopes.filter(({ type }) => SCOPE_TYPES.has(type))) {
-    if (!addScope(scope, reader, list)) {
+    if (!peekScope(scope, reader, list)) {
       break;
     }
   }
 
-  return list.variables;
+  return list.scopes;
+};
+
+// Reads on the slots that are not final, in `order`, while the budget lasts; past it, a slot keeps its shell
+const readOnSlots = (order: readonly Slot[], reader: ValueReader): Map<Slot, Value> => {
+  const values = new Map<Slot, Value>();
+  for (const slot of order) {
+    if (slot.pending !== undefined) {
+      values.set(slot, reader.readOn(slot.pending, slot.value));
+    }
+  }
+
+  return values;
+};
+
+/**
+ * `this`, then the scopes from the innermost out. Two passes, so a large value cannot leave the variables after it
+ * out: every variable first gets what costs no inspector call, then the values are read on within the budget. The
+ * innermost scope is read on from its last variable to its first, since V8 lists a function's own variables after its
+ * parameters, such as a handler's `request` and `response`; then `this` and the outer scopes, each from its last.
+ */
+const readVariables = (frame: CallFrame, reader: ValueReader): Variable[] => {
+  const receiver =
+    frame.receiver === undefined
+      ? []
+      : [peekSlot({ name: "this", value: frame.receiver, isAccessor: false, isEnumerable: true }, reader)];
+  const scopes = peekScopes(frame, reader);
+  const [innermost = [], ...outer] = scopes;
+  const order = [...innermost.toReversed(), ...receiver, ...outer.flatMap((slots) => slots.toReversed())];
+  const values = readOnSlots(order, reader);
+  return [...receiver, ...scopes.flat()].map((slot) => ({ name: slot.name, value: values.get(slot) ?? slot.value }));
 };
 
 const toStackFrame = (frame: CallFrame, location: FrameLocation): StackFrame => ({
@@ -180,8 +222,9 @@ const toStackFrame = (frame: CallFrame, location: FrameLocation): StackFrame => 
 /**
  * Reads the stack and the variables of the innermost frame of a `Debugger.paused` event, with `Runtime.getProperties`
  * only, within the largest of `limits` (a breakpoint without limits counts as the defaults). At 10 ms or 64 KiB the
- * first value not read is `unavailable`, the rest is left out, and the read is truncated. Throws `CaptureError` when the
- * innermost frame cannot be read.
+ * read is truncated: the first value not read is `unavailable` and the rest of its object or array is left out, while
+ * every variable that fits the size keeps what costs no call, its primitive value or its shell. Throws `CaptureError`
+ * when the innermost frame cannot be read.
  */
 export const readPause = (
   params: unknown,

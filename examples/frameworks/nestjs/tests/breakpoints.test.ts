@@ -1,7 +1,7 @@
 import {
   E2E_TEST_TIMEOUT_MS,
   fetchInARow,
-  fetchUntilCompleteSnapshot,
+  fetchUntilSnapshot,
   findQuoteLine,
   shutDownQuoteApp,
   startQuoteApp,
@@ -28,7 +28,7 @@ describe("the NestJS app", { timeout: E2E_TEST_TIMEOUT_MS }, () => {
     await waitForQuoteStatus(hub.run, (status) => status.status === "active");
 
     const statuses = await fetchInARow(toQuoteUrl(server.port), REQUESTS);
-    const snapshot = await fetchUntilCompleteSnapshot(toQuoteUrl(server.port), hub.run);
+    const snapshot = await fetchUntilSnapshot(toQuoteUrl(server.port), hub.run);
     const [top] = snapshot.stack;
 
     expect({

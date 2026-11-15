@@ -1,7 +1,7 @@
 import {
   E2E_TEST_TIMEOUT_MS,
   fetchInARow,
-  fetchUntilCompleteSnapshot,
+  fetchUntilSnapshot,
   findQuoteLine,
   shutDownQuoteApp,
   startQuoteApp,
@@ -28,7 +28,7 @@ describe("the Express app", { timeout: E2E_TEST_TIMEOUT_MS }, () => {
     await waitForQuoteStatus(hub.run, (status) => status.status === "active");
 
     const statuses = await fetchInARow(toQuoteUrl(server.port), REQUESTS);
-    const snapshot = await fetchUntilCompleteSnapshot(toQuoteUrl(server.port), hub.run);
+    const snapshot = await fetchUntilSnapshot(toQuoteUrl(server.port), hub.run);
     const [top] = snapshot.stack;
 
     expect({
@@ -42,6 +42,9 @@ describe("the Express app", { timeout: E2E_TEST_TIMEOUT_MS }, () => {
       file: expect.stringMatching(toQuoteFilePattern(EXPRESS_APP)) as unknown,
       line: findQuoteLine(EXPRESS_APP),
       variables: expect.arrayContaining([
+        // Large and read after the handler's own variables: still there, whole or cut
+        { name: "request", value: expect.objectContaining({ type: "object" }) as unknown },
+        { name: "response", value: expect.objectContaining({ type: "object" }) as unknown },
         { name: "sku", value: { type: "string", value: "SKU-2", length: 5 } },
         { name: "quantity", value: { type: "number", value: 3 } },
         { name: "unitPrice", value: { type: "number", value: 4.5 } },

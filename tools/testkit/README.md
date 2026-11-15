@@ -18,7 +18,7 @@ they are.
 - `src/markers.ts` — `findMarkerLine()`: the line a test sets its breakpoint on, found by a marker comment.
 - `src/requests.ts` — `fetchInARow()`.
 - `src/quote-app.ts` — what the framework examples share: a `QuoteApp` describes an app that serves `GET /quote`, and
-  `startQuoteHub()`, `startQuoteApp()`, `fetchUntilCompleteSnapshot()` and `shutDownQuoteApp()` run it.
+  `startQuoteHub()`, `startQuoteApp()`, `fetchUntilSnapshot()` and `shutDownQuoteApp()` run it.
 - `src/fake-hub/` — the fake hub, run as its own process: `main.ts` serves, and `startHub()` and the `start:hub` script
   run it by that path, `connection.ts` answers one app and prints what it sends, `modules.ts` picks the modules of its
   `welcome`, `breakpoints.ts` reads the breakpoints to set and counts their time left down.

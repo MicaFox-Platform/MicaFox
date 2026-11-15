@@ -1,7 +1,6 @@
 // The example apps of compose.yaml as the container tests see them: the breakpoint the stack's hub sets on each, for
 // its service only (toHubBreakpoints()), the port compose publishes and how the app ends on SIGTERM.
 
-import type { CaptureLimits } from "@micafox/protocol";
 import path from "node:path";
 
 import { findMarkerLine } from "../src/markers.js";
@@ -24,8 +23,6 @@ export interface DockerApp {
   readonly exitOnSigterm: number;
   /** The path and query of its quote endpoint. */
   readonly quotePath: string;
-  /** The breakpoint's capture limits, when the defaults do not fit. */
-  readonly limits?: CaptureLimits;
 }
 
 const QUOTE_PATH = "/quote?sku=SKU-2&quantity=3";
@@ -59,8 +56,6 @@ export const DOCKER_APPS: readonly DockerApp[] = [
     settledStatus: "active",
     exitOnSigterm: 0,
     quotePath: QUOTE_PATH,
-    // Its `request` and `response` are large
-    limits: { maxDepth: 1 },
   },
   {
     service: "nestjs",
@@ -114,6 +109,5 @@ export const toHubBreakpoints = (): string =>
       file: app.quoteSource,
       line: findQuoteLine(app),
       service: app.service,
-      ...(app.limits === undefined ? {} : { limits: app.limits }),
     })),
   );

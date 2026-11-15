@@ -14,7 +14,7 @@ export {
   type Readiness,
 } from "./processes.js";
 export {
-  fetchUntilCompleteSnapshot,
+  fetchUntilSnapshot,
   findQuoteLine,
   shutDownQuoteApp,
   startQuoteApp,

@@ -21,10 +21,19 @@ export interface ReadSettings {
 /** The properties of an object, or why they could not be read. */
 export type Listed = { ok: true; list: PropertyList } | { ok: false; reason: string };
 
+/** A variable's value as far as it is known without an inspector call; `isFinal` when reading on cannot add to it. */
+export interface Peeked {
+  value: Value;
+  isFinal: boolean;
+}
+
 type ArrayValue = Extract<Value, { type: "array" }>;
 
 const REDACTED: Value = { type: "redacted" };
 const READ_FAILED = "the inspector could not read the value";
+// Stands for a function or error until it is read on; the read or the reason it was not replaces it. Only this
+// object is a placeholder, so a value that is unavailable for its own reason keeps it
+const PLACEHOLDER: Value = { type: "unavailable", reason: "the value was not read" };
 const ENTRIES = "[[Entries]]";
 // An array index: no leading zeros, so "01" is a name and not an item
 const ARRAY_INDEX = /^(?:0|[1-9]\d{0,9})$/;
@@ -78,9 +87,9 @@ export class ValueReader {
     return reply.ok ? { ok: true, list: readPropertyList(reply.value) } : { ok: false, reason: READ_FAILED };
   }
 
-  /** Why the next value may not be read, or undefined while there is budget left; a reason truncates the read. */
-  stopReason(): string | undefined {
-    return this.budget.stopReason();
+  /** Why the next value that costs no inspector call may not be added: the size limit only; it truncates the read. */
+  sizeStopReason(): string | undefined {
+    return this.budget.sizeStopReason();
   }
 
   /** Whether the budget still allows a read. */
@@ -88,15 +97,60 @@ export class ValueReader {
     return this.budget.exhaustedReason() === undefined;
   }
 
-  /** Reads a variable of a scope and counts its name. */
-  readVariable(property: Property): Variable {
+  /**
+   * Reads a variable without an inspector call and counts it and its name: a primitive in full, an object, array,
+   * `Set` or `Map` as its shell without children, a function or error as `unavailable` until `readOn` reads it.
+   */
+  peekVariable(property: Property): Peeked {
     this.budget.charge(property.name.length + 16);
-    return { name: property.name, value: this.readNamed(property, 0) };
+    const peeked = this.peekNamed(property);
+    this.budget.charge(sizeOf(peeked.value));
+    return peeked;
   }
 
-  /** Reads the value of `this`, unless a rule matches the name `this`. */
-  readReceiver(remote: RemoteObject): Value {
-    return this.isSecret("this") ? this.redact() : this.readValue(remote, 0);
+  /**
+   * Reads on the value of a variable that `peekVariable` gave as not final; its value replaces `peeked`, whose bytes it takes back.
+   * Once the budget is spent, a shell is kept, which means not read, and a function or error is unavailable with the
+   * reason. The budget is checked once here, so a shell is never lost between two checks.
+   */
+  readOn(remote: RemoteObject, peeked: Value): Value {
+    const reason = this.budget.stopReason();
+    if (reason !== undefined) {
+      return peeked === PLACEHOLDER ? unavailable(reason) : peeked;
+    }
+
+    this.budget.refund(sizeOf(peeked));
+    const value = this.readReference(remote, 0);
+    this.budget.charge(sizeOf(value));
+    return value;
+  }
+
+  private peekNamed(property: Property): Peeked {
+    if (this.isSecret(property.name)) {
+      return { value: REDACTED, isFinal: true };
+    }
+
+    if (property.isAccessor) {
+      return { value: { type: "accessor" }, isFinal: true };
+    }
+
+    if (property.value === undefined) {
+      return { value: unavailable(READ_FAILED), isFinal: true };
+    }
+
+    const primitive = readPrimitive(property.value, this.limits.maxStringLength);
+    return primitive === undefined ? this.peekReference(property.value) : { value: primitive, isFinal: true };
+  }
+
+  // A function's name and an error's message cost a call; any other reference read at the depth limit costs none
+  private peekReference(remote: RemoteObject): Peeked {
+    if (remote.type === "function" || remote.subtype === "error") {
+      return { value: PLACEHOLDER, isFinal: false };
+    }
+
+    // An array or collection of unknown size is unavailable for good
+    const value = this.readReference(remote, this.limits.maxDepth);
+    return { value, isFinal: remote.objectId === undefined || value.type === "unavailable" };
   }
 
   // The value under a name that a rule matches is not read, so a container is never listed and a primitive, which
