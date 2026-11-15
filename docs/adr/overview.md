@@ -46,6 +46,7 @@ writing one: [`.claude/rules/adr.md`](../../.claude/rules/adr.md).
 
 - [0012. Redact secrets by name inside the SDK](sdk/debugger/0012-redact-secrets-by-name-inside-the-sdk.md)
 - [0018. Expire breakpoints in the SDK by a time left from the hub](sdk/debugger/0018-expire-breakpoints-in-the-sdk-by-a-time-left-from-the-hub.md)
+- [0020. Find a bundle by reading maps on demand](sdk/debugger/0020-find-a-bundle-by-reading-maps-on-demand.md)
 
 ## SDK: logger
 
