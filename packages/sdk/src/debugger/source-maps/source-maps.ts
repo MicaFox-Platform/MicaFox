@@ -1,36 +1,53 @@
 import { performance } from "node:perf_hooks";
 
 import { resolveMapSources, type MapSource } from "./map-sources.js";
+import { ReadQueue } from "./read-queue.js";
 import { readSourceMap, type MappedScript } from "./read-source-map.js";
+import { SourceSearch, type SearchedSource, type SearchView } from "./source-search.js";
 import type { SdkLogger } from "../../logger/index.js";
-import { decodeSourceMap, type SourceMapIndex } from "../source-map-decoder/index.js";
+import {
+  decodeSourceMap,
+  readMapSources,
+  type DecodeFailure,
+  type SourceMapIndex,
+} from "../source-map-decoder/index.js";
 
 const COMPONENT = "debugger";
 
-/** What is known of a script's map: its sources resolved to paths and, while the script holds it, its index. */
+/** The most segments the indexes of held maps may have together, about 72 MB at 24 bytes a segment. */
+export const MAX_HELD_SEGMENTS = 3_000_000;
+
+/**
+ * What is known of a script's map from a read by name: its sources resolved to paths, aligned with the map's
+ * `sources` so a source is found by its id, and, while the script holds it, its index.
+ */
 export type MapView =
   | { kind: "unread" }
   | { kind: "reading" }
   | { kind: "failed"; reason: string }
-  | { kind: "read"; sources: readonly MapSource[]; index?: SourceMapIndex };
+  | { kind: "read"; sources: ReadonlyArray<MapSource | undefined>; index?: SourceMapIndex };
 
-type MapState<Script> =
+type NameState<Script> =
   | { kind: "reading"; script: Script }
-  | { kind: "failed"; script: Script; reason: string }
-  | { kind: "read"; script: Script; sources: readonly MapSource[]; index?: SourceMapIndex };
+  | { kind: "failed"; script: Script; failure: DecodeFailure }
+  | { kind: "read"; script: Script; sources: ReadonlyArray<MapSource | undefined>; index?: SourceMapIndex };
 
 interface ReadingState<Script> {
   kind: "reading";
   script: Script;
 }
 
-type Decoded = { ok: true; bytes: number; sources: MapSource[]; index: SourceMapIndex } | { ok: false; reason: string };
+type Decoded<Value> = { ok: true; bytes: number; value: Value } | DecodeFailure;
+type DecodedMap = Decoded<{ sources: Array<MapSource | undefined>; index: SourceMapIndex }>;
+type QueueItem<Script> = { need: "name"; reading: ReadingState<Script> } | { need: "search"; script: Script };
 
 /** What `SourceMaps` needs from the breakpoints; `Script` is their record of a script. */
 export interface SourceMapsDependencies<Script extends MappedScript> {
   logger: SdkLogger;
-  /** Runs when the read of a script's current record ends, so the entries waiting for it are resolved again. */
+  /** Runs when the read by name of a script's current record ends, so the entries waiting for it are resolved again. */
   onRead: (script: Script) => void;
+  /** Runs when the last search read pending ends, so the entries searching the bundles are resolved again. */
+  onSearched: () => void;
   /** Reports an unexpected error of a read: the debugger stops itself. */
   fail: (error: unknown) => void;
 }
@@ -40,7 +57,10 @@ const UNREAD: MapView = { kind: "unread" };
 const describeMap = (script: MappedScript): string =>
   script.sourceMapUrl.startsWith("data:") ? `inline in ${script.url}` : `${script.sourceMapUrl} of ${script.url}`;
 
-const readAndDecode = async (script: MappedScript): Promise<Decoded> => {
+const toOverLimitReason = (failure: DecodeFailure): string | undefined =>
+  failure.isOverLimit ? failure.reason : undefined;
+
+const readAndDecode = async (script: MappedScript): Promise<DecodedMap> => {
   const read = await readSourceMap(script);
   if (!read.ok) {
     return read;
@@ -52,33 +72,41 @@ const readAndDecode = async (script: MappedScript): Promise<Decoded> => {
   }
 
   const { map } = decoded;
-  return {
-    ok: true,
-    bytes: read.bytes,
-    sources: resolveMapSources(map.sourceRoot, map.sources, read.mapUrl),
-    index: map,
-  };
+  const sources = resolveMapSources(map.sourceRoot, map.sources, read.mapUrl);
+  return { ok: true, bytes: read.bytes, value: { sources, index: map } };
+};
+
+const readSources = async (script: MappedScript): Promise<Decoded<Array<MapSource | undefined>>> => {
+  const read = await readSourceMap(script);
+  if (!read.ok) {
+    return read;
+  }
+
+  const found = await readMapSources(read.text);
+  return found.ok
+    ? { ok: true, bytes: read.bytes, value: resolveMapSources(found.map.sourceRoot, found.map.sources, read.mapUrl) }
+    : found;
 };
 
 /**
- * The source maps of the loaded scripts, read once per script record and shared by every entry that needs them.
- * Maps are read one at a time, in the order they were asked for, so at most one 8 MiB text and one partial index
- * are in memory and the host's thread pool keeps its other threads. The decoded index of a map, up to about 36 MB,
- * is kept only while an entry holds its script; for the others only the resolved sources are kept, so a pending
- * entry does not read them again. The states and the queue hold at most one item per recorded script and are
- * dropped with the records.
+ * The source maps of the loaded scripts, read once per script record and need, by name or for a search of the
+ * bundles, and shared by every entry that needs them. Maps are read one at a time, every read by name before any
+ * read for a search, so at most one 8 MiB text and one partial index are in memory and the host's thread pool keeps
+ * its other threads. The decoded index of a map is kept only while an entry holds its script, at most 3,000,000
+ * segments in all; a search keeps only the sources. The states and the queue hold at most one item per recorded
+ * script and need, and are dropped with the records.
  */
 export class SourceMaps<Script extends MappedScript> {
-  private readonly states = new Map<string, MapState<Script>>();
+  private readonly states = new Map<string, NameState<Script>>();
   /** The entries whose breakpoint is set through the map of each script URL. */
   private readonly holders = new Map<string, Set<string>>();
-  private queue: Array<ReadingState<Script>> = [];
-  private queueHead = 0;
+  private readonly search = new SourceSearch<Script>();
+  private readonly queue = new ReadQueue<QueueItem<Script>>();
   private isReading = false;
 
   constructor(private readonly dependencies: SourceMapsDependencies<Script>) {}
 
-  /** What is known of the map of `script`; a script with the URL of an earlier record starts as unread. */
+  /** What a read by name knows of the map of `script`; a script with the URL of an earlier record starts as unread. */
   view(script: Script): MapView {
     const state = this.states.get(script.url);
     if (state?.script !== script) {
@@ -89,7 +117,7 @@ export class SourceMaps<Script extends MappedScript> {
       case "reading":
         return { kind: "reading" };
       case "failed":
-        return { kind: "failed", reason: state.reason };
+        return { kind: "failed", reason: state.failure.reason };
       case "read":
         return state.index === undefined
           ? { kind: "read", sources: state.sources }
@@ -97,7 +125,7 @@ export class SourceMaps<Script extends MappedScript> {
     }
   }
 
-  /** Queues the map of `script` for reading, unless it is queued or what is known already serves every lookup. */
+  /** Queues the map of `script` for a read by name, unless it is queued or what is known already serves every lookup. */
   load(script: Script): void {
     const state = this.states.get(script.url);
     const isKnown = state?.script === script && (state.kind !== "read" || state.index !== undefined);
@@ -107,13 +135,79 @@ export class SourceMaps<Script extends MappedScript> {
 
     const reading: ReadingState<Script> = { kind: "reading", script };
     this.states.set(script.url, reading);
-    this.queue.push(reading);
+    this.queue.push("name", { need: "name", reading });
     this.readNext();
   }
 
-  /** Forgets the map of a URL whose script was recorded again; a read of the old record is ignored when it ends. */
+  /** How far the search of `script`'s map got. */
+  searchView(script: Script): SearchView {
+    return this.search.view(script);
+  }
+
+  /**
+   * Queues the map of `script` for a search, unless it was searched; what a read by name knows serves it, and a
+   * read by name under way settles it. Never ends a search synchronously, so it never calls `onSearched`.
+   */
+  searchMap(script: Script): void {
+    if (this.search.view(script) !== "unsearched") {
+      return;
+    }
+
+    const state = this.states.get(script.url);
+    const byName = state?.script === script ? state : undefined;
+    if (byName?.kind === "read") {
+      this.search.keep(script, byName.sources);
+    } else if (byName?.kind === "failed") {
+      this.search.fail(script, toOverLimitReason(byName.failure));
+    } else {
+      this.search.start(script);
+      if (byName === undefined) {
+        this.queue.push("search", { need: "search", script });
+        this.readNext();
+      }
+    }
+  }
+
+  /** The sources found by searches and reads by name, outside `node_modules`, whose path ends in `fileName`. */
+  findSearched(fileName: string): Array<SearchedSource<Script>> {
+    return this.search.find(fileName);
+  }
+
+  /** Whether a search read is queued or running. */
+  isSearching(): boolean {
+    return this.search.isSearching();
+  }
+
+  /** The reason of the first map a search found over a limit. */
+  searchFailure(): string | undefined {
+    return this.search.failure();
+  }
+
+  /** Forgets the maps of a URL whose script was recorded again; a read of the old record is ignored when it ends. */
   forget(url: string): void {
     this.states.delete(url);
+    if (this.search.forget(url)) {
+      this.endSearch();
+    }
+  }
+
+  /**
+   * Whether the decoded maps of `scripts` can be held on top of those held already: each map counts once, and all
+   * of them together hold at most 3,000,000 segments. O(held maps + scripts).
+   */
+  canHold(scripts: readonly Script[]): boolean {
+    const counted = new Map<string, number>();
+    for (const url of [...this.holders.keys(), ...scripts.map((script) => script.url)]) {
+      const state = this.states.get(url);
+      counted.set(url, state?.kind === "read" ? (state.index?.segmentCount ?? 0) : 0);
+    }
+
+    let total = 0;
+    for (const count of counted.values()) {
+      total += count;
+    }
+
+    return total <= MAX_HELD_SEGMENTS;
   }
 
   /** Keeps the index of `script`'s map while `owner` has a breakpoint set through it. */
@@ -133,10 +227,12 @@ export class SourceMaps<Script extends MappedScript> {
     }
   }
 
-  /** Drops the index of `script`'s map when no entry holds it, after the entries waiting for it were resolved. */
-  trim(script: Script): void {
-    if (!this.holders.has(script.url)) {
-      this.dropIndex(script.url);
+  /** Drops every index no entry holds; for after the last entry waiting for a read has been resolved. */
+  trimUnheld(): void {
+    for (const [url, state] of this.states) {
+      if (state.kind === "read" && state.index !== undefined && !this.holders.has(url)) {
+        this.dropIndex(url);
+      }
     }
   }
 
@@ -144,8 +240,8 @@ export class SourceMaps<Script extends MappedScript> {
   clear(): void {
     this.states.clear();
     this.holders.clear();
-    this.queue = [];
-    this.queueHead = 0;
+    this.search.clear();
+    this.queue.clear();
   }
 
   private dropIndex(url: string): void {
@@ -155,32 +251,38 @@ export class SourceMaps<Script extends MappedScript> {
     }
   }
 
-  // A queued read whose record was forgotten or read again is skipped without I/O
+  // A queued read whose record was forgotten, read again or searched another way is skipped without I/O
   private readNext(): void {
     if (this.isReading) {
       return;
     }
 
-    while (this.queueHead < this.queue.length) {
-      const reading = this.queue[this.queueHead];
-      this.queueHead += 1;
-      if (reading !== undefined && this.states.get(reading.script.url) === reading) {
+    for (let next = this.queue.take(); next !== undefined; next = this.queue.take()) {
+      if (this.isCurrent(next)) {
         this.isReading = true;
-        void this.read(reading);
+        void this.read(next);
         return;
       }
     }
+  }
 
-    this.queue = [];
-    this.queueHead = 0;
+  private isCurrent(item: QueueItem<Script>): boolean {
+    return item.need === "name"
+      ? this.states.get(item.reading.script.url) === item.reading
+      : this.search.view(item.script) === "searching";
   }
 
   // Never rejects: what ends a read is logged, and an unexpected error stops the debugger
-  private async read(reading: ReadingState<Script>): Promise<void> {
+  private async read(item: QueueItem<Script>): Promise<void> {
     try {
       const startedMs = performance.now();
-      const decoded = await readAndDecode(reading.script);
-      this.settle(reading, decoded, performance.now() - startedMs);
+      if (item.need === "name") {
+        const decoded = await readAndDecode(item.reading.script);
+        this.settleName(item.reading, decoded, performance.now() - startedMs);
+      } else {
+        const found = await readSources(item.script);
+        this.settleSearch(item.script, found, performance.now() - startedMs);
+      }
     } catch (error) {
       this.dependencies.fail(error);
     } finally {
@@ -189,28 +291,65 @@ export class SourceMaps<Script extends MappedScript> {
     }
   }
 
-  private settle(reading: ReadingState<Script>, decoded: Decoded, elapsedMs: number): void {
+  private settleName(reading: ReadingState<Script>, decoded: DecodedMap, elapsedMs: number): void {
     const { script } = reading;
     if (this.states.get(script.url) !== reading) {
       this.log("debug", `source map ${describeMap(script)} ignored: its script record is gone`);
       return;
     }
 
+    let isSearchOver: boolean;
     if (decoded.ok) {
-      this.states.set(script.url, { kind: "read", script, sources: decoded.sources, index: decoded.index });
-      this.log(
-        "debug",
-        `source map loaded: ${describeMap(script)}, ${String(decoded.bytes)} bytes, ${String(Math.round(elapsedMs))} ms`,
-      );
+      const { sources, index } = decoded.value;
+      this.states.set(script.url, { kind: "read", script, sources, index });
+      this.log("debug", `source map loaded: ${describeMap(script)}, ${describeRead(decoded.bytes, elapsedMs)}`);
+      isSearchOver = this.search.keep(script, sources);
     } else {
-      this.states.set(script.url, { kind: "failed", script, reason: decoded.reason });
+      this.states.set(script.url, { kind: "failed", script, failure: decoded });
       this.log("warn", `source map ${describeMap(script)} cannot be used: ${decoded.reason}`);
+      isSearchOver = this.search.fail(script, toOverLimitReason(decoded));
     }
 
     this.dependencies.onRead(script);
+    if (isSearchOver) {
+      this.endSearch();
+    }
+  }
+
+  // A map over a limit is worth a warning, since a breakpoint may be in it; any other failure, such as the index map
+  // of a bundler's own runtime, is expected while searching
+  private settleSearch(script: Script, found: Decoded<Array<MapSource | undefined>>, elapsedMs: number): void {
+    if (this.search.view(script) !== "searching") {
+      this.log("debug", `source map ${describeMap(script)} ignored: its script record is gone`);
+      return;
+    }
+
+    let isSearchOver: boolean;
+    if (found.ok) {
+      this.log("debug", `source map searched: ${describeMap(script)}, ${describeRead(found.bytes, elapsedMs)}`);
+      isSearchOver = this.search.keep(script, found.value);
+    } else {
+      this.log(
+        found.isOverLimit ? "warn" : "debug",
+        `source map ${describeMap(script)} cannot be searched: ${found.reason}`,
+      );
+      isSearchOver = this.search.fail(script, toOverLimitReason(found));
+    }
+
+    if (isSearchOver) {
+      this.endSearch();
+    }
+  }
+
+  private endSearch(): void {
+    this.log("debug", "bundles searched");
+    this.dependencies.onSearched();
   }
 
   private log(level: "debug" | "warn", message: string): void {
     this.dependencies.logger.log(level, message, { component: COMPONENT });
   }
 }
+
+const describeRead = (bytes: number, elapsedMs: number): string =>
+  `${String(bytes)} bytes, ${String(Math.round(elapsedMs))} ms`;

@@ -1,5 +1,5 @@
-// The route handler to debug, on the Node.js runtime. Next.js bundles it into `.next/server/`, and the SDK does not
-// support bundled code yet, so a breakpoint on the marked line stays unresolved: see tests/nextjs.test.ts.
+// The route handler to debug, on the Node.js runtime. Next.js bundles it into a chunk in `.next/server/chunks/`, and
+// the SDK finds the marked line through that chunk's source map: see tests/nextjs.test.ts.
 
 import type { NextRequest } from "next/server";
 

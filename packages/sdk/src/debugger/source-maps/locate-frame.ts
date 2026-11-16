@@ -28,10 +28,10 @@ const toScriptPath = (url: string | undefined): string => {
   }
 };
 
-// O(sources) for the source's path; a script that is not a bundle has one, and a frame is looked up at most 20 times
+// O(log segments): the sources are aligned with the map's, so the source of a bundle's frame is found by its id
 const findOriginal = (view: Extract<MapView, { kind: "read" }>, line: number, column: number) => {
   const position = view.index?.findOriginalPosition(line, column);
-  const source = view.sources.find((candidate) => candidate.source === position?.source);
+  const source = position === undefined ? undefined : view.sources[position.sourceId];
   if (position === undefined || source === undefined) {
     return undefined;
   }

@@ -49,13 +49,13 @@ describe("readSourceMap with a data: URL", () => {
   ])("gives a reason for %s", async (_name, sourceMapUrl) => {
     const result = await readSourceMap({ url: SCRIPT_URL, sourceMapUrl });
 
-    expect(result).toEqual({ ok: false, reason: "the source map data URL is not JSON" });
+    expect(result).toEqual({ ok: false, reason: "the source map data URL is not JSON", isOverLimit: false });
   });
 
   it("gives a reason for a broken percent escape", async () => {
     const result = await readSourceMap({ url: SCRIPT_URL, sourceMapUrl: "data:application/json,%E0%A4%A" });
 
-    expect(result).toEqual({ ok: false, reason: "the source map data URL is invalid" });
+    expect(result).toEqual({ ok: false, reason: "the source map data URL is invalid", isOverLimit: false });
   });
 
   it("gives a reason for a map over 8 MiB without decoding it", async () => {
@@ -63,7 +63,7 @@ describe("readSourceMap with a data: URL", () => {
 
     const result = await readSourceMap({ url: SCRIPT_URL, sourceMapUrl });
 
-    expect(result).toEqual({ ok: false, reason: "the source map is larger than 8 MiB" });
+    expect(result).toEqual({ ok: false, reason: "the source map is larger than 8 MiB", isOverLimit: true });
   });
 });
 
@@ -95,7 +95,7 @@ describe("readSourceMap with a relative URL", () => {
 
     const result = await readSourceMap({ url, sourceMapUrl: "missing.js.map" });
 
-    expect(result).toEqual({ ok: false, reason: "the source map file cannot be read" });
+    expect(result).toEqual({ ok: false, reason: "the source map file cannot be read", isOverLimit: false });
   });
 
   it("gives a reason for a file over 8 MiB without reading it", async () => {
@@ -105,7 +105,7 @@ describe("readSourceMap with a relative URL", () => {
 
     const result = await readSourceMap({ url, sourceMapUrl: "checkout.js.map" });
 
-    expect(result).toEqual({ ok: false, reason: "the source map is larger than 8 MiB" });
+    expect(result).toEqual({ ok: false, reason: "the source map is larger than 8 MiB", isOverLimit: true });
   });
 
   it("gives a reason without reading for a path that is not a regular file", async () => {
@@ -113,25 +113,25 @@ describe("readSourceMap with a relative URL", () => {
 
     const result = await readSourceMap({ url, sourceMapUrl: "." });
 
-    expect(result).toEqual({ ok: false, reason: "the source map file cannot be read" });
+    expect(result).toEqual({ ok: false, reason: "the source map file cannot be read", isOverLimit: false });
   });
 
   it("gives a reason for a protocol-relative URL, which names a host", async () => {
     const result = await readSourceMap({ url: SCRIPT_URL, sourceMapUrl: "//host/share/checkout.js.map" });
 
-    expect(result).toEqual({ ok: false, reason: "the source map URL cannot be resolved" });
+    expect(result).toEqual({ ok: false, reason: "the source map URL cannot be resolved", isOverLimit: false });
   });
 
   it("gives a reason when the map URL names no local file", async () => {
     const result = await readSourceMap({ url: "file://host/share/checkout.js", sourceMapUrl: "checkout.js.map" });
 
-    expect(result).toEqual({ ok: false, reason: "the source map URL cannot be resolved" });
+    expect(result).toEqual({ ok: false, reason: "the source map URL cannot be resolved", isOverLimit: false });
   });
 
   it("gives a reason when the script has no file URL to resolve against", async () => {
     const result = await readSourceMap({ url: "dist/checkout.js", sourceMapUrl: "checkout.js.map" });
 
-    expect(result).toEqual({ ok: false, reason: "the source map URL cannot be resolved" });
+    expect(result).toEqual({ ok: false, reason: "the source map URL cannot be resolved", isOverLimit: false });
   });
 });
 
@@ -143,6 +143,6 @@ describe("readSourceMap with another scheme", () => {
   ])("gives a reason for %s", async (sourceMapUrl) => {
     const result = await readSourceMap({ url: SCRIPT_URL, sourceMapUrl });
 
-    expect(result).toEqual({ ok: false, reason: "the source map URL scheme is not supported" });
+    expect(result).toEqual({ ok: false, reason: "the source map URL scheme is not supported", isOverLimit: false });
   });
 });

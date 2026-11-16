@@ -66,7 +66,7 @@ class JsonShapeScanner {
   private countValue(): void {
     this.values += 1;
     if (this.values > MAX_VALUES) {
-      throw new SourceMapError("the source map has more than 50,000 JSON values");
+      throw new SourceMapError("the source map has more than 50,000 JSON values", true);
     }
   }
 }

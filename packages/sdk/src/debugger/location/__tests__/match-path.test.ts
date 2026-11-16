@@ -16,14 +16,22 @@ describe("matchPath", () => {
   it("gives the only candidate", () => {
     const only = script("/app/dist/checkout.js");
 
-    expect(matchPath(toSegments("src/orders/checkout.js"), [only])).toEqual({ kind: "one", candidate: only });
+    expect(matchPath(toSegments("src/orders/checkout.js"), [only])).toEqual({
+      kind: "found",
+      candidates: [only],
+      count: 1,
+    });
   });
 
   it("prefers the candidate that shares the most trailing segments", () => {
     const orders = script("/app/src/orders/checkout.js");
     const billing = script("/app/src/billing/checkout.js");
 
-    expect(matchPath(toSegments("orders/checkout.js"), [billing, orders])).toEqual({ kind: "one", candidate: orders });
+    expect(matchPath(toSegments("orders/checkout.js"), [billing, orders])).toEqual({
+      kind: "found",
+      candidates: [orders],
+      count: 2,
+    });
   });
 
   it("gives several when two candidates share the most segments", () => {
@@ -46,9 +54,31 @@ describe("matchPath", () => {
     const other = script("/c/checkout.js");
 
     expect(matchPath(toSegments("src/orders/checkout.js"), [other, shallow, deep])).toEqual({
-      kind: "one",
-      candidate: deep,
+      kind: "found",
+      candidates: [deep],
+      count: 3,
     });
+  });
+});
+
+describe("matchPath with one path in several scripts", () => {
+  it("gives every candidate with the winning path, such as a file two chunks hold", () => {
+    const first = { url: "file:///app/chunks/a.js", segments: toSegments("/app/src/checkout.ts") };
+    const second = { url: "file:///app/chunks/b.js", segments: toSegments("/app/src/checkout.ts") };
+
+    expect(matchPath(toSegments("src/checkout.ts"), [first, second])).toEqual({
+      kind: "found",
+      candidates: [first, second],
+      count: 2,
+    });
+  });
+
+  it("gives several when a third candidate with another path ties with them", () => {
+    const first = script("/app/src/checkout.ts");
+    const second = { url: "file:///app/chunks/b.js", segments: toSegments("/app/src/checkout.ts") };
+    const other = script("/lib/src/checkout.ts");
+
+    expect(matchPath(toSegments("src/checkout.ts"), [first, other, second])).toEqual({ kind: "several" });
   });
 });
 

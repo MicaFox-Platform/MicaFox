@@ -127,8 +127,11 @@ class SegmentBuilder {
   }
 }
 
-// A segment is a run of characters between separators, so counting the runs gives the exact size to allocate
-const countSegments = function* (mappings: string, budget: WorkBudget): Generator<void, number, void> {
+/**
+ * Counts the segments of a `mappings` string in slices, a run of characters between separators each, which gives
+ * the exact size to allocate; more than 1,500,000 is over the limit. O(characters).
+ */
+export const countSegments = function* (mappings: string, budget: WorkBudget): Generator<void, number, void> {
   let count = 0;
   let isInSegment = false;
 
@@ -148,7 +151,7 @@ const countSegments = function* (mappings: string, budget: WorkBudget): Generato
   }
 
   if (count > MAX_SEGMENTS) {
-    throw new SourceMapError("the source map has more than 1,500,000 segments");
+    throw new SourceMapError("the source map has more than 1,500,000 segments", true);
   }
 
   return count;

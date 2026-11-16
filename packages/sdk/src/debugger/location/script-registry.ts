@@ -34,6 +34,13 @@ export const toBaseName = (fileName: string): string => {
 /** Whether `script` names a source map. */
 export const isMapped = (script: ScriptRecord): script is MappedRecord => script.sourceMapUrl !== undefined;
 
+/** Whether a path has a `node_modules` segment: a script or source there is never a candidate. O(segments). */
+export const isDependency = (segments: readonly string[]): boolean => segments.includes("node_modules");
+
+/** Whether the map of `script` may be searched for a bundle's sources: it has one, outside `node_modules`. */
+export const isSearchable = (script: ScriptRecord): script is MappedRecord =>
+  isMapped(script) && !isDependency(script.segments);
+
 /** What a stack frame needs of a script: its URL and, for a file of the app, its record. */
 export interface FrameScript {
   url: string;
@@ -66,6 +73,7 @@ const toPath = (url: string): string | undefined => {
 export class ScriptRegistry {
   private readonly byFileName = new Map<string, Map<string, ScriptRecord>>();
   private readonly mappedByBaseName = new Map<string, Map<string, MappedRecord>>();
+  private readonly searchable = new Map<string, MappedRecord>();
   private readonly frameScripts = new Map<string, FrameScript>();
 
   /**
@@ -92,19 +100,29 @@ export class ScriptRegistry {
     return this.frameScripts.get(scriptId);
   }
 
-  /** The scripts without a source map whose path ends in `fileName`. */
+  /** The scripts without a source map, outside `node_modules`, whose path ends in `fileName`. */
   findCandidates(fileName: string): ScriptRecord[] {
-    return [...(this.byFileName.get(fileName)?.values() ?? [])].filter((script) => !isMapped(script));
+    return [...(this.byFileName.get(fileName)?.values() ?? [])].filter(
+      (script) => !isMapped(script) && !isDependency(script.segments),
+    );
   }
 
-  /** The scripts with a source map whose file name without its extension is `baseName`. */
+  /** The scripts with a source map, outside `node_modules`, whose file name without its extension is `baseName`. */
   findMapped(baseName: string): MappedRecord[] {
-    return [...(this.mappedByBaseName.get(baseName)?.values() ?? [])];
+    return [...(this.mappedByBaseName.get(baseName)?.values() ?? [])].filter(
+      (script) => !isDependency(script.segments),
+    );
+  }
+
+  /** The scripts whose maps a search of the bundles reads: every one with a map outside `node_modules`. */
+  listSearchable(): MappedRecord[] {
+    return [...this.searchable.values()];
   }
 
   clear(): void {
     this.byFileName.clear();
     this.mappedByBaseName.clear();
+    this.searchable.clear();
     this.frameScripts.clear();
   }
 
@@ -123,6 +141,11 @@ export class ScriptRegistry {
     sameName.set(url, script);
     this.byFileName.set(fileName, sameName);
     this.indexByBaseName(fileName, script);
+    this.searchable.delete(url);
+    if (isSearchable(script)) {
+      this.searchable.set(url, script);
+    }
+
     return script;
   }
 

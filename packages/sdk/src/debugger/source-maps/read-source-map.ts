@@ -12,8 +12,12 @@ export interface MappedScript {
   readonly sourceMapUrl: string;
 }
 
-/** The text of a map and the URL its sources are resolved against, or a fixed reason that never carries a URL. */
-export type ReadResult = { ok: true; text: string; mapUrl: string; bytes: number } | { ok: false; reason: string };
+/**
+ * The text of a map and the URL its sources are resolved against, or a fixed reason that never carries a URL;
+ * `isOverLimit` when the map is larger than 8 MiB.
+ */
+export type ReadResult =
+  { ok: true; text: string; mapUrl: string; bytes: number } | { ok: false; reason: string; isOverLimit: boolean };
 
 /** 8 MiB, the largest map the debugger reads. */
 export const MAX_SOURCE_MAP_BYTES = 8 * 1024 * 1024;
@@ -40,7 +44,7 @@ const readDataUrl = (script: MappedScript): ReadResult => {
   const header = comma < 0 ? "" : url.slice("data:".length, comma).toLowerCase();
   const parts = header.split(";").map((part) => part.trim());
   if (comma < 0 || parts[0] !== JSON_MEDIA_TYPE) {
-    return { ok: false, reason: "the source map data URL is not JSON" };
+    return { ok: false, reason: "the source map data URL is not JSON", isOverLimit: false };
   }
 
   const data = url.slice(comma + 1);
@@ -48,7 +52,7 @@ const readDataUrl = (script: MappedScript): ReadResult => {
   // A base64 text is a third larger than its bytes; a percent-encoded one is never smaller than its text
   const bytes = isBase64 ? Math.floor((data.length * 3) / 4) : data.length;
   if (bytes > MAX_SOURCE_MAP_BYTES) {
-    return { ok: false, reason: TOO_LARGE };
+    return { ok: false, reason: TOO_LARGE, isOverLimit: true };
   }
 
   try {
@@ -56,7 +60,7 @@ const readDataUrl = (script: MappedScript): ReadResult => {
     return { ok: true, text, mapUrl: script.url, bytes: Buffer.byteLength(text) };
   } catch {
     // decodeURIComponent throws on a `%` that starts no valid escape
-    return { ok: false, reason: "the source map data URL is invalid" };
+    return { ok: false, reason: "the source map data URL is invalid", isOverLimit: false };
   }
 };
 
@@ -127,14 +131,16 @@ export const readSourceMap = async (script: MappedScript): Promise<ReadResult> =
   }
 
   if (SCHEME.test(script.sourceMapUrl)) {
-    return { ok: false, reason: "the source map URL scheme is not supported" };
+    return { ok: false, reason: "the source map URL scheme is not supported", isOverLimit: false };
   }
 
   const located = toMapPath(script);
   if (located === undefined) {
-    return { ok: false, reason: "the source map URL cannot be resolved" };
+    return { ok: false, reason: "the source map URL cannot be resolved", isOverLimit: false };
   }
 
   const file = await readMapFile(located.path);
-  return "reason" in file ? { ok: false, reason: file.reason } : { ok: true, ...file, mapUrl: located.mapUrl };
+  return "reason" in file
+    ? { ok: false, reason: file.reason, isOverLimit: file.reason === TOO_LARGE }
+    : { ok: true, ...file, mapUrl: located.mapUrl };
 };

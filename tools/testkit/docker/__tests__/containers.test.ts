@@ -9,15 +9,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { readType } from "../../src/child-process-run.js";
 import { readStatus, waitForStatus } from "../../src/hub.js";
 import { fetchInARow } from "../../src/requests.js";
-import {
-  CAPTURING_APPS,
-  DOCKER_APPS,
-  PENDING_APPS,
-  findQuoteLine,
-  toQuoteFilePattern,
-  toQuoteUrl,
-  type DockerApp,
-} from "../apps.js";
+import { DOCKER_APPS, findQuoteLine, toQuoteFilePattern, toQuoteUrl, type DockerApp } from "../apps.js";
 import { followHub, readServiceLines, stopService } from "../stack.js";
 
 const REQUESTS = 20;
@@ -81,10 +73,13 @@ const fetchUntilSnapshot = async (app: DockerApp): Promise<Snapshot | undefined>
 };
 
 describe.each(DOCKER_APPS)("the $service container", (app) => {
-  it(`reports its breakpoint as ${app.settledStatus} first`, async () => {
-    const status = await waitForStatus(hub, app.breakpointId);
+  it("reports its breakpoint as active", async () => {
+    // A framework loads a route's chunk on its first request, and the breakpoint stays pending until then; the first
+    // status can also be pending while a source map is read or the bundles are searched
+    await fetchInARow(toQuoteUrl(app), 1);
+    const status = await waitForStatus(hub, app.breakpointId, (candidate) => candidate.status !== "pending");
 
-    expect(status.status).toBe(app.settledStatus);
+    expect(status.status).toBe("active");
   });
 
   it("answers every request while the SDK runs", async () => {
@@ -100,7 +95,7 @@ describe.each(DOCKER_APPS)("the $service container", (app) => {
   });
 });
 
-describe.each(CAPTURING_APPS)("the $service container's breakpoint", (app) => {
+describe.each(DOCKER_APPS)("the $service container's breakpoint", (app) => {
   it("captures a snapshot whose top frame is the marked line and keeps serving", async () => {
     await waitForStatus(hub, app.breakpointId, (status) => status.status === "active");
 
@@ -115,22 +110,14 @@ describe.each(CAPTURING_APPS)("the $service container's breakpoint", (app) => {
   });
 });
 
-describe.each(CAPTURING_APPS)("docker stop of the $service container", (app) => {
-  it("sends the snapshot taken just before and exits with 0", async () => {
+describe.each(DOCKER_APPS)("docker stop of the $service container", (app) => {
+  it("sends the snapshot taken just before and exits by itself", async () => {
     await waitUntilActive(app);
     const before = countSnapshots(app);
     await fetchInARow(toQuoteUrl(app), 1);
 
     const stopped = stopService(app.service);
     await hub.waitForLines((line) => isSnapshotOf(app, line), before + 1);
-
-    expect(stopped).toEqual({ status: "exited", exitCode: app.exitOnSigterm, isOomKilled: false });
-  });
-});
-
-describe.each(PENDING_APPS)("docker stop of the $service container", (app) => {
-  it("exits by itself within the stop timeout", () => {
-    const stopped = stopService(app.service);
 
     expect(stopped).toEqual({ status: "exited", exitCode: app.exitOnSigterm, isOomKilled: false });
   });

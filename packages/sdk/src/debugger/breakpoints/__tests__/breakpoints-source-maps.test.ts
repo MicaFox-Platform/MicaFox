@@ -34,6 +34,8 @@ const status = (breakpointId: string, state: BreakpointStatus["status"], message
 
 const LOADED = "source map loaded: ";
 const UNUSABLE = "source map ";
+// With no other candidate by name, an entry gets the error of its map once the search of the bundles ended
+const SEARCHED = "bundles searched";
 
 describe("Breakpoints resolving a file through a source map", () => {
   it("sets a breakpoint on a TypeScript line of tsc output with a map file, which pauses there", async () => {
@@ -188,7 +190,11 @@ describe("Breakpoints resolving a file through a source map", () => {
     test.fixtures.loadCheckout(working.script);
 
     test.apply({ id: "bp-1", file: broken.file, line: 8 }, { id: "bp-2", file: working.file, line: 8 });
-    await Promise.all([test.waitForLine("warn", UNUSABLE), test.waitForLine("debug", LOADED)]);
+    await Promise.all([
+      test.waitForLine("warn", UNUSABLE),
+      test.waitForLine("debug", LOADED),
+      test.waitForLine("debug", SEARCHED),
+    ]);
 
     expect({ sent: test.sent.slice(2), warnings: test.messagesAt("warn") }).toEqual({
       sent: expect.arrayContaining([
@@ -207,7 +213,7 @@ describe("Breakpoints resolving a file through a source map", () => {
     test.fixtures.loadCheckout(compiled.script);
 
     test.apply({ id: "bp-1", file: compiled.file, line: 8 });
-    await test.waitForLine("warn", UNUSABLE);
+    await Promise.all([test.waitForLine("warn", UNUSABLE), test.waitForLine("debug", SEARCHED)]);
 
     expect(test.sent.at(-1)).toEqual(status("bp-1", "error", "the source map file cannot be read"));
   });
@@ -218,7 +224,7 @@ describe("Breakpoints resolving a file through a source map", () => {
     test.fixtures.loadCheckout(compiled.script);
 
     test.apply({ id: "bp-1", file: compiled.file, line: 8 });
-    await test.waitForLine("warn", UNUSABLE);
+    await Promise.all([test.waitForLine("warn", UNUSABLE), test.waitForLine("debug", SEARCHED)]);
 
     expect(test.sent.at(-1)).toEqual(status("bp-1", "error", "the source map is larger than 8 MiB"));
   });
@@ -231,7 +237,7 @@ describe("Breakpoints resolving a file through a source map", () => {
     test.fixtures.loadCheckout(script);
 
     test.apply({ id: "bp-1", file: test.fixtures.file("src/checkout.ts"), line: 4 });
-    await test.waitForLine("warn", UNUSABLE);
+    await Promise.all([test.waitForLine("warn", UNUSABLE), test.waitForLine("debug", SEARCHED)]);
 
     expect(test.sent.at(-1)).toEqual(status("bp-1", "error", "the source map URL scheme is not supported"));
   });
@@ -290,7 +296,7 @@ describe("Breakpoints sharing and retrying through source maps", () => {
     const app = writeCompiled(test.fixtures, "checkout");
     test.fixtures.loadCheckout(vendor.script);
     test.apply({ id: "bp-1", file: app.file, line: 8 });
-    await test.waitForLine("warn", UNUSABLE);
+    await Promise.all([test.waitForLine("warn", UNUSABLE), test.waitForLine("debug", SEARCHED)]);
 
     test.fixtures.loadCheckout(app.script);
     await test.waitForLine("debug", LOADED);

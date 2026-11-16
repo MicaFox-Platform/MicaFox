@@ -40,7 +40,7 @@ describe.each(SUPPORTED_APPS)("the $name app on the built SDK", { timeout: E2E_T
 
     expect({ statuses, file: top?.file, line: top?.line, variables: snapshot?.variables }).toEqual({
       statuses: Array.from({ length: REQUESTS }, () => 200),
-      // For the tsc apps, the original .ts file and line from the .map beside the compiled file
+      // For the tsc apps and the bundle, the original .ts file and line from the .map beside the compiled file
       file: expect.stringMatching(new RegExp(`/${escapeRegExp(toRepositoryPath(app.quoteSource))}$`)) as unknown,
       line: findQuoteLine(app),
       variables: expect.arrayContaining([

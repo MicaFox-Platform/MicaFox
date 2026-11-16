@@ -24,14 +24,27 @@ export interface InvalidEntry {
 export type ListedEntry = ValidEntry | InvalidEntry;
 
 /**
- * Where an entry is set: `place` names its V8 breakpoint, set at `position` of the script at `url`, and `mapUrl` the
- * URL of the script whose map placed it, which holds that map.
+ * One script an entry is set in: `place` names its V8 breakpoint, set at `position` of the script at `url`, and
+ * `mapUrl` the URL of the script whose map placed it, which holds that map.
  */
-export interface Placed {
+export interface Placement {
   place: string;
   url: string;
   position: ScriptPosition;
   mapUrl?: string;
+}
+
+/**
+ * Where an entry is set: one placement per script, several when chunks of a bundle hold its file. `winningPath` is
+ * the path of the source a search found, which a script that loads later may hold too, and `extending` the URLs of
+ * such scripts whose maps it waits for by name.
+ */
+export interface Placed {
+  placements: Placement[];
+  winningPath?: string;
+  extending?: readonly string[];
+  /** The scripts a search found with the winning path where no breakpoint could be set; not tried again. */
+  tried?: readonly string[];
 }
 
 /** A set entry that captures. */
@@ -50,15 +63,25 @@ export interface ExpiredOutcome {
 }
 
 /**
+ * An entry not set yet: `waitsFor` the URLs of the scripts whose maps it waits for by name, and `isSearching` while
+ * it searches the bundles, so it is resolved again when the last search read ends.
+ */
+export interface PendingOutcome {
+  status: "pending";
+  waitsFor?: readonly string[];
+  isSearching?: boolean;
+}
+
+/**
  * What became of an entry. A retryable error came from a map that could not be used and is resolved again like a
- * pending entry.
+ * pending entry; with `isSearching`, also when the last search read ends.
  */
 export type Outcome =
-  | { status: "pending" }
+  | PendingOutcome
   | ActiveOutcome
   | RateLimitedOutcome
   | ExpiredOutcome
-  | { status: "error"; message: string; isRetryable?: boolean };
+  | { status: "error"; message: string; isRetryable?: boolean; isSearching?: boolean };
 
 /** An entry of the latest list and what became of it. */
 export interface Applied {

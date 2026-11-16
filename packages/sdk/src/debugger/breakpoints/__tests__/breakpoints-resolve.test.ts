@@ -19,6 +19,9 @@ afterEach(() => {
   test.dispose();
 });
 
+// The last read of a search of the bundles ended: the test process's own scripts have source maps
+const SEARCHED = "bundles searched";
+
 const status = (breakpointId: string, state: BreakpointStatus["status"], message?: string): BreakpointStatus => ({
   version: 1,
   module: "debugger",
@@ -64,10 +67,11 @@ describe("Breakpoints resolving a file", () => {
     expect(test.sent).toEqual([status("bp-1", "pending")]);
   });
 
-  it("resolves the entry to a script whose path has fewer segments than the file", () => {
+  it("resolves the entry to a script whose path has fewer segments than the file, after searching the bundles", async () => {
     test.apply({ id: "bp-1", file: test.fixtures.file("orders/checkout.cjs"), line: 4 });
 
     test.fixtures.loadCheckout(test.fixtures.write("checkout.cjs", CHECKOUT_SOURCE));
+    await test.waitForLine("debug", SEARCHED);
 
     expect(test.sent.map((sent) => sent.status)).toEqual(["pending", "active"]);
   });
@@ -160,29 +164,31 @@ describe("Breakpoints resolving a file", () => {
     });
   });
 
-  it("picks the script whose path ends with the most segments of the file", () => {
+  it("picks the script whose path ends with the most segments of the file", async () => {
     const orders = test.fixtures.loadCheckout(test.fixtures.write("orders/checkout.cjs", CHECKOUT_SOURCE));
     const billing = test.fixtures.loadCheckout(test.fixtures.write("billing/checkout.cjs", CHECKOUT_SOURCE));
 
     test.apply({ id: "bp-1", file: test.fixtures.file("src/orders/checkout.cjs"), line: 4 });
+    await test.waitForLine("debug", SEARCHED);
     billing.total(TWO_ITEMS);
     const billingPauses = test.session.pauses.length;
     orders.total(TWO_ITEMS);
 
     expect({ sent: test.sent, billingPauses, ordersPauses: test.session.pauses.length - billingPauses }).toEqual({
-      sent: [status("bp-1", "active")],
+      sent: [status("bp-1", "pending"), status("bp-1", "active")],
       billingPauses: 0,
       ordersPauses: 2,
     });
   });
 
-  it("gives error when several scripts match equally", () => {
+  it("gives error when several scripts match equally, after searching the bundles", async () => {
     test.fixtures.loadCheckout(test.fixtures.write("orders/checkout.cjs", CHECKOUT_SOURCE));
     test.fixtures.loadCheckout(test.fixtures.write("billing/checkout.cjs", CHECKOUT_SOURCE));
 
     test.apply({ id: "bp-1", file: test.fixtures.file("src/checkout.cjs"), line: 4 });
+    await test.waitForLine("debug", SEARCHED);
 
-    expect(test.sent).toEqual([status("bp-1", "error", "file matches several files")]);
+    expect(test.sent).toEqual([status("bp-1", "pending"), status("bp-1", "error", "file matches several files")]);
   });
 
   it("does not use a script with a source map", () => {

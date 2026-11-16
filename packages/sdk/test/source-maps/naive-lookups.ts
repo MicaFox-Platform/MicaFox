@@ -28,7 +28,11 @@ export const naiveOriginalPosition = (
   const before = (lines[position.line] ?? []).filter((segment) => segment.column <= position.column);
   const nearest = before.at(-1);
 
-  return nearest !== undefined && "source" in nearest
-    ? { source: sources[nearest.source] ?? "", line: nearest.line, column: nearest.originalColumn }
-    : undefined;
+  if (nearest === undefined || !("source" in nearest)) {
+    return undefined;
+  }
+
+  // Entries with the same name share the id of the first, as the decoder gives them
+  const source = sources[nearest.source] ?? "";
+  return { source, sourceId: sources.indexOf(source), line: nearest.line, column: nearest.originalColumn };
 };

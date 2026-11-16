@@ -53,7 +53,7 @@ limits, redacts secrets and sends them to the hub through a connector. How to us
   - Memory is bounded: 100 breakpoints; source maps up to 8 MiB, 1,500,000 segments and 50,000 JSON values each,
     read one at a time, and only for scripts that may hold an entry's file or while an entry searches the bundles;
     a decoded index, about 24 bytes a segment, is kept only for scripts that have breakpoints, at most 3,000,000
-    segments in all, about 72 MB. The sources of maps read for a search are kept by file name, at most 100,000, the
+    segments in all, about 72 MB. The sources of every map read, for a search or by name, are kept by file name, at most 100,000, the
     oldest script record's dropped first. Only scripts with a `file:` URL or an absolute path are recorded, one record
     per URL; scripts without a URL, such as `eval` and `new Function`, are ignored. Every script with a URL is also
     kept by its id, at most 20,000, the oldest dropped first, because V8 names the script of a call frame by id only.
@@ -143,7 +143,7 @@ packages/sdk/src/debugger/
 │   ├── entry.ts                ValidEntry, InvalidEntry, Outcome, Placed and Applied, what a list changes, a status
 │   ├── read-list.ts            reads and validates the entries of a breakpoints message, with the limits on the list
 │   ├── place-entry.ts          placeEntry, placeAgain, releaseEntry: an entry's V8 breakpoints and the maps they hold
-│   ├── expiry.ts               Expiry: the entries' deadlines on the monotonic clock and the one unref'd timer
+│   ├── resolve-again.ts        the entries a loaded script, a read map or the end of a search resolves or extends
 │   └── v8-breakpoints.ts       V8Breakpoints: Debugger.setBreakpointByUrl and removeBreakpoint, shared by position
 ├── capture/                    Capture: one pause read into values within the limits, then cut per breakpoint
 │   ├── index.ts                the sub-component's only entry: readPause, cutSnapshot and their types
@@ -154,8 +154,12 @@ packages/sdk/src/debugger/
 │   ├── limits.ts               ResolvedLimits: defaults, caps and the largest of several, and truncateText
 │   ├── budget.ts               CaptureBudget: the 10 ms and 64 KiB of a capture, and the size of a value
 │   └── cut-snapshot.ts         cutSnapshot: a read cut to one breakpoint's limits as a Snapshot, with no V8 call
-├── location/                   Location: the loaded scripts and the script and position an entry resolves to
+├── expiry/                     Expiry: the entries' deadlines on the monotonic clock and the one unref'd timer
+│   ├── index.ts                the sub-component's only entry: Expiry
+│   └── expiry.ts               Expiry: a deadline per entry id, the nearest one's timer and the entries past theirs
+├── location/                   Location: the loaded scripts and the scripts and positions an entry resolves to
 │   ├── index.ts                the sub-component's only entry: findLocation, ScriptRegistry and their types
+│   ├── collect-candidates.ts   an entry's candidates by name, then from the search of the bundles, never node_modules
 │   ├── find-location.ts        findLocation: an entry's scripts and positions, or the maps it waits for
 │   ├── match-path.ts           picks the candidate whose path ends with the most segments of an entry's file
 │   └── script-registry.ts      ScriptRegistry: the loaded scripts, one per URL, by file name, by base name and by id
@@ -180,7 +184,7 @@ packages/sdk/src/debugger/
 │   ├── map-sources.ts          resolveMapSources: the sources of a map against its sourceRoot and URL, as paths
 │   └── locate-frame.ts         locateFrame: the file, line and column a frame is shown at, its source found by id
 └── source-map-decoder/         decodeSourceMap: the text of a map into its two indexes, in slices
-    ├── index.ts                the sub-component's only entry: decodeSourceMap and the types of its result
+    ├── index.ts                the sub-component's only entry: decodeSourceMap, readMapSources and the types of their results
     ├── decode-source-map.ts    decodeSourceMap, and readMapSources for a search: check the size, in slices, never throw
     ├── parse-source-map.ts     checks the JSON's depth and number of values in slices, parses it, reads the fields
     ├── decode-mappings.ts      VlqCursor and the mappings string read into segments in generated order
@@ -190,8 +194,8 @@ packages/sdk/src/debugger/
     └── source-map-error.ts     SourceMapError: the fixed reason of a map that cannot be decoded
 ```
 
-`Breakpoints` uses `location/` and `source-maps/`, which both use `source-map-decoder/`, and `location/` uses
-`source-maps/` for what is known of a map; `Capture` uses `source-maps/` only for the type
+`Breakpoints` uses `expiry/`, `location/` and `source-maps/`; the last two use `source-map-decoder/`, and `location/`
+uses `source-maps/` for what is known of a map; `Capture` uses `source-maps/` only for the type
 of a frame's position, which it gets from `Breakpoints.locateFrame`. `Pauses` uses `capture/` and `rate-limiter/`,
 and `Breakpoints` through an interface it declares, so the two do not import each other. `Debugger` creates the
 `RateLimiter` it gives to `Pauses`, and uses `redaction/`; `Capture` gets only its `isSecret`.
@@ -258,8 +262,9 @@ and `Breakpoints` through an interface it declares, so the two do not import eac
    resolved again when the last map it waits for is read; while one is listed, every script with a map outside
    `node_modules` that loads queues its map for the search. An entry set through a search is also set in a script
    that loads later and whose map holds the winning path. A script with the URL of a recorded one replaces it: its
-   map, its sources found by a search and the entry's breakpoint in it are dropped, and its map is read again when
-   it is needed.
+   map, its sources found by a search and the breakpoints set through its map are dropped, an entry left with none is
+   resolved again, and its map is read again when it is needed; a breakpoint in a script without a map stays, as V8
+   sets it in the new script by URL.
 
 ### Loading a source map
 

@@ -7,9 +7,10 @@ never from sources. The app serves `GET /quote`, and its handler is the code to 
 | ------ | ---------------- | ----------------------------------------------------- |
 | `src/` | `next start src` | in `register()` of `instrumentation.ts`, Node.js only |
 
-In Next.js the SDK runs, but a breakpoint in a route handler stays `pending`: `next build` bundles route handlers,
-and bundled output is not supported ([SDK API](../../../docs/api/sdk/overview.md#compatibility)).
-`tests/nextjs.test.ts` records that, so a change shows up.
+`next build` bundles route handlers into chunks with source maps, which the debugger searches to set a breakpoint
+on a handler's line ([SDK API](../../../docs/api/sdk/overview.md#compatibility)). Next.js loads a route's chunk on
+its first request, so that request can run before the breakpoint is set, and `next build` minifies server code, so
+captured variables have the names the minifier gave them.
 
 ## What Next.js needs
 
@@ -38,8 +39,8 @@ pnpm --filter @micafox/example-nextjs test:build # the end-to-end tests
 ```
 
 To try the app by hand, copy `.env.example` to `.env`, start [the kit's fake hub](../../../tools/testkit/README.md#fake-hub),
-whose `.env.example` sets a breakpoint on the handler, and run the app on port 3003. The breakpoint stays `pending`, as
-above.
+whose `.env.example` sets a breakpoint on the handler, and run the app on port 3003. The breakpoint turns `active`
+once the route's chunk is loaded, and each request then sends a snapshot.
 
 ```sh
 pnpm --filter @micafox/testkit start:hub
