@@ -17,8 +17,6 @@ export interface DockerApp {
   readonly breakpointId: string;
   /** The source of its quote handler, from the repository root, as the breakpoint names it. */
   readonly quoteSource: string;
-  /** The status its breakpoint settles in. */
-  readonly settledStatus: "active" | "pending";
   /** The exit code of its PID 1 after SIGTERM. */
   readonly exitOnSigterm: number;
   /** The path and query of its quote endpoint. */
@@ -32,7 +30,6 @@ const createFormatsApp = (name: string, port: number, quoteSource: string): Dock
   port,
   breakpointId: `bp-${name}`,
   quoteSource: `examples/formats/src/${quoteSource}`,
-  settledStatus: "active",
   exitOnSigterm: 0,
   quotePath: QUOTE_PATH,
 });
@@ -44,7 +41,6 @@ export const DOCKER_APPS: readonly DockerApp[] = [
     port: 3000,
     breakpointId: "bp-fastify",
     quoteSource: "examples/frameworks/fastify/src/pricing.ts",
-    settledStatus: "active",
     exitOnSigterm: 0,
     quotePath: "/price?sku=SKU-2&quantity=3",
   },
@@ -53,7 +49,6 @@ export const DOCKER_APPS: readonly DockerApp[] = [
     port: 3001,
     breakpointId: "bp-express",
     quoteSource: "examples/frameworks/express/src/quote.js",
-    settledStatus: "active",
     exitOnSigterm: 0,
     quotePath: QUOTE_PATH,
   },
@@ -62,17 +57,15 @@ export const DOCKER_APPS: readonly DockerApp[] = [
     port: 3002,
     breakpointId: "bp-nestjs",
     quoteSource: "examples/frameworks/nestjs/src/quote.controller.ts",
-    settledStatus: "active",
     exitOnSigterm: 0,
     quotePath: QUOTE_PATH,
   },
-  // Breakpoints in bundled route handlers do not resolve yet; `next start` exits with 128 + 15 after a clean shutdown
+  // `next build` bundles the route handler; `next start` exits with 128 + 15 after a clean shutdown
   {
     service: "nextjs",
     port: 3003,
     breakpointId: "bp-nextjs",
     quoteSource: "examples/frameworks/nextjs/src/app/quote/route.ts",
-    settledStatus: "pending",
     exitOnSigterm: 143,
     quotePath: QUOTE_PATH,
   },
@@ -80,15 +73,9 @@ export const DOCKER_APPS: readonly DockerApp[] = [
   createFormatsApp("esm", 3102, "esm/quote.js"),
   createFormatsApp("tsc-cjs", 3103, "tsc-cjs/quote.ts"),
   createFormatsApp("tsc-esm", 3104, "tsc-esm/quote.ts"),
-  // Bundled output is not supported: the debugger reads no source map of `server.cjs` for a breakpoint on `quote.ts`
-  { ...createFormatsApp("bundled", 3105, "bundled/quote.ts"), settledStatus: "pending" },
+  // The debugger finds `quote.ts` by searching the map of `server.cjs`, whose name differs
+  createFormatsApp("bundled", 3105, "bundled/quote.ts"),
 ];
-
-/** The apps whose breakpoint becomes active and captures snapshots; the others keep it pending. */
-export const CAPTURING_APPS: readonly DockerApp[] = DOCKER_APPS.filter((app) => app.settledStatus === "active");
-
-/** The apps whose breakpoint stays pending, so they capture nothing. */
-export const PENDING_APPS: readonly DockerApp[] = DOCKER_APPS.filter((app) => app.settledStatus === "pending");
 
 /** The 1-based line of the marked line of `app`'s quote handler. */
 export const findQuoteLine = (app: DockerApp): number => findMarkerLine(path.join(ROOT, app.quoteSource), QUOTE_MARKER);

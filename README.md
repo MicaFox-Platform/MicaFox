@@ -96,10 +96,8 @@ Logger, buffers, batching, rate limits and the rest: [SDK API](docs/api/sdk/over
 ## Requirements
 
 - Node.js 22 or later, with `import` or `require()`. The main thread is debugged; worker threads are not.
-- TypeScript apps ship source maps, inline or as `.map` files next to the JavaScript. Bundled output is not
-  supported.
-- Tested with Fastify, Express and NestJS. Next.js runs MicaFox, but breakpoints in its route handlers are not
-  supported yet: [compatibility](docs/api/sdk/overview.md#compatibility).
+- TypeScript apps and bundles ship source maps, inline or as `.map` files next to the JavaScript.
+- Tested with Fastify, Express, NestJS and Next.js: [compatibility](docs/api/sdk/overview.md#compatibility).
 - No other debugger attached to the process: while breakpoints are set, MicaFox resumes every pause it did not cause.
   With `--inspect`, MicaFox does not start.
 

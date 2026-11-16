@@ -8,7 +8,11 @@ export interface MapSource {
   readonly path: string;
   /** `path` split at `/`, without empty and `.` segments. */
   readonly segments: readonly string[];
+  /** Whether the path has a `node_modules` segment: such a source is never a candidate. */
+  readonly isDependency: boolean;
 }
+
+const DEPENDENCIES = "node_modules";
 
 // The spec joins sourceRoot and a source with one `/` between them, then resolves the result against the map's URL
 const joinRoot = (sourceRoot: string, source: string): string => {
@@ -19,6 +23,7 @@ const joinRoot = (sourceRoot: string, source: string): string => {
   return sourceRoot.endsWith("/") ? `${sourceRoot}${source}` : `${sourceRoot}/${source}`;
 };
 
+// Any other scheme, such as `webpack://app/./src/x.ts` or `turbopack:///[project]/src/x.ts`, keeps only its path
 const toPath = (source: string, mapUrl: string): string | undefined => {
   try {
     const url = new URL(source, mapUrl);
@@ -29,28 +34,23 @@ const toPath = (source: string, mapUrl: string): string | undefined => {
   }
 };
 
+const toMapSource = (source: string, path: string): MapSource => {
+  // Split once here: every pending entry compares them again on each script that loads
+  const segments = path.split("/").filter((segment) => segment !== "" && segment !== ".");
+  return { source, path, segments, isDependency: segments.includes(DEPENDENCIES) };
+};
+
 /**
  * Resolves the `sources` of a map against its `sourceRoot` and `mapUrl`, the URL of the map file or, for an inline
- * map, of its script. A `null` entry, which decoding turned into an empty string, and one that does not resolve
- * are left out. O(sources).
+ * map, of its script. The result is aligned with `sources`, so a source is found by its id in O(1); a `null` entry,
+ * which decoding turned into an empty string, and one that does not resolve are undefined. O(sources).
  */
-export const resolveMapSources = (sourceRoot: string, sources: readonly string[], mapUrl: string): MapSource[] => {
-  const resolved: MapSource[] = [];
-  for (const source of sources) {
-    if (source === "") {
-      continue;
-    }
-
-    const path = toPath(joinRoot(sourceRoot, source), mapUrl);
-    if (path !== undefined) {
-      // Split once here: every pending entry compares them again on each script that loads
-      resolved.push({
-        source,
-        path,
-        segments: path.split("/").filter((segment) => segment !== "" && segment !== "."),
-      });
-    }
-  }
-
-  return resolved;
-};
+export const resolveMapSources = (
+  sourceRoot: string,
+  sources: readonly string[],
+  mapUrl: string,
+): Array<MapSource | undefined> =>
+  sources.map((source) => {
+    const path = source === "" ? undefined : toPath(joinRoot(sourceRoot, source), mapUrl);
+    return path === undefined ? undefined : toMapSource(source, path);
+  });

@@ -27,20 +27,17 @@ export interface App {
   readonly quoteSource: string;
 }
 
-/** The apps whose format the SDK supports: plain JavaScript as is, TypeScript as tsc compiled it. */
+/**
+ * The apps of every format: plain JavaScript as is, TypeScript as tsc compiled it, and TypeScript that esbuild bundled
+ * with the SDK into one file, whose breakpoint the debugger finds by searching the bundle's map.
+ */
 export const SUPPORTED_APPS: readonly App[] = [
   { name: "cjs", entry: "src/cjs/server.js", quoteSource: "src/cjs/quote.js" },
   { name: "esm", entry: "src/esm/server.js", quoteSource: "src/esm/quote.js" },
   { name: "tsc-cjs", entry: "dist/tsc-cjs/server.js", quoteSource: "src/tsc-cjs/quote.ts" },
   { name: "tsc-esm", entry: "dist/tsc-esm/server.js", quoteSource: "src/tsc-esm/quote.ts" },
+  { name: "bundled", entry: "dist/bundled/server.cjs", quoteSource: "src/bundled/quote.ts" },
 ];
-
-/** The app esbuild bundled with the SDK into one file: a format the SDK does not support. */
-export const BUNDLED_APP: App = {
-  name: "bundled",
-  entry: "dist/bundled/server.cjs",
-  quoteSource: "src/bundled/quote.ts",
-};
 
 /** The path of `file` in the repository, as a hub sets a breakpoint on it. */
 export const toRepositoryPath = (file: string): string => `examples/formats/${file}`;

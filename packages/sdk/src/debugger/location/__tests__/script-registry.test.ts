@@ -217,3 +217,44 @@ describe("ScriptRegistry frame scripts", () => {
     expect(registry.findFrameScript("1")).toBeUndefined();
   });
 });
+
+describe("ScriptRegistry and node_modules", () => {
+  it("never gives a script under node_modules as a candidate by name", () => {
+    const registry = new ScriptRegistry();
+
+    registry.record({ url: "file:///app/node_modules/lib/checkout.js" });
+    registry.record({ url: "file:///app/node_modules/lib/checkout.cjs", sourceMapURL: "checkout.cjs.map" });
+
+    expect({ plain: registry.findCandidates("checkout.js"), mapped: registry.findMapped("checkout") }).toEqual({
+      plain: [],
+      mapped: [],
+    });
+  });
+
+  it("lists the scripts with a map outside node_modules for a search, the latest record of each URL", () => {
+    const registry = new ScriptRegistry();
+    registry.record({ url: "file:///app/dist/server.cjs", sourceMapURL: "old.map" });
+    registry.record({ url: "file:///app/dist/plain.js" });
+    registry.record({ url: "file:///app/node_modules/next/dist/server.js", sourceMapURL: "server.js.map" });
+    registry.record({ url: "file:///app/.next/server/chunks/root.js", sourceMapURL: "root.js.map" });
+
+    registry.record({ url: "file:///app/dist/server.cjs", sourceMapURL: "server.cjs.map" });
+
+    expect(registry.listSearchable().map((script) => script.sourceMapUrl)).toEqual(["root.js.map", "server.cjs.map"]);
+  });
+
+  it("stops listing a script recorded again without a map, and lists none after clear", () => {
+    const registry = new ScriptRegistry();
+    registry.record({ url: "file:///app/dist/server.cjs", sourceMapURL: "server.cjs.map" });
+    registry.record({ url: "file:///app/.next/server/chunks/root.js", sourceMapURL: "root.js.map" });
+
+    registry.record({ url: "file:///app/dist/server.cjs" });
+    const afterReplace = registry.listSearchable().map((script) => script.url);
+    registry.clear();
+
+    expect({ afterReplace, afterClear: registry.listSearchable() }).toEqual({
+      afterReplace: ["file:///app/.next/server/chunks/root.js"],
+      afterClear: [],
+    });
+  });
+});

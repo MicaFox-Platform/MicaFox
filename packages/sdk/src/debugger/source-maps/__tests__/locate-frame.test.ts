@@ -27,6 +27,28 @@ const readView = async (sourceName = "../src/checkout.ts"): Promise<MapView> => 
 });
 
 describe("locateFrame", () => {
+  it("gives the source of a bundle's frame by its id among many", async () => {
+    const mappings = encodeMappings([
+      [{ column: 0, source: 0, line: 3, originalColumn: 0 }],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [{ column: 4, source: 1, line: 7, originalColumn: 2 }],
+    ]);
+    const decoded = await decodeSourceMap(createSourceMapText(["../src/cart.ts", "../src/checkout.ts"], mappings));
+    const sources = resolveMapSources("", ["../src/cart.ts", "../src/checkout.ts"], MAP_URL);
+    const view: MapView = decoded.ok ? { kind: "read", sources, index: decoded.map } : { kind: "unread" };
+
+    expect(locateFrame(SCRIPT_URL, view, { line: 7, column: 4 })).toEqual({
+      file: "/app/src/checkout.ts",
+      line: 8,
+      column: 3,
+    });
+  });
+
   it("gives the original path and 1-based position where the map is decoded", async () => {
     const view = await readView();
 
@@ -57,10 +79,10 @@ describe("locateFrame", () => {
     });
   });
 
-  it("keeps the generated position when the source of the segment is not among the resolved ones", async () => {
+  it("keeps the generated position when the source of the segment names no file", async () => {
     const view: MapView = {
       kind: "read",
-      sources: resolveMapSources("", ["../src/other.ts"], MAP_URL),
+      sources: resolveMapSources("", ["file://host/share/checkout.ts"], MAP_URL),
       index: await decodeIndex(),
     };
 

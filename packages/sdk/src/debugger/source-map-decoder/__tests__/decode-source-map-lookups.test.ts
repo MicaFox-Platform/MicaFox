@@ -111,19 +111,19 @@ describe("SourceMapIndex.findOriginalPosition", () => {
   it("returns the segment that starts at the column", async () => {
     const map = await decodeOrFail(["a.ts"], SPARSE_LINES);
 
-    expect(map.findOriginalPosition(1, 8)).toEqual({ source: "a.ts", line: 4, column: 2 });
+    expect(map.findOriginalPosition(1, 8)).toEqual({ source: "a.ts", sourceId: 0, line: 4, column: 2 });
   });
 
   it("returns the nearest segment before the column", async () => {
     const map = await decodeOrFail(["a.ts"], SPARSE_LINES);
 
-    expect(map.findOriginalPosition(1, 7)).toEqual({ source: "a.ts", line: 0, column: 4 });
+    expect(map.findOriginalPosition(1, 7)).toEqual({ source: "a.ts", sourceId: 0, line: 0, column: 4 });
   });
 
   it("returns the last segment of the line for a column past it", async () => {
     const map = await decodeOrFail(["a.ts"], SPARSE_LINES);
 
-    expect(map.findOriginalPosition(1, 500)).toEqual({ source: "a.ts", line: 4, column: 2 });
+    expect(map.findOriginalPosition(1, 500)).toEqual({ source: "a.ts", sourceId: 0, line: 4, column: 2 });
   });
 
   it("returns undefined for a column before the first segment of the line", async () => {
@@ -155,13 +155,13 @@ describe("SourceMapIndex.findOriginalPosition", () => {
       ],
     );
 
-    expect(map.findOriginalPosition(0, 3)).toEqual({ source: "b.ts", line: 8, column: 1 });
+    expect(map.findOriginalPosition(0, 3)).toEqual({ source: "b.ts", sourceId: 1, line: 8, column: 1 });
   });
 
   it("names a file listed twice by its name from either entry", async () => {
     const map = await decodeOrFail(["a.ts", "b.ts", "a.ts"], [[{ column: 0, source: 2, line: 4, originalColumn: 1 }]]);
 
-    expect(map.findOriginalPosition(0, 0)).toEqual({ source: "a.ts", line: 4, column: 1 });
+    expect(map.findOriginalPosition(0, 0)).toEqual({ source: "a.ts", sourceId: 0, line: 4, column: 1 });
   });
 
   it("returns undefined where a segment without a source ends the previous one", async () => {

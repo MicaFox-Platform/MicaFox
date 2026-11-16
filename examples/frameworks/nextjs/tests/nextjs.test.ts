@@ -1,19 +1,21 @@
-// The SDK runs in a self-hosted Next.js app, started from instrumentation.ts on the Node.js runtime, but breakpoints in
-// its route handlers are not supported yet: `next build` (Turbopack, next 16.4.6) bundles each handler into a
-// `.next/server/chunks/` file whose name does not match the breakpoint's, and `.next/server/app/quote/route.js` only
-// loads those chunks and has no source map comment, so the debugger reads no map for `route.ts` (docs/architecture/
-// sdk/debugger.md, loading a source map). These tests record that the breakpoint stays `pending`, so a change to it
-// shows up here. A change of Next.js or of that rule fails them on purpose; it is not flakiness.
+// The SDK runs in a self-hosted Next.js app, started from instrumentation.ts on the Node.js runtime. `next build`
+// (Turbopack, next 16.4.6) bundles each route handler into a `.next/server/chunks/` file whose name does not match
+// the breakpoint's, and `.next/server/app/quote/route.js` only loads those chunks, so the debugger finds route.ts by
+// searching the maps of the app's chunks (docs/architecture/sdk/debugger.md, applying breakpoints). Next.js loads a
+// route's chunks on its first request, so that request runs before the breakpoint is set.
 
 import {
   E2E_TEST_TIMEOUT_MS,
   fetchInARow,
-  readStatus,
+  fetchUntilSnapshot,
+  findQuoteLine,
   shutDownQuoteApp,
   startQuoteApp,
   startQuoteHub,
+  toQuoteFilePattern,
   toQuoteUrl,
   useProcesses,
+  waitForQuoteStatus,
 } from "@micafox/testkit";
 import { describe, expect, it } from "vitest";
 
@@ -25,29 +27,49 @@ const EDGE_LOG = "MicaFox does not run on the Edge runtime: the SDK is not start
 describe("the Next.js app", { timeout: E2E_TEST_TIMEOUT_MS }, () => {
   useProcesses();
 
-  it("starts the SDK on the Node.js runtime, keeps a route-handler breakpoint pending and stops it on SIGTERM", async () => {
+  it("captures the handler's locals at the source line of a bundled route handler once its chunk loads", async () => {
     const hub = await startQuoteHub(NEXTJS_APP);
     const server = await startQuoteApp(NEXTJS_APP, hub.port);
     await hub.run.waitForMessages("breakpointStatus");
 
+    // The first request loads the route's chunk, whose map holds route.ts, unless Next.js loaded it already
+    const first = await fetchInARow(toQuoteUrl(server.port), 1);
+    await waitForQuoteStatus(hub.run, (status) => status.status === "active");
     const statuses = await fetchInARow(toQuoteUrl(server.port), REQUESTS);
-    const shutdown = await shutDownQuoteApp(NEXTJS_APP, server.run, hub.run);
-    const messages = hub.run.messages();
+    const snapshot = await fetchUntilSnapshot(toQuoteUrl(server.port), hub.run);
+    const [top] = snapshot.stack;
 
     expect({
-      statuses,
-      breakpointStatuses: hub.run.lines.flatMap((line) => readStatus(line)?.status ?? []),
-      snapshots: messages.filter((message) => message.type === "snapshot"),
-      hellos: messages.filter((message) => message.type === "hello").length,
-      ...shutdown,
+      statuses: [...first, ...statuses],
+      file: top?.file,
+      line: top?.line,
+      variables: snapshot.variables,
     }).toEqual({
-      statuses: Array.from({ length: REQUESTS }, () => 200),
-      breakpointStatuses: ["pending"],
-      snapshots: [],
-      hellos: 1,
-      exit: NEXTJS_APP.exitOnSigterm,
-      stopped: true,
+      statuses: Array.from({ length: REQUESTS + 1 }, () => 200),
+      // The handler's own file and line, from the map of the chunk Next.js bundled it into
+      file: expect.stringMatching(toQuoteFilePattern(NEXTJS_APP)) as unknown,
+      line: findQuoteLine(NEXTJS_APP),
+      // `next build` minifies server code: the handler's locals keep the names the minifier gave them, and `total`,
+      // used once, is inlined into the response
+      variables: expect.arrayContaining([
+        { name: expect.any(String) as unknown, value: { type: "string", value: "SKU-2", length: 5 } },
+        { name: expect.any(String) as unknown, value: { type: "number", value: 3 } },
+        { name: expect.any(String) as unknown, value: { type: "number", value: 4.5 } },
+      ]) as unknown,
     });
+  });
+
+  it("stops the SDK on SIGTERM", async () => {
+    const hub = await startQuoteHub(NEXTJS_APP);
+    const server = await startQuoteApp(NEXTJS_APP, hub.port);
+    await hub.run.waitForMessages("breakpointStatus");
+
+    const shutdown = await shutDownQuoteApp(NEXTJS_APP, server.run, hub.run);
+
+    expect({
+      hellos: hub.run.messages().filter((message) => message.type === "hello").length,
+      ...shutdown,
+    }).toEqual({ hellos: 1, exit: NEXTJS_APP.exitOnSigterm, stopped: true });
   });
 
   it("does not start the SDK on the Edge runtime and keeps serving there", async () => {

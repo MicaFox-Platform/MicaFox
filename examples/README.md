@@ -36,8 +36,8 @@ The hub prints the `breakpointStatus` of the app's breakpoint and, after the req
 
 Fastify runs from its sources; the others run their built output, so `pnpm build` comes first. The five formats apps
 share one `.env`, which has no `PORT`: each script has its own default, and
-`PORT=4000 pnpm --filter @micafox/example-formats start:cjs` changes one. The breakpoints of the bundled and the
-Next.js apps stay `pending`: bundled output is not supported
+`PORT=4000 pnpm --filter @micafox/example-formats start:cjs` changes one. The Next.js app's breakpoint turns `active`
+once the route's chunk is loaded, on its first request at the latest
 ([compatibility](../docs/api/sdk/overview.md#compatibility)).
 
 Node 22.9 to 23.x prints `.env not found. Continuing without it.` when there is no `.env`; the app starts anyway.

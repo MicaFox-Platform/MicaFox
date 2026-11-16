@@ -6,7 +6,7 @@
 pnpm add @micafox/sdk
 ```
 
-Node.js 22 or later, with `import` or `require()`. For TypeScript, ship source maps; bundles are not supported.
+Node.js 22 or later, with `import` or `require()`. For TypeScript and bundles, ship source maps.
 What else the app needs: [`micafox`](debugger.md#micafox).
 
 What your app can rely on:
@@ -22,18 +22,17 @@ What your app can rely on:
 
 CI runs each framework below in a real app on Node.js 22.13 and 24, with breakpoints set by a hub:
 
-| Framework                                 | Tested with                                      | Breakpoints                         |
-| ----------------------------------------- | ------------------------------------------------ | ----------------------------------- |
-| Fastify 5                                 | TypeScript run by tsx                            | yes                                 |
-| Express 5                                 | CommonJS JavaScript run by `node`                | yes                                 |
-| NestJS 12                                 | the Nest CLI's build: CommonJS with `.map` files | yes                                 |
-| Next.js 16, Node.js runtime, `next start` | MicaFox started in `instrumentation.ts`          | not yet: route handlers are bundled |
+| Framework                                 | Tested with                                      | Breakpoints                                  |
+| ----------------------------------------- | ------------------------------------------------ | -------------------------------------------- |
+| Fastify 5                                 | TypeScript run by tsx                            | yes                                          |
+| Express 5                                 | CommonJS JavaScript run by `node`                | yes                                          |
+| NestJS 12                                 | the Nest CLI's build: CommonJS with `.map` files | yes                                          |
+| Next.js 16, Node.js runtime, `next start` | MicaFox started in `instrumentation.ts`          | yes, in route handlers after their first use |
 
-Module formats are tested separately, in plain Node.js apps: CommonJS, ES modules, and TypeScript compiled by tsc with
-source maps.
+Module formats are tested separately, in plain Node.js apps: CommonJS, ES modules, TypeScript compiled by tsc with
+source maps, and TypeScript bundled by esbuild with a source map.
 
-Not supported: bundled output (Next.js server code included), the Edge runtime, Vercel serverless functions, Bun and
-Deno.
+Not supported: bundles without source maps, the Edge runtime, Vercel serverless functions, Bun and Deno.
 
 What each framework needs and the apps CI runs: [Express](../../../examples/frameworks/express/README.md),
 [NestJS](../../../examples/frameworks/nestjs/README.md), [Next.js](../../../examples/frameworks/nextjs/README.md),

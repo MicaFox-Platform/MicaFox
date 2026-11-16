@@ -31,14 +31,20 @@ then, as long as it fits the size: one the time left unread keeps its primitive 
 its parameters, such as `request` and `response`, and before `this`. An array, `Set` or `Map` with more children
 than `maxItems` is captured with its size only. Details: [capturing a snapshot](../../architecture/sdk/debugger.md#capturing-a-snapshot).
 
-The hub sets breakpoints by the file's path in your repository. For TypeScript, ship source maps: inline as a
-`data:` URL or as `.map` files referenced by a relative URL; a map URL with a scheme, such as `file:` or `https:`,
-and a map over 8 MiB are not read. Keep each compiled file's name, without its extension, the same as its
-source's (`dist/checkout.js` for `src/checkout.ts`); bundled output is not supported. While breakpoints are set,
-the debugger resumes every pause it did not cause, including `debugger` statements, so do not attach another
-debugger to the process. When the process runs with `--inspect`, MicaFox does not start. A breakpoint on the
-top-level code of a module with a source map can miss the module's first run, because the map is read after the
-module loads. Design:
+The hub sets breakpoints by the file's path in your repository. For TypeScript and bundles, ship source maps:
+inline as a `data:` URL or as `.map` files referenced by a relative URL; a map URL with a scheme, such as `file:` or
+`https:`, an index map (`sections`) and a map over 8 MiB, 1,500,000 segments or 50,000 JSON values are not read.
+The debugger finds a file first among the scripts whose name, without its extension, is the file's
+(`dist/checkout.js` for `src/checkout.ts`). When none of them holds the file's whole path, it searches the maps of
+the app's other scripts, one at a time, so a breakpoint resolves inside a bundle from esbuild, webpack, Rollup or
+`next build`; it stays `pending` until that search ends. A file that several chunks hold gets the breakpoint in
+each. Code under `node_modules` is never matched, so breakpoints in dependencies stay `pending`. A bundle map over
+the limits gives `error` with the reason when nothing else matches. In minified output, such as `next build`'s,
+variables have the names the minifier gave them. While breakpoints are set, the debugger resumes every pause it did
+not cause, including `debugger` statements, so do not attach another debugger to the process. When the process
+runs with `--inspect`, MicaFox does not start. A breakpoint on the top-level code of a module with a source map can
+miss the module's first run, because the map is read after the module loads; likewise a chunk a bundler loads on
+first use, such as a Next.js route's on its first request, gets the breakpoint only after that use. Design:
 [debugger architecture](../../architecture/sdk/debugger.md).
 
 **Methods**

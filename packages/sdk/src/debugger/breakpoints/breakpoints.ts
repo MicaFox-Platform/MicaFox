@@ -3,8 +3,6 @@ import type { BreakpointStatus } from "@micafox/protocol";
 import { DebuggerDomain, type DomainInspector } from "./domain.js";
 import {
   diffList,
-  isSameStatus,
-  isUnresolved,
   keepsDomainOn,
   summarizeOutcomes,
   toStatus,
@@ -12,15 +10,24 @@ import {
   type ListedEntry,
   type Outcome,
   type Placed,
-  type ValidEntry,
 } from "./entry.js";
-import { Expiry } from "./expiry.js";
-import { placeAgain, placeEntry, releaseEntry, type PlaceContext } from "./place-entry.js";
+import { placeAgain, releaseEntry, takeOff, type PlaceContext } from "./place-entry.js";
 import { readBreakpointList } from "./read-list.js";
+import {
+  extendRestored,
+  isWaitingForReads,
+  resolveEntry,
+  resolveOnMapRead,
+  resolveOnScript,
+  resolveOnSearched,
+  type Changes,
+  type ResolveState,
+} from "./resolve-again.js";
 import { V8Breakpoints } from "./v8-breakpoints.js";
 import type { SdkLogger } from "../../logger/index.js";
 import type { PausedLocation, SnapshotTarget } from "../capture/index.js";
-import { isMapped, mayResolveTo, toSegments, type MappedRecord, type ScriptRecord } from "../location/index.js";
+import { Expiry } from "../expiry/index.js";
+import { isMapped, type MappedRecord, type ScriptRecord } from "../location/index.js";
 import { SourceMaps, locateFrame, type FrameLocation, type MapView } from "../source-maps/index.js";
 
 const COMPONENT = "debugger";
@@ -71,6 +78,11 @@ export class Breakpoints {
       onRead: (script) => {
         this.guard(() => {
           this.onMapRead(script);
+        });
+      },
+      onSearched: () => {
+        this.guard(() => {
+          this.onSearched();
         });
       },
       fail: dependencies.fail,
@@ -157,7 +169,7 @@ export class Breakpoints {
   /** Takes active entries off their V8 breakpoints, removed with the last of them, and sends `rateLimited`. */
   rateLimit(ids: readonly string[]): void {
     this.setRateLimited(ids, (id, outcome) => {
-      this.v8.release(id, outcome.place);
+      takeOff(this.placing, id, outcome);
     });
   }
 
@@ -193,6 +205,8 @@ export class Breakpoints {
       }
     }
 
+    // A chunk with the entry's file may have loaded while it was off its V8 breakpoints
+    this.commit(extendRestored(this.resolving(), restored));
     this.report(restored);
     return restored.filter((id) => this.applied.get(id)?.outcome.status === "active");
   }
@@ -246,7 +260,10 @@ export class Breakpoints {
       if (!this.applied.has(entry.id)) {
         // An entry with no time left is never set in V8
         const isOver = entry.kind === "valid" && entry.expiresInMs === 0;
-        this.applied.set(entry.id, isOver ? { entry, segments: [], outcome: EXPIRED } : this.resolve(entry));
+        this.applied.set(
+          entry.id,
+          isOver ? { entry, segments: [], outcome: EXPIRED } : resolveEntry(this.resolving(), entry),
+        );
       }
     }
   }
@@ -297,20 +314,6 @@ export class Breakpoints {
     }
   }
 
-  private resolve(entry: ListedEntry): Applied {
-    if (entry.kind === "invalid") {
-      return { entry, segments: [], outcome: { status: "error", message: entry.message } };
-    }
-
-    const segments = toSegments(entry.file);
-    return { entry, segments, outcome: this.locate(entry, segments) };
-  }
-
-  private locate(entry: ValidEntry, segments: readonly string[]): Outcome {
-    const status = this.areAllRateLimited ? "rateLimited" : "active";
-    return placeEntry(this.placing, { entry, segments, status });
-  }
-
   private setRateLimited(ids: readonly string[], takeOff: (id: string, outcome: Placed) => void): void {
     const limited: string[] = [];
     for (const id of ids) {
@@ -325,40 +328,42 @@ export class Breakpoints {
     this.report(limited);
   }
 
-  // A pending entry is resolved again when a script it may resolve to loads; the new status is sent
+  // docs/architecture/sdk/debugger.md#applying-breakpoints, step 7. A script with the URL of a recorded one
+  // replaces it, so what was read of the old one no longer applies
   private onScript(script: ScriptRecord): void {
-    // A script with the URL of a recorded one replaces it, so the map read for the old one no longer applies
     this.sourceMaps.forget(script.url);
-    this.resolvePending(script);
+    this.commit(resolveOnScript(this.resolving(), script));
   }
 
-  // The entries waiting for this map are resolved again; then its index is dropped unless one of them holds it
+  // The entries waiting for this map are resolved again. Indexes no entry holds are dropped once none waits for a
+  // read: an entry that waits for several maps needs the ones already read until the last arrives
   private onMapRead(script: MappedRecord): void {
     if (this.isStopped) {
       return;
     }
 
-    this.resolvePending(script);
-    this.sourceMaps.trim(script);
+    this.commit(resolveOnMapRead(this.resolving(), script));
+    if (!isWaitingForReads(this.applied)) {
+      this.sourceMaps.trimUnheld();
+    }
   }
 
-  private resolvePending(script: ScriptRecord): void {
-    const changed: string[] = [];
-    for (const [id, current] of this.applied) {
-      if (current.entry.kind !== "valid" || !isUnresolved(current.outcome)) {
-        continue;
-      }
+  private onSearched(): void {
+    if (!this.isStopped) {
+      this.commit(resolveOnSearched(this.resolving()));
+    }
+  }
 
-      if (mayResolveTo(current.segments.at(-1), script)) {
-        const outcome = this.locate(current.entry, current.segments);
-        this.applied.set(id, { ...current, outcome });
-        if (!isSameStatus(current.outcome, outcome)) {
-          changed.push(id);
-        }
-      }
+  private resolving(): ResolveState {
+    return { applied: this.applied, placing: this.placing, areAllRateLimited: this.areAllRateLimited };
+  }
+
+  private commit(changes: Changes): void {
+    for (const [id, applied] of changes.applied) {
+      this.applied.set(id, applied);
     }
 
-    this.report(changed);
+    this.report(changes.changed);
   }
 
   private report(ids: readonly string[]): void {

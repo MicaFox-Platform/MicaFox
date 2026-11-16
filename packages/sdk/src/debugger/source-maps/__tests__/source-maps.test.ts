@@ -11,6 +11,13 @@ const MAP_TEXT = createSourceMapText(
   encodeMappings([[{ column: 2, source: 0, line: 3, originalColumn: 0 }]]),
 );
 
+const CHECKOUT_SOURCE = {
+  source: "checkout.ts",
+  path: "/app/src/checkout.ts",
+  segments: ["app", "src", "checkout.ts"],
+  isDependency: false,
+};
+
 const toDataUrl = (text: string): string => `data:application/json;base64,${Buffer.from(text).toString("base64")}`;
 
 const script = (sourceMapUrl = toDataUrl(MAP_TEXT)): MappedScript => ({
@@ -34,11 +41,15 @@ const createSourceMaps = (onRead: (read: MappedScript) => void = () => undefined
   logger.set({ logLevel: "debug" }, "debugger");
   const reads: MappedScript[] = [];
   const failures: unknown[] = [];
+  let searchesEnded = 0;
   const maps = new SourceMaps<MappedScript>({
     logger,
     onRead: (read) => {
       reads.push(read);
       onRead(read);
+    },
+    onSearched: () => {
+      searchesEnded += 1;
     },
     fail: (error) => {
       failures.push(error);
@@ -49,6 +60,7 @@ const createSourceMaps = (onRead: (read: MappedScript) => void = () => undefined
     maps,
     reads,
     failures,
+    searchesEnded: () => searchesEnded,
     messages: (prefix: string) => lines.map((line) => line.message).filter((message) => message.startsWith(prefix)),
     /** Resolves after the line starting with `prefix` is logged and the call that logged it returns. */
     logged: (prefix: string) =>
@@ -82,7 +94,7 @@ describe("SourceMaps reading", () => {
     expect({ view: test.maps.view(checkout), reads: test.reads }).toEqual({
       view: {
         kind: "read",
-        sources: [{ source: "checkout.ts", path: "/app/src/checkout.ts", segments: ["app", "src", "checkout.ts"] }],
+        sources: [CHECKOUT_SOURCE],
         index: expect.anything() as unknown,
       },
       reads: [checkout],
@@ -215,11 +227,11 @@ describe("SourceMaps keeping the index", () => {
     test.maps.load(checkout);
     await test.logged("source map loaded");
 
-    test.maps.trim(checkout);
+    test.maps.trimUnheld();
 
     expect(test.maps.view(checkout)).toEqual({
       kind: "read",
-      sources: [{ source: "checkout.ts", path: "/app/src/checkout.ts", segments: ["app", "src", "checkout.ts"] }],
+      sources: [CHECKOUT_SOURCE],
     });
   });
 
@@ -230,7 +242,7 @@ describe("SourceMaps keeping the index", () => {
     await test.logged("source map loaded");
 
     test.maps.hold(checkout, "bp-1");
-    test.maps.trim(checkout);
+    test.maps.trimUnheld();
 
     expect(test.maps.view(checkout)).toHaveProperty("index");
   });
@@ -258,7 +270,7 @@ describe("SourceMaps keeping the index", () => {
     const checkout = script();
     test.maps.load(checkout);
     await test.logged("source map loaded");
-    test.maps.trim(checkout);
+    test.maps.trimUnheld();
 
     test.maps.load(checkout);
     await test.logged("source map loaded");
@@ -279,4 +291,219 @@ describe("SourceMaps keeping the index", () => {
 
     expect(test.maps.view(checkout).kind).toBe("read");
   });
+});
+
+const BUNDLE_TEXT = createSourceMapText(
+  ["../src/checkout.ts", "../node_modules/lib/index.js", "../src/cart.ts"],
+  encodeMappings([[{ column: 2, source: 0, line: 3, originalColumn: 0 }]]),
+);
+
+const bundle = (name: string, text = BUNDLE_TEXT): MappedScript => ({
+  url: `file:///app/dist/${name}`,
+  sourceMapUrl: toDataUrl(text),
+});
+
+const pathsFound = (test: ReturnType<typeof createSourceMaps>, fileName: string): string[] =>
+  test.maps.findSearched(fileName).map(({ script: found, source }) => `${found.url} ${source.path}`);
+
+describe("SourceMaps searching the bundles", () => {
+  it("keeps only the sources of a searched map outside node_modules, without an index, and ends the search", async () => {
+    const test = createSourceMaps();
+    const server = bundle("server.cjs");
+
+    test.maps.searchMap(server);
+    const during = { view: test.maps.searchView(server), isSearching: test.maps.isSearching() };
+    await test.logged("bundles searched");
+
+    expect({
+      during,
+      after: test.maps.searchView(server),
+      checkout: pathsFound(test, "checkout.ts"),
+      dependency: pathsFound(test, "index.js"),
+      byName: test.maps.view(server),
+      searchesEnded: test.searchesEnded(),
+    }).toEqual({
+      during: { view: "searching", isSearching: true },
+      after: "searched",
+      checkout: ["file:///app/dist/server.cjs /app/src/checkout.ts"],
+      dependency: [],
+      byName: { kind: "unread" },
+      searchesEnded: 1,
+    });
+  });
+
+  it("reads every map by name before any map for a search", async () => {
+    const test = createSourceMaps();
+    test.maps.searchMap(bundle("first.cjs"));
+    test.maps.searchMap(bundle("second.cjs"));
+
+    test.maps.load(script());
+    await test.logged("bundles searched");
+
+    expect(
+      test.messages("source map").map((message) => /^source map (\w+): inline in (\S+),/.exec(message)?.slice(1)),
+    ).toEqual([
+      ["searched", "file:///app/dist/first.cjs"],
+      ["loaded", "file:///app/src/checkout.js"],
+      ["searched", "file:///app/dist/second.cjs"],
+    ]);
+  });
+
+  it("reads a map once for overlapping searches", async () => {
+    const test = createSourceMaps();
+    const server = bundle("server.cjs");
+
+    test.maps.searchMap(server);
+    test.maps.searchMap(server);
+    await test.logged("bundles searched");
+
+    expect(test.messages("source map searched")).toHaveLength(1);
+  });
+
+  it("logs a map over a limit as a warning and gives its reason to the search", async () => {
+    const test = createSourceMaps();
+    const tooMany = `{"version":3,"sources":[],"mappings":"","names":[${"0,".repeat(50_000)}0]}`;
+
+    test.maps.searchMap(bundle("huge.cjs", tooMany));
+    await test.logged("bundles searched");
+
+    expect({ warned: test.messages("source map inline"), failure: test.maps.searchFailure() }).toEqual({
+      warned: [
+        "source map inline in file:///app/dist/huge.cjs cannot be searched: the source map has more than 50,000 JSON values",
+      ],
+      failure: "the source map has more than 50,000 JSON values",
+    });
+  });
+
+  it("logs any other failure of a search, such as an index map, at debug and gives no reason", async () => {
+    const test = createSourceMaps();
+    const runtime = bundle("runtime.js", JSON.stringify({ version: 3, sections: [] }));
+
+    test.maps.searchMap(runtime);
+    await test.logged("bundles searched");
+
+    expect({ view: test.maps.searchView(runtime), failure: test.maps.searchFailure() }).toEqual({
+      view: "searched",
+      failure: undefined,
+    });
+  });
+
+  it("uses the sources of a map read by name without reading it again", async () => {
+    const test = createSourceMaps();
+    const server = bundle("server.cjs");
+    test.maps.load(server);
+    await test.logged("source map loaded");
+
+    test.maps.searchMap(server);
+
+    expect({
+      view: test.maps.searchView(server),
+      isSearching: test.maps.isSearching(),
+      checkout: pathsFound(test, "checkout.ts"),
+      searched: test.messages("source map searched"),
+    }).toEqual({
+      view: "searched",
+      isSearching: false,
+      checkout: ["file:///app/dist/server.cjs /app/src/checkout.ts"],
+      searched: [],
+    });
+  });
+
+  it("lets a read by name under way end the search of the same map", async () => {
+    const test = createSourceMaps();
+    const server = bundle("server.cjs");
+    test.maps.load(server);
+
+    test.maps.searchMap(server);
+    await test.logged("bundles searched");
+
+    expect({
+      loaded: test.messages("source map loaded").length,
+      searched: test.messages("source map searched").length,
+      checkout: pathsFound(test, "checkout.ts"),
+    }).toEqual({ loaded: 1, searched: 0, checkout: ["file:///app/dist/server.cjs /app/src/checkout.ts"] });
+  });
+
+  it("ends the search with a debug line when the map file of a search read is missing", async () => {
+    const test = createSourceMaps();
+    const missing: MappedScript = { url: "file:///app/dist/missing.cjs", sourceMapUrl: "missing.cjs.map" };
+
+    test.maps.searchMap(missing);
+    await test.logged("bundles searched");
+
+    expect({
+      failures: test.failures,
+      view: test.maps.searchView(missing),
+      failure: test.maps.searchFailure(),
+      searchesEnded: test.searchesEnded(),
+      debug: test.messages("source map"),
+    }).toEqual({
+      failures: [],
+      view: "searched",
+      failure: undefined,
+      searchesEnded: 1,
+      debug: [expect.stringContaining("cannot be searched")],
+    });
+  });
+
+  it("ignores the result of a search read that ends after clear()", async () => {
+    const test = createSourceMaps();
+    const server = bundle("server.cjs");
+    test.maps.searchMap(server);
+
+    test.maps.clear();
+    await test.logged("source map inline");
+
+    expect({ checkout: pathsFound(test, "checkout.ts"), searchesEnded: test.searchesEnded() }).toEqual({
+      checkout: [],
+      searchesEnded: 0,
+    });
+  });
+
+  it("ends the search when the last record searched is recorded again", () => {
+    const test = createSourceMaps();
+    const server = bundle("server.cjs");
+    test.maps.searchMap(server);
+
+    test.maps.forget(server.url);
+
+    expect({ isSearching: test.maps.isSearching(), searchesEnded: test.searchesEnded() }).toEqual({
+      isSearching: false,
+      searchesEnded: 1,
+    });
+  });
+});
+
+describe("SourceMaps holding indexes", () => {
+  // Decoding 1,500,000 segments takes about a second, more under coverage; Vitest waits five seconds by default
+  const TIMEOUT_MS = 60_000;
+  const LARGEST = createSourceMapText(["checkout.ts"], "AAAA,".repeat(1_500_000));
+
+  it(
+    "holds the indexes of maps up to 3,000,000 segments in all, each map counted once",
+    { timeout: TIMEOUT_MS },
+    async () => {
+      const test = createSourceMaps();
+      const first = bundle("first.cjs", LARGEST);
+      const second = bundle("second.cjs", LARGEST);
+      const small = bundle("small.cjs");
+      for (const each of [first, second, small]) {
+        test.maps.load(each);
+      }
+
+      await test.logged("source map loaded: inline in file:///app/dist/small.cjs");
+      test.maps.hold(first, "bp-1");
+      test.maps.hold(second, "bp-2");
+
+      const again = test.maps.canHold([first, second]);
+      const more = test.maps.canHold([small]);
+      test.maps.release(second.url, "bp-2");
+
+      expect({ again, more, afterRelease: test.maps.canHold([small]) }).toEqual({
+        again: true,
+        more: false,
+        afterRelease: true,
+      });
+    },
+  );
 });

@@ -12,8 +12,8 @@ a breakpoint on the line marked `// breakpoint here` captures the request's valu
 | tsc → ESM      | `src/tsc-esm/` | `dist/tsc-esm/server.js`  | `import`, `.map` files beside the JS    |
 | bundled        | `src/bundled/` | `dist/bundled/server.cjs` | bundled in by esbuild, one `.map`       |
 
-Bundled output is not supported ([debugger API](../../docs/api/sdk/debugger.md)): the bundled app runs and serves, but
-its breakpoint stays `pending`. `tests/bundled.test.ts` records that, so a change shows up.
+The bundle's name differs from its sources', so the debugger finds `quote.ts` by searching its map
+([debugger API](../../docs/api/sdk/debugger.md)); every app, the bundle included, gets the same tests.
 
 ## Layout
 

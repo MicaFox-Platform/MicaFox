@@ -6,9 +6,13 @@ export interface GeneratedPosition {
   readonly column: number;
 }
 
-/** A position in an original source. `source` is the entry of the map's `sources`, as written. */
+/**
+ * A position in an original source. `source` is the entry of the map's `sources`, as written, and `sourceId` its
+ * index there, the first one when several entries have that name.
+ */
 export interface OriginalPosition {
   readonly source: string;
+  readonly sourceId: number;
   readonly line: number;
   readonly column: number;
 }
@@ -65,10 +69,13 @@ const findFirstKeyAtLeast = ({ segments, originalOrder }: SourceMapIndexParts, w
 export class SourceMapIndex {
   readonly sourceRoot: string;
   readonly sources: readonly string[];
+  /** The number of segments, which the memory the index takes grows with. */
+  readonly segmentCount: number;
 
   constructor(private readonly parts: SourceMapIndexParts) {
     this.sourceRoot = parts.sourceRoot;
     this.sources = parts.sources;
+    this.segmentCount = parts.segments.count;
   }
 
   /**
@@ -109,6 +116,7 @@ export class SourceMapIndex {
     const sourceId = Math.floor(key / LINE_RADIX);
     return {
       source: this.sources[sourceId] ?? "",
+      sourceId,
       line: key - sourceId * LINE_RADIX,
       column: valueAt(segments.originalColumns, nearest),
     };

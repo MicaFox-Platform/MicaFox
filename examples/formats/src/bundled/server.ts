@@ -1,6 +1,6 @@
-// TypeScript bundled by esbuild, with the SDK, into one CommonJS file and its .map. Bundled output is not supported:
-// tests/bundled.test.ts records what it reports. It serves `GET /quote` on PORT and is debugged by `micafox`,
-// configured by the MICAFOX_* environment variables.
+// TypeScript bundled by esbuild, with the SDK, into one CommonJS file and its .map; the debugger finds quote.ts in
+// the bundle by searching that map. It serves `GET /quote` on PORT and is debugged by `micafox`, configured by the
+// MICAFOX_* environment variables.
 
 import { micafox } from "@micafox/sdk";
 import { createServer } from "node:http";
