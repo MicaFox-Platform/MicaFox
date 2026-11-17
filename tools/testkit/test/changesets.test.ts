@@ -48,8 +48,14 @@ const commit = (message: string): void => {
   git("commit", "--quiet", "--message", message);
 };
 
-const packageJson = (name: string, version: string, isPrivate = false): string =>
-  JSON.stringify({ name, version, ...(isPrivate ? { private: true } : {}) });
+interface Manifest {
+  readonly name: string;
+  readonly version: string;
+  readonly private?: boolean;
+  readonly scripts?: Record<string, string>;
+}
+
+const packageJson = (manifest: Manifest): string => JSON.stringify(manifest);
 
 const changeset = (bumps: Record<string, "major" | "minor" | "patch">): string =>
   `---\n${Object.entries(bumps)
@@ -63,16 +69,16 @@ const run = (...args: string[]): SpawnSyncReturns<string> =>
 const createRepo = (): void => {
   repo = mkdtempSync(path.join(tmpdir(), "micafox-changesets-"));
   git("init", "--quiet", "--initial-branch", "staging");
-  write("package.json", packageJson("fixture", "0.0.0", true));
+  write("package.json", packageJson({ name: "fixture", version: "0.0.0", private: true }));
   write("pnpm-workspace.yaml", "packages:\n  - packages/*\n");
   mkdirSync(path.join(repo, ".changeset"));
   copyFileSync(path.join(ROOT, ".changeset", "config.json"), path.join(repo, ".changeset", "config.json"));
   copyFileSync(path.join(ROOT, ".changeset", "README.md"), path.join(repo, ".changeset", "README.md"));
-  write("packages/young/package.json", packageJson("@fixture/young", "0.3.0"));
+  write("packages/young/package.json", packageJson({ name: "@fixture/young", version: "0.3.0" }));
   write("packages/young/src/index.ts", "export const a = 1;\n");
-  write("packages/stable/package.json", packageJson("@fixture/stable", "1.2.0"));
+  write("packages/stable/package.json", packageJson({ name: "@fixture/stable", version: "1.2.0" }));
   write("packages/stable/src/index.ts", "export const b = 1;\n");
-  write("packages/hidden/package.json", packageJson("@fixture/hidden", "0.1.0", true));
+  write("packages/hidden/package.json", packageJson({ name: "@fixture/hidden", version: "0.1.0", private: true }));
   write("packages/hidden/src/index.ts", "export const c = 1;\n");
   commit("chore: base");
   git("switch", "--quiet", "--create", "feat/change");
@@ -107,7 +113,10 @@ describe("check-changesets.sh pr", { timeout: E2E_TEST_TIMEOUT_MS }, () => {
   });
 
   it("passes with an empty changeset, written by pnpm changeset --empty", () => {
-    write("packages/stable/package.json", packageJson("@fixture/stable", "1.2.0").replace("}", ',"scripts":{}}'));
+    write(
+      "packages/stable/package.json",
+      packageJson({ name: "@fixture/stable", version: "1.2.0", scripts: { build: "tsc" } }),
+    );
     write(".changeset/no-release.md", EMPTY_CHANGESET);
     commit("build: change a script");
 
@@ -221,7 +230,7 @@ describe("check-changesets.sh release", { timeout: E2E_TEST_TIMEOUT_MS }, () => 
 
 describe("sync-sdk-version.sh", () => {
   it("sets SDK_VERSION to the version that changeset version wrote to the SDK's package.json", () => {
-    write("packages/sdk/package.json", packageJson("@micafox/sdk", "0.2.0"));
+    write("packages/sdk/package.json", packageJson({ name: "@micafox/sdk", version: "0.2.0" }));
     write(VERSION_FILE, '// The constant\nexport const SDK_VERSION = "0.1.0";\n');
 
     const result = spawnSync("bash", [SYNC_SCRIPT], { cwd: repo, env: GIT_ENV, encoding: "utf8" });
@@ -233,7 +242,7 @@ describe("sync-sdk-version.sh", () => {
   });
 
   it("fails when version.ts no longer declares the constant on one line", () => {
-    write("packages/sdk/package.json", packageJson("@micafox/sdk", "0.2.0"));
+    write("packages/sdk/package.json", packageJson({ name: "@micafox/sdk", version: "0.2.0" }));
     write(VERSION_FILE, 'export const SDK_VERSION =\n  "0.1.0";\n');
 
     const result = spawnSync("bash", [SYNC_SCRIPT], { cwd: repo, env: GIT_ENV, encoding: "utf8" });
