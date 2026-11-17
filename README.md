@@ -4,8 +4,8 @@ Open-source runtime platform for Node.js, built from SDK modules that share one 
 module is a debugger: set non-breaking breakpoints in a running application and get snapshots of its state, without
 changing code or redeploying.
 
-> Early development. The design and API below are decided, but the packages are not implemented or published yet,
-> and the API may still change.
+> Early development. `@micafox/sdk` and `@micafox/protocol` are implemented and tested but not on npm yet, so the
+> install below works only after their first release; the API may still change.
 
 ## How it works
 
