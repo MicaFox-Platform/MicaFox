@@ -1,0 +1,8 @@
+{
+  "extends": "@micafox/configs/tsconfig/workspace-cjs.json",
+  "references": [
+    {
+      "path": "../protocol/tsconfig.cjs.json"
+    }
+  ]
+}

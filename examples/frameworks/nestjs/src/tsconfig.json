@@ -1,0 +1,21 @@
+{
+  "extends": "@micafox/configs/tsconfig/base.json",
+  "compilerOptions": {
+    "verbatimModuleSyntax": false,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "sourceMap": true,
+
+    "rootDir": ".",
+    "outDir": "../dist"
+  },
+  "include": ["."],
+  "references": [
+    {
+      "path": "../../../../packages/protocol/tsconfig.cjs.json"
+    },
+    {
+      "path": "../../../../packages/sdk/tsconfig.cjs.json"
+    }
+  ]
+}

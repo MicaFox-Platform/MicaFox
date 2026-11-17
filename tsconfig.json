@@ -1,15 +1,25 @@
 {
-  "extends": "@probex-platform/configs/tsconfig/base.json",
+  "extends": "@micafox/configs/tsconfig/base.json",
   "compilerOptions": {
     "noEmit": true,
-    "customConditions": ["@probex-platform/source"]
+    "customConditions": ["@micafox/source"]
   },
   "include": [
     "*.ts",
-    "packages/*/vitest.config.ts",
+    "packages/*/vitest*.config.ts",
     "packages/*/src/**/*.test.ts",
-    "packages/configs/test",
-    "examples/*/vitest.config.ts",
-    "examples/*/tests"
+    "packages/*/src/**/*.test-d.ts",
+    "examples/*/src/**/*.test.ts",
+    "examples/frameworks/*/src/**/*.test.ts",
+    "packages/*/test",
+    "examples/*/vitest*.config.ts",
+    "examples/frameworks/*/vitest*.config.ts",
+    "examples/*/tests",
+    "examples/frameworks/*/tests",
+    "tools/*/vitest*.config.ts",
+    "tools/*/src",
+    "tools/*/docker",
+    "tools/*/bench",
+    "tools/*/test"
   ]
 }

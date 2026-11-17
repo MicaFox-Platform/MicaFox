@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Before anything leaves the machine: commit subjects not yet on the remote follow docs/development.md#naming, and
+# `pnpm verify` is green on the working tree. Skip once with git push --no-verify; CI runs the same checks.
+set -uo pipefail
+root=$(git rev-parse --show-toplevel)
+zero=$(git hash-object --stdin </dev/null | tr '0-9a-f' '0')
+
+pushed=0
+# stdin: <local ref> <local sha> <remote ref> <remote sha>, one line per ref
+while read -r _ local_sha _ _; do
+  [[ $local_sha == "$zero" ]] && continue # deleting a remote ref
+  pushed=1
+  # Only commits on no remote yet: they can still be reworded without a force-push
+  if ! out=$(bash "$root/.github/scripts/check-names.sh" commits "$local_sha" --not --remotes); then
+    echo "$out" >&2
+    exit 1
+  fi
+done
+((pushed)) || exit 0
+echo '✓ commit names' >&2
+
+cd "$root" || exit 1
+if ! out=$(pnpm verify 2>&1); then
+  {
+    tail -n 30 <<<"$out"
+    echo
+    echo '✗ pnpm verify is red, fix it before pushing (pnpm verify:fix fixes lint and formatting)'
+  } >&2
+  exit 1
+fi
+echo '✓ pnpm verify' >&2

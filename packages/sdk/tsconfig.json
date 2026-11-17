@@ -1,5 +1,9 @@
 {
-  "extends": "@probex-platform/configs/tsconfig/workspace.json",
+  "extends": "@micafox/configs/tsconfig/workspace.json",
+  "compilerOptions": {
+    "outDir": "${configDir}/dist/esm",
+    "tsBuildInfoFile": "${configDir}/dist/esm/tsconfig.tsbuildinfo"
+  },
   "references": [
     {
       "path": "../protocol"

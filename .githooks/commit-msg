@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Rejects a commit whose subject breaks docs/development.md#naming before the commit exists: once pushed, it takes
+# a reword and a force-push to fix. Skip once with git commit --no-verify; pre-push and CI still check it.
+set -uo pipefail
+
+# Merge commits keep git's default subject, CI skips them too
+[[ -f $(git rev-parse --git-path MERGE_HEAD) ]] && exit 0
+subject=$(git stripspace --strip-comments <"$1" | head -1)
+# Autosquash folds these into earlier commits; pre-push catches any left over
+[[ $subject =~ ^(fixup|squash|amend)!\  ]] && exit 0
+exec bash "$(git rev-parse --show-toplevel)/.github/scripts/check-names.sh" commit "$subject" >&2

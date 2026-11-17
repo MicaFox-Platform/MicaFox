@@ -1,0 +1,11 @@
+{
+  "extends": "./workspace.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "Bundler",
+    "verbatimModuleSyntax": false,
+
+    "outDir": "${configDir}/dist/cjs",
+    "tsBuildInfoFile": "${configDir}/dist/cjs/tsconfig.tsbuildinfo"
+  }
+}

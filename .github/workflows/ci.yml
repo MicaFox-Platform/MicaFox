@@ -12,8 +12,19 @@ permissions:
   contents: read
 
 jobs:
-  ci:
+  # One leg per supported Node line: the SDK talks to V8 through the inspector, which changes between versions
+  verify:
+    name: verify (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Oldest 22.x the dev toolchain runs on (eslint 10 needs >= 22.13); the primary leg also does the
+          # checks that need to run once
+          - node: 22.13.0
+            primary: true
+          - node: 24
 
     steps:
       # Any branch may target staging; main accepts only staging
@@ -34,7 +45,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ matrix.node }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -44,13 +55,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Branch, PR title and commits
-        if: ${{ !startsWith(github.head_ref, 'dependabot/') }}
+      - name: PR title
+        if: ${{ matrix.primary && !startsWith(github.head_ref, 'dependabot/') }}
         env:
-          BRANCH: ${{ github.head_ref }}
           TITLE: ${{ github.event.pull_request.title }}
+        run: bash .github/scripts/check-names.sh title "$TITLE"
+
+      - name: Commit messages
+        if: ${{ matrix.primary && !startsWith(github.head_ref, 'dependabot/') && github.head_ref != 'staging' }}
+        env:
           RANGE: ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}
-        run: bash .github/scripts/check-names.sh "$BRANCH" "$TITLE" "$RANGE"
+        run: bash .github/scripts/check-names.sh commits "$RANGE"
 
       - name: Linter
         run: pnpm lint
@@ -61,8 +76,89 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      # Coverage is reported once, from the primary leg
       - name: Tests and coverage
+        if: ${{ matrix.primary }}
         run: pnpm test:coverage
+
+      - name: Tests
+        if: ${{ !matrix.primary }}
+        run: pnpm test
 
       - name: Build
         run: pnpm build
+
+      # Loads `dist/` of each package through import and require() in child processes, so it follows the build
+      - name: Tests of the built output
+        run: pnpm test:build
+
+  # The required check `ci` of the repo ruleset: stays one name however the matrix above changes
+  ci:
+    needs: verify
+    # Without this a failed matrix would skip the gate, and a skipped required check counts as passed
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: All Node versions passed
+        env:
+          RESULT: ${{ needs.verify.result }}
+        run: |
+          echo "verify: $RESULT"
+          test "$RESULT" = success
+
+  # Every example app in its container on each supported base image: PID 1, non-root, musl, a read-only root filesystem
+  # and 256 MB. Not a required check yet: it joins the ruleset once it has proven stable
+  docker:
+    name: docker (${{ matrix.image }})
+    # A rename re-runs only the title check; the images need no rebuild for it
+    if: ${{ github.base_ref == 'staging' && github.event.action != 'edited' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [node:22-slim, node:22-alpine, node:24-slim]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.2
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Containers
+        env:
+          NODE_IMAGE: ${{ matrix.image }}
+        run: pnpm test:docker
+
+      # The test run removes its stack, also after a failure; this fails the job when it did not
+      - name: Nothing left behind
+        if: ${{ always() }}
+        run: |
+          left=$(docker ps --all --quiet --filter label=com.docker.compose.project=micafox-docker-test)
+          networks=$(docker network ls --quiet --filter label=com.docker.compose.project=micafox-docker-test)
+          echo "containers: ${left:-none}; networks: ${networks:-none}"
+          test -z "$left$networks"
+
+  # One name for the whole matrix, to add to the ruleset once `docker` is stable
+  docker-result:
+    needs: docker
+    if: ${{ always() && github.base_ref == 'staging' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: All base images passed
+        env:
+          RESULT: ${{ needs.docker.result }}
+        run: |
+          echo "docker: $RESULT"
+          test "$RESULT" = success

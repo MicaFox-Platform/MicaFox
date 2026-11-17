@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# Checks the PR branch, title and commit subjects against docs/development.md#branches-and-pull-requests.
-# Usage: check-names.sh <branch> <pr title> <base sha>..<head sha>
+# Checks PR titles and commit subjects against docs/development.md#naming.
+# Usage: check-names.sh title <pr title>          CI, on every PR
+#        check-names.sh commit <subject>          .githooks/commit-msg, before the commit exists
+#        check-names.sh commits <git log args>    CI and .githooks/pre-push, every non-merge commit they select
 # Every failure says what is wrong and prints the rules with passing and failing examples.
-# .claude/hooks/guard-git.sh sources this file for the same rules, so it only defines functions when sourced.
+# .claude/hooks/guard-git.sh sources this file for the branch rules, so it only defines functions when sourced.
 set -uo pipefail
 
 # The only allowed types, for branches, PR titles and commits; keep the table in docs/development.md in sync
@@ -23,6 +25,7 @@ aliases='feature:feat bugfix:fix hotfix:fix doc:docs tests:test deps:build confi
 
 max_branch=50
 max_subject=100
+# Branch rules bind only AI agents, through guard-git.sh: a wrong branch name is cheap to live with.
 # Branches stay lowercase: on case-insensitive file systems `Feat/x` and `feat/x` are the same ref
 branch_re="^($types)/[a-z0-9]+(-[a-z0-9]+)*\$"
 # Conventional Commits treats type and scope as case-insensitive
@@ -82,6 +85,10 @@ branch_problems() {
 subject_problems() {
   local s=$1 head desc type scope
   ((${#s} > max_subject)) && echo "${#s} chars, the limit is $max_subject"
+  if [[ $s =~ ^(fixup|squash|amend)! ]]; then
+    echo "'${BASH_REMATCH[0]}' commit is not squashed yet: git rebase -i --autosquash <base>"
+    return
+  fi
   if [[ $s != *:* ]]; then
     echo "no ':' after '<type>' or '<type>(<scope>)'"
     return
@@ -121,11 +128,17 @@ subject_problems() {
 
 [[ ${BASH_SOURCE[0]} == "$0" ]] || return 0
 
-branch=$1 title=$2 range=$3
+mode=${1:-} && shift
+case $mode in
+  title | commit) (($# == 1)) || mode= ;;
+  commits) (($# > 0)) || mode= ;;
+  *) mode= ;;
+esac
+if [[ -z $mode ]]; then
+  echo 'Usage: check-names.sh title <pr title> | commit <subject> | commits <git log args>' >&2
+  exit 2
+fi
 
-branch_pass=(docs/configs-architecture feat/sdk-snapshots fix/issue-42)
-branch_fail=(Docs/configs-architecture feature/sdk-snapshots feat/Sdk-snapshots feat/sdk_snapshots feat/sdk--snapshots
-  feat/sdk/snapshots sdk-snapshots)
 subject_pass=('docs: decide configs architecture' 'Docs: decide configs architecture' 'feat(sdk): add snapshots'
   'FEAT(SDK)!: drop Node 20')
 subject_fail=('decide configs architecture' 'infra: bump pnpm' 'ci-infra-docs: add checks' 'docs:decide'
@@ -133,12 +146,12 @@ subject_fail=('decide configs architecture' 'infra: bump pnpm' 'ci-infra-docs: a
 
 # Examples are run through the same checks, so they cannot drift from the rules
 examples() {
-  local ok=$1 problems=$2 kind=$3 verdict reason x
-  shift 3
+  local kind=$1 verdict reason x
+  shift
   for x in "$@"; do
-    reason=$($problems "$x" | head -1)
+    reason=$(subject_problems "$x" | head -1)
     reason=${reason%%; use one of*}
-    if $ok "$x"; then verdict='✓' reason=''; else verdict='✗'; fi
+    if subject_ok "$x"; then verdict='✓' reason=''; else verdict='✗'; fi
     if [[ ($kind == pass && $verdict == '✗') || ($kind == fail && $verdict == '✓') ]]; then
       echo "::error::check-names.sh: example '$x' should $kind but does not, fix the examples"
       exit 2
@@ -147,73 +160,63 @@ examples() {
   done
 }
 
-# Workflow commands need %, CR and LF encoded
+# Workflow commands need %, CR and LF encoded; outside GitHub Actions they would be noise
 annotate() {
+  [[ -n ${GITHUB_ACTIONS:-} ]] || return 0
   local msg=$2
   msg=${msg//%/%25} msg=${msg//$'\r'/%0D} msg=${msg//$'\n'/%0A}
   echo "::error title=$1::$msg"
 }
 
-failed=()
+failed=0
 report() {
-  local label=$1 value=$2 ok=$3 problems=$4 reasons
-  if $ok "$value"; then
+  local label=$1 value=$2 reasons
+  if subject_ok "$value"; then
     printf '✓ %s: "%s"\n' "$label" "$value"
     return
   fi
-  reasons=$($problems "$value")
+  reasons=$(subject_problems "$value")
   [[ -z $reasons ]] && reasons="does not match the rule below"
   printf '✗ %s: "%s"\n%s\n' "$label" "$value" "$(sed 's/^/    - /' <<<"$reasons")"
   annotate "$label is invalid" "\"$value\""$'\n'"$reasons"
-  failed+=("$label")
+  failed=$((failed + 1))
 }
 
-report 'Branch' "$branch" branch_ok branch_problems
-report 'PR title' "$title" subject_ok subject_problems
-# Merge commits keep every commit in history, so each subject must follow the same rule as the title.
-# Commits on staging were checked in their own PRs and cannot be reworded there, so release PRs skip them.
-if [[ $branch == staging ]]; then
-  echo "- Commits: skipped, staging commits were checked in their own PRs"
-else
-  while IFS= read -r line; do
-    report "Commit ${line%% *}" "${line#* }" subject_ok subject_problems
-  done < <(git log --no-merges --format='%h %s' "$range")
-fi
+case $mode in
+  title) report 'PR title' "$1" ;;
+  commit) report 'Commit' "$1" ;;
+  commits)
+    # Merge commits keep git's default subject and are skipped
+    while IFS= read -r line; do
+      report "Commit ${line%% *}" "${line#* }"
+    done < <(git log --no-merges --format='%h %s' "$@")
+    ;;
+esac
 
-((${#failed[@]} == 0)) && exit 0
+((failed == 0)) && exit 0
 
-fixes() {
-  local all=" ${failed[*]} "
-  [[ $all == *" PR title "* ]] && echo '  PR title  gh pr edit <number> --title "<type>: <description>"   (CI re-runs on rename)'
-  [[ $all == *" Commit "* ]] &&
-    echo "  Commits   git rebase -i ${range%%..*}, mark them 'reword', then git push --force-with-lease"
-  [[ $all == *" Branch "* ]] &&
-    echo '  Branch    git branch -m <type>/<kebab-case> && git push -u origin HEAD, then open a new PR from it'
-  return 0
-}
+case $mode in
+  title) fix='gh pr edit <number> --title "<type>: <description>"   (CI re-runs on rename)' ;;
+  commit) fix='git commit -e -F "$(git rev-parse --git-path COMMIT_EDITMSG)"   (reopens the message you wrote)' ;;
+  commits) fix="git rebase -i --autosquash <base>, mark them 'reword'; once pushed, also git push --force-with-lease" ;;
+esac
 
 cat <<EOF
 
-${#failed[@]} name(s) break the rules: $(printf '%s\n' "${failed[@]}" | paste -sd, - | sed 's/,/, /g')
+$failed name(s) break the rules
 
-Rules (docs/development.md#branches-and-pull-requests)
-  Branch          <type>/<kebab-case>, ≤ $max_branch chars, lowercase only; 'staging' is exempt
-                  $branch_re
-  Title, commits  <type>[(<scope>)][!]: <description>, ≤ $max_subject chars; type and scope in any case
-                  $subject_re (case-insensitive)
+Rule (docs/development.md#naming)
+  <type>[(<scope>)][!]: <description>, ≤ $max_subject chars; type and scope in any case
+  $subject_re (case-insensitive)
 
 Types
 $(sed 's/^/  /' <<<"$types_help")
 
-Branch examples
-$(examples branch_ok branch_problems pass "${branch_pass[@]}")
-$(examples branch_ok branch_problems fail "${branch_fail[@]}")
-
-Title and commit examples
-$(examples subject_ok subject_problems pass "${subject_pass[@]}")
-$(examples subject_ok subject_problems fail "${subject_fail[@]}")
+Examples
+$(examples pass "${subject_pass[@]}")
+$(examples fail "${subject_fail[@]}")
 
 How to fix
-$(fixes)
+  $fix
 EOF
 exit 1

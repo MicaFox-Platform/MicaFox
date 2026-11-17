@@ -1,0 +1,11 @@
+{
+  "extends": "@micafox/configs/tsconfig/workspace.json",
+  "references": [
+    {
+      "path": "../../../packages/protocol"
+    },
+    {
+      "path": "../../../packages/sdk"
+    }
+  ]
+}

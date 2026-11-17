@@ -1,0 +1,178 @@
+import { isAbsolute } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { isRecord } from "../../connector/index.js";
+
+/** A loaded script the breakpoints can be set in. */
+export interface ScriptRecord {
+  /** As V8 reported it, so that `Debugger.setBreakpointByUrl` finds this script and every later one with it. */
+  url: string;
+  /** The path of the script, split into segments. */
+  segments: string[];
+  /** The script's `sourceMappingURL`, as written; absent when it names none. */
+  sourceMapUrl?: string;
+}
+
+/** A recorded script that names a source map. */
+export interface MappedRecord extends ScriptRecord {
+  sourceMapUrl: string;
+}
+
+/** Splits a path into its segments, with `/` as the separator; `\` counts as one, so Windows paths compare equal. */
+export const toSegments = (path: string): string[] =>
+  path
+    .replaceAll("\\", "/")
+    .split("/")
+    .filter((segment) => segment !== "" && segment !== ".");
+
+/** A file name without its last extension, which a script and the original file it was compiled from share. */
+export const toBaseName = (fileName: string): string => {
+  const dot = fileName.lastIndexOf(".");
+  return dot > 0 ? fileName.slice(0, dot) : fileName;
+};
+
+/** Whether `script` names a source map. */
+export const isMapped = (script: ScriptRecord): script is MappedRecord => script.sourceMapUrl !== undefined;
+
+/** Whether a path has a `node_modules` segment: a script or source there is never a candidate. O(segments). */
+export const isDependency = (segments: readonly string[]): boolean => segments.includes("node_modules");
+
+/** Whether the map of `script` may be searched for a bundle's sources: it has one, outside `node_modules`. */
+export const isSearchable = (script: ScriptRecord): script is MappedRecord =>
+  isMapped(script) && !isDependency(script.segments);
+
+/** What a stack frame needs of a script: its URL and, for a file of the app, its record. */
+export interface FrameScript {
+  url: string;
+  record?: ScriptRecord;
+}
+
+// Frames show scripts the breakpoints never use, such as node: internals, so every script with a URL is kept by id;
+// the oldest goes first when an app that reloads modules would grow the map past this
+const MAX_FRAME_SCRIPTS = 20_000;
+
+// A file: URL or an absolute path is a file of the app; eval, new Function and node: internals have neither
+const toPath = (url: string): string | undefined => {
+  if (url.startsWith("file:")) {
+    try {
+      return fileURLToPath(url);
+    } catch {
+      // Not a local file URL, such as one with a host name
+      return undefined;
+    }
+  }
+
+  return isAbsolute(url) ? url : undefined;
+};
+
+/**
+ * The scripts V8 reported with `Debugger.scriptParsed`, one record per URL, found by file name and, for scripts
+ * with a source map, by base name. It grows with the files the app loads while breakpoints are set, and is dropped
+ * with the last of them.
+ */
+export class ScriptRegistry {
+  private readonly byFileName = new Map<string, Map<string, ScriptRecord>>();
+  private readonly mappedByBaseName = new Map<string, Map<string, MappedRecord>>();
+  private readonly searchable = new Map<string, MappedRecord>();
+  private readonly frameScripts = new Map<string, FrameScript>();
+
+  /**
+   * Records the script of a `Debugger.scriptParsed` event, replacing the record of its URL; returns it only for a
+   * script the breakpoints can use. Every script with a URL can be found by its id for a stack frame.
+   */
+  record(params: unknown): ScriptRecord | undefined {
+    const url: unknown = isRecord(params) ? Reflect.get(params, "url") : undefined;
+    if (!isRecord(params) || typeof url !== "string") {
+      return undefined;
+    }
+
+    const script = this.recordFile(params, url);
+    const scriptId: unknown = Reflect.get(params, "scriptId");
+    if (typeof scriptId === "string" && url !== "") {
+      this.rememberForFrames(scriptId, script === undefined ? { url } : { url, record: script });
+    }
+
+    return script;
+  }
+
+  /** The script V8 gave `scriptId`, as a stack frame names it; undefined for one without a URL or an evicted one. */
+  findFrameScript(scriptId: string): FrameScript | undefined {
+    return this.frameScripts.get(scriptId);
+  }
+
+  /** The scripts without a source map, outside `node_modules`, whose path ends in `fileName`. */
+  findCandidates(fileName: string): ScriptRecord[] {
+    return [...(this.byFileName.get(fileName)?.values() ?? [])].filter(
+      (script) => !isMapped(script) && !isDependency(script.segments),
+    );
+  }
+
+  /** The scripts with a source map, outside `node_modules`, whose file name without its extension is `baseName`. */
+  findMapped(baseName: string): MappedRecord[] {
+    return [...(this.mappedByBaseName.get(baseName)?.values() ?? [])].filter(
+      (script) => !isDependency(script.segments),
+    );
+  }
+
+  /** The scripts whose maps a search of the bundles reads: every one with a map outside `node_modules`. */
+  listSearchable(): MappedRecord[] {
+    return [...this.searchable.values()];
+  }
+
+  clear(): void {
+    this.byFileName.clear();
+    this.mappedByBaseName.clear();
+    this.searchable.clear();
+    this.frameScripts.clear();
+  }
+
+  private recordFile(params: object, url: string): ScriptRecord | undefined {
+    const path = toPath(url);
+    const segments = path === undefined ? [] : toSegments(path);
+    const fileName = segments.at(-1);
+    if (fileName === undefined) {
+      return undefined;
+    }
+
+    const sourceMapUrl: unknown = Reflect.get(params, "sourceMapURL");
+    const script: ScriptRecord =
+      typeof sourceMapUrl === "string" && sourceMapUrl !== "" ? { url, segments, sourceMapUrl } : { url, segments };
+    const sameName = this.byFileName.get(fileName) ?? new Map<string, ScriptRecord>();
+    sameName.set(url, script);
+    this.byFileName.set(fileName, sameName);
+    this.indexByBaseName(fileName, script);
+    this.searchable.delete(url);
+    if (isSearchable(script)) {
+      this.searchable.set(url, script);
+    }
+
+    return script;
+  }
+
+  private rememberForFrames(scriptId: string, script: FrameScript): void {
+    this.frameScripts.delete(scriptId);
+    this.frameScripts.set(scriptId, script);
+    if (this.frameScripts.size > MAX_FRAME_SCRIPTS) {
+      const oldest = this.frameScripts.keys().next();
+      if (oldest.done !== true) {
+        this.frameScripts.delete(oldest.value);
+      }
+    }
+  }
+
+  // A script with the URL of a recorded one replaces it, also when one of them has a map and the other has not
+  private indexByBaseName(fileName: string, script: ScriptRecord): void {
+    const baseName = toBaseName(fileName);
+    const sameBaseName = this.mappedByBaseName.get(baseName) ?? new Map<string, MappedRecord>();
+    sameBaseName.delete(script.url);
+    if (isMapped(script)) {
+      sameBaseName.set(script.url, script);
+    }
+
+    if (sameBaseName.size === 0) {
+      this.mappedByBaseName.delete(baseName);
+    } else {
+      this.mappedByBaseName.set(baseName, sameBaseName);
+    }
+  }
+}

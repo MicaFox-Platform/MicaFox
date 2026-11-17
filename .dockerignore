@@ -1,0 +1,13 @@
+# What the Docker build context leaves out: builds happen inside the image, from the sources.
+**/node_modules
+**/dist
+**/.next
+**/coverage
+**/*.tsbuildinfo
+**/.env
+**/.env.*
+.git
+.claude
+.github
+.githooks
+docs

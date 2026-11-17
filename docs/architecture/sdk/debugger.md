@@ -4,153 +4,412 @@
 
 The debugger is the part of the SDK that sets breakpoints in the running app and captures snapshots without
 stopping it. It turns the hub's breakpoint list into V8 breakpoints, reads the variables at each hit within strict
-limits and sends them to the hub through a connector. How to use it: [API](../../api/sdk/debugger.md).
+limits, redacts secrets and sends them to the hub through a connector. How to use it: [API](../../api/sdk/debugger.md).
 
 ## Boundaries
 
 - Owns:
-  - the lifecycle of [`probex`](../../api/sdk/debugger.md#probex): options, `run()`, `stop()` and the connector it
-    creates;
+  - the lifecycle of [`micafox`](../../api/sdk/debugger.md#micafox): options, `run()`, `stop()`, the connector it
+    creates and the [logger](logger.md) it shares with that connector;
   - the in-process inspector session and the V8 breakpoints in it;
   - matching repository paths and TypeScript lines to loaded scripts through source maps;
   - capturing snapshots and cutting values to [`CaptureLimits`](../../api/protocol.md#capturelimits);
-  - rate limits, the pause budget and the status of each breakpoint.
+  - redacting secrets by name before a value is read;
+  - rate limits, the pause budget, the expiry and the status of each breakpoint.
 - Does not own:
   - moving messages, buffering and reconnects: the [connector](connector.md);
   - message types: the [protocol](../protocol.md);
-  - which breakpoints exist: the hub.
+  - which breakpoints exist: the hub;
+  - filtering, collapsing and writing log lines: the [logger](logger.md).
 - Constraints:
   - Never throws into, crashes or blocks the host app. Every handler is wrapped in try/catch; an unexpected error is
     logged and the debugger stops itself while the app keeps running.
   - Every pause ends in `Debugger.resume`, also after an error. If resuming fails, `Debugger.disable` resumes the
     thread and the debugger stops itself.
   - A pause lasts at most 10 ms, the app spends at most 20 ms per second paused, and a snapshot is at most 64 KiB.
-  - Without breakpoints the inspector's `Debugger` domain is off, so V8 runs the app as if ProbeX were not there.
+    Every pause counts, also one resumed at once. Log lines written during a pause are held and written after it;
+    the pause path builds a log message only when its level is enabled.
+  - No single inspector call reads an unbounded value: an array, typed array, `Set` or `Map` with more children
+    than `maxItems` is captured with its size only. Two values are exceptions, as V8 returns them whole in one
+    reply: an object's own properties are read in one call, and a string comes in full with the object or scope that
+    holds it and is cut afterwards. An object with a very large number of own properties, or a string of many
+    megabytes, can make that one pause longer than 10 ms and cost its size in memory until the pause ends.
+  - Without breakpoints the inspector's `Debugger` domain is off, so V8 runs the app as if MicaFox were not there.
   - Runs no user code: getters are never called and nothing is evaluated.
+  - A redacted value never reaches the snapshot or the logs: a container under a redacted name is never expanded,
+    and a primitive, which V8 returns with its siblings in one `Runtime.getProperties` reply, is dropped there.
+    Only the host app sets the redaction rules; the hub cannot change them.
+  - One debugger per process: the first copy of the SDK loaded stores its `Debugger` on `globalThis` under
+    `Symbol.for("micafox.debugger")`, and every later copy, an ES module or CommonJS build or another install,
+    exports that object. The first copy also stores its major version, the constant `SDK_MAJOR`, beside it under
+    `Symbol.for("micafox.debugger.major")`, so the `Debugger` type has no member for it. A copy of another major
+    version, or of one that stored none, logs a warning and exports the stored debugger too. A value under the key
+    that is not a debugger is replaced; a `globalThis` that cannot be read or written gives the copy its own
+    debugger and a warning.
   - Debugs the main thread only; worker threads are not debugged.
+  - Does not start when the inspector is already open at `run()`, by `--inspect` or `inspector.open()`.
   - Resumes every pause it did not cause, including `debugger` statements, so another debugger attached to the
     process does not work while breakpoints are set.
-  - Memory is bounded: 100 breakpoints, source maps up to 8 MiB each, decoded only for scripts that have
-    breakpoints and dropped with them.
-  - Reads source maps inline (`data:` URLs) or from `.map` files next to the scripts; bundles, where many sources
-    map into one script, are not supported.
-  - Imports only `@probex-platform/protocol`, the connector module and Node built-ins; source maps are decoded by
-    its own VLQ decoder.
-  - Never keeps the host process alive: every timer is unref'd.
+  - Memory is bounded: 100 breakpoints; source maps up to 8 MiB, 1,500,000 segments and 50,000 JSON values each,
+    read one at a time, and only for scripts that may hold an entry's file or while an entry searches the bundles;
+    a decoded index, about 24 bytes a segment, is kept only for scripts that have breakpoints, at most 3,000,000
+    segments in all, about 72 MB. The sources of every map read, for a search or by name, are kept by file name, at most 100,000, the
+    oldest script record's dropped first. Only scripts with a `file:` URL or an absolute path are recorded, one record
+    per URL; scripts without a URL, such as `eval` and `new Function`, are ignored. Every script with a URL is also
+    kept by its id, at most 20,000, the oldest dropped first, because V8 names the script of a call frame by id only.
+  - Reads source maps inline (`data:` URLs) or from a relative `sourceMappingURL` resolved against the script's
+    path; a map with any other scheme is not read, and an entry that nothing else resolves gets the status `error`.
+    A map may list many sources, as a bundle's does. Index maps (`sections`) are not read.
+  - Never resolves an entry into `node_modules`: a script or a map source with a `node_modules` segment in its path
+    is never a candidate, and the maps of such scripts are not searched
+    ([ADR 0020](../../adr/sdk/debugger/0020-find-a-bundle-by-reading-maps-on-demand.md)).
+  - Imports only `@micafox/protocol`, the connector and logger modules and Node built-ins; source maps are
+    decoded by its own VLQ decoder.
+  - Never keeps the host process alive: every timer is unref'd. While `stop()` flushes the connector it created,
+    the connector keeps the process alive, see [Closing](connector.md#closing).
 
 ## Interactions
 
 ```text
-                                                         resolve file:line     ┌────────────┐
-┌───────────┐   breakpoints     ┌────────────────────┐ ──────────────────────▶ │ SourceMaps │
-│           │ ────────────────▶ │                    │                         └────────────┘
-│           │                   │                    │
-│           │ ◀──────────────── │    Breakpoints     │     allow hit?          ┌─────────────┐
-│           │ breakpointStatus  │                    │ ──────────────────────▶ │ RateLimiter │
-│           │                   └────────────────────┘                         └─────────────┘
-│           │                     │       │         ▲
-│           │             capture │       │         │
-│ Connector │                     ▼       │ set,    │
-│           │  snapshot   ┌─────────┐     │ remove, │ scriptParsed,
-│           │ ◀────────── │ Capture │     │ resume  │ paused
-│           │             └─────────┘     │         │
-│           │    getProperties ▼          ▼         │
-│           │                 ┌────────────────────────┐   Debugger.*, Runtime.*  ┌────┐
-│           │                 │    InspectorSession    │ ───────────────────────▶ │ V8 │
-└───────────┘                 └────────────────────────┘ ◀─────────────────────── └────┘
-                                                           scriptParsed, paused
+┌───────────┐  breakpoints        ┌──────────┐   log, hold, release         ┌────────┐
+│ Connector │ ──────────────────▶ │ Debugger │ ───────────────────────────▶ │ Logger │
+│           │ ◀────────────────── │          │                              └────────┘
+└───────────┘ statuses, snapshots └──┬────┬──┘
+                                     │    ▲
+                               apply │    │ statuses, snapshots
+                                     ▼    │
+        ┌────────────────────────────┴────┴────────────────────────┐
+        │  Breakpoints ◀── hit entries, limit, restore ── Pauses   │
+        └─────┬──────────────────┬─────────────────┬────────┬───┬──┘
+              │                  │                 │        │   ▲
+              │ read map, sources│ allow hit?      │ capture│   │
+              │                  │                 │        │   │ set, remove, resume, all on/off ▼
+              ▼                  ▼                 ▼        │   │
+        ┌────────────┐    ┌─────────────┐     ┌─────────┐   │   │ ▲ scriptParsed, paused
+        │ SourceMaps │    │ RateLimiter │     │ Capture │   │   │
+        └────────────┘    └─────────────┘     └────┬────┘   │   │
+                                                   │        │   │
+                                     getProperties │        │   │
+                                                   ▼        ▼   │
+                                        ┌──────────┴────────┴───┴──┐  Debugger.*, Runtime.*     ┌────┐
+                                        │     InspectorSession     │ ─────────────────────────▶ │ V8 │
+                                        │                          │ ◀───────────────────────── │    │
+                                        └──────────────────────────┘  scriptParsed, paused      └────┘
+
 ```
 
 The parts live in `packages/sdk/src/debugger/`:
 
-- `Debugger` — the `probex` object. Resolves the options, creates the connector and the parts below, hands
-  `breakpoints` messages to `Breakpoints` and sends what they produce. It is not running, running or stopping.
-- `Breakpoints` — holds the latest list from the hub, the V8 breakpoint of each entry and its status, and handles
-  every pause.
-- `SourceMaps` — finds the script and position for a repository path and line, and the original position for a
-  script position.
-- `RateLimiter` — token buckets per breakpoint and per process, and the pause budget.
-- `Capture` — reads the stack and variables of a paused frame into a [`Snapshot`](../../api/protocol.md#snapshot).
+- `Debugger` — the `micafox` object, a `MicafoxDebugger`; the public type `Debugger` has only its three methods. Resolves the options and the redaction rules, creates the logger, the connector
+  and the parts below, hands `breakpoints` messages to `Breakpoints` and sends what they produce. It is not running,
+  running or stopping.
+- `Breakpoints` — holds the latest list from the hub, the V8 breakpoint of each entry, its status and its
+  deadline, with the one unref'd timer that expires entries. Tells which active entries a pause hit, and takes
+  entries off and sets them again for the rate limits, never an expired one.
+- `Pauses` — handles every `Debugger.paused`: asks `RateLimiter` which hit entries may capture, has `Capture` read
+  the pause once, resumes the thread, charges the pause to the budget and sends one snapshot per allowed entry. Its
+  `Throttle` takes breakpoints off when a limit runs out and sets them again, with one unref'd timer.
+- `SourceMaps` — reads the maps of loaded scripts, one at a time, by name before any search of the bundles, and
+  keeps their resolved sources, the sources found by a search by file name and, while a breakpoint is set through a
+  map, its index from original line to generated position and back. `Breakpoints` finds an entry's scripts and
+  positions with them.
+- `Location` — the loaded scripts, one per URL, and `findLocation`, which picks the scripts and positions an entry
+  resolves to from them and from what `SourceMaps` knows, or the maps it waits for by name or for a search. Pure;
+  `Breakpoints` sets what it finds.
+- `RateLimiter` — token buckets per breakpoint and per process, and the pause budget. Pure: time comes from a
+  monotonic clock it is given.
+- `Capture` — reads the stack and variables of a paused frame into one read, and cuts that read to the limits of
+  each breakpoint as a [`Snapshot`](../../api/protocol.md#snapshot). It asks `Breakpoints` where a frame is shown,
+  and redacts secrets by name as it goes.
 - `InspectorSession` — wraps `node:inspector`. On the main thread, `post` answers synchronously, also while the
   thread is paused; failures come back as results and are never thrown.
+
+## Layout
+
+```text
+packages/sdk/src/debugger/
+├── index.ts                    the debugger's only entry: micafox, Debugger, InspectorSession and their types
+├── debugger.ts                 Debugger, the public type, and MicafoxDebugger: configure(), run(), stop() and the states
+├── micafox.ts                  micafox: the one Debugger of the process, shared through globalThis, and SDK_MAJOR
+├── options.ts                  DebuggerOptions: the fields of a configure() call, enabled, the custom connector check
+├── connector-choice.ts         chooseConnector: the custom connector, or a HubConnector built from the options
+├── connector-link.ts           ConnectorLink: subscribes to, connects and sends to a connector; catches its rejections
+├── running.ts                  Running and createRunning: the parts one run() wires together
+├── inspector-session.ts        InspectorSession: node:inspector calls that answer synchronously and never throw
+├── breakpoints/                Breakpoints: the hub's list as V8 breakpoints and their statuses
+│   ├── index.ts                the sub-component's only entry: Breakpoints
+│   ├── breakpoints.ts          Breakpoints: applies a list, resolves pending entries, rate-limits, expires, stops
+│   ├── domain.ts               DebuggerDomain: Debugger.enable and disable, and the scripts V8 reports while it is on
+│   ├── entry.ts                ValidEntry, InvalidEntry, Outcome, Placed and Applied, what a list changes, a status
+│   ├── read-list.ts            reads and validates the entries of a breakpoints message, with the limits on the list
+│   ├── place-entry.ts          placeEntry, placeAgain, releaseEntry: an entry's V8 breakpoints and the maps they hold
+│   ├── resolve-again.ts        the entries a loaded script, a read map or the end of a search resolves or extends
+│   └── v8-breakpoints.ts       V8Breakpoints: Debugger.setBreakpointByUrl and removeBreakpoint, shared by position
+├── capture/                    Capture: one pause read into values within the limits, then cut per breakpoint
+│   ├── index.ts                the sub-component's only entry: readPause, cutSnapshot and their types
+│   ├── read-pause.ts           readPause: the call frames, the stack and the variables of the innermost frame
+│   ├── read-value.ts           ValueReader: a value and what is below it with Runtime.getProperties, depth first
+│   ├── read-primitive.ts       the values that V8 describes in full: primitives, null, Date, and the size of a container
+│   ├── remote-object.ts        RemoteObject, Property and the reading of a Runtime.getProperties reply
+│   ├── limits.ts               ResolvedLimits: defaults, caps and the largest of several, and truncateText
+│   ├── budget.ts               CaptureBudget: the 10 ms and 64 KiB of a capture, and the size of a value
+│   └── cut-snapshot.ts         cutSnapshot: a read cut to one breakpoint's limits as a Snapshot, with no V8 call
+├── expiry/                     Expiry: the entries' deadlines on the monotonic clock and the one unref'd timer
+│   ├── index.ts                the sub-component's only entry: Expiry
+│   └── expiry.ts               Expiry: a deadline per entry id, the nearest one's timer and the entries past theirs
+├── location/                   Location: the loaded scripts and the scripts and positions an entry resolves to
+│   ├── index.ts                the sub-component's only entry: findLocation, ScriptRegistry and their types
+│   ├── collect-candidates.ts   an entry's candidates by name, then from the search of the bundles, never node_modules
+│   ├── find-location.ts        findLocation: an entry's scripts and positions, or the maps it waits for
+│   ├── match-path.ts           picks the candidate whose path ends with the most segments of an entry's file
+│   └── script-registry.ts      ScriptRegistry: the loaded scripts, one per URL, by file name, by base name and by id
+├── pauses/                     Pauses: every Debugger.paused, from the rate limits to the snapshots
+│   ├── index.ts                the sub-component's only entry: Pauses
+│   ├── pauses.ts               Pauses: admits, captures once, resumes, charges the budget, sends the snapshots
+│   └── throttle.ts             Throttle: entries off and all breakpoints off, and the one timer that sets them again
+├── rate-limiter/               RateLimiter: the token buckets and the pause budget, on a clock it is given
+│   ├── index.ts                the sub-component's only entry: RateLimiter
+│   ├── rate-limiter.ts         RateLimiter: a bucket per entry, the process's bucket and the budget; admit and charge
+│   └── token-bucket.ts         TokenBucket: refilled continuously, may go into debt, how long until it is full
+├── redaction/                  RedactionRules: the names whose values are redacted, resolved once at run()
+│   ├── index.ts                the sub-component's only entry: resolveRedaction and RedactionRules
+│   ├── redaction-rules.ts      RedactionRules: the built-in names, normalizeName and the match by containment
+│   └── resolve-redaction.ts    resolveRedaction: the built-in names plus redact and MICAFOX_REDACT, at most 100
+├── source-maps/                SourceMaps: reads the maps of loaded scripts and keeps what each one is needed for
+│   ├── index.ts                the sub-component's only entry: SourceMaps, locateFrame and the types of what it knows
+│   ├── source-maps.ts          SourceMaps: one read per script record and need, shared; the indexes entries hold
+│   ├── read-queue.ts           ReadQueue: one read at a time, every read by name before any read for a search
+│   ├── source-search.ts        SourceSearch: the sources a search found, by file name, at most 100,000
+│   ├── read-source-map.ts      readSourceMap: a data: URL in place or a relative file with node:fs/promises, 8 MiB
+│   ├── map-sources.ts          resolveMapSources: the sources of a map against its sourceRoot and URL, as paths
+│   └── locate-frame.ts         locateFrame: the file, line and column a frame is shown at, its source found by id
+└── source-map-decoder/         decodeSourceMap: the text of a map into its two indexes, in slices
+    ├── index.ts                the sub-component's only entry: decodeSourceMap, readMapSources and the types of their results
+    ├── decode-source-map.ts    decodeSourceMap, and readMapSources for a search: check the size, in slices, never throw
+    ├── parse-source-map.ts     checks the JSON's depth and number of values in slices, parses it, reads the fields
+    ├── decode-mappings.ts      VlqCursor and the mappings string read into segments in generated order
+    ├── sort-by-original.ts     orders the segments by source and original line, first generated position first
+    ├── source-map-index.ts     SourceMapIndex: original line to generated position, generated position to original
+    ├── sliced-work.ts          WorkBudget and runSliced: slices of fixed work with a yield to the event loop between
+    └── source-map-error.ts     SourceMapError: the fixed reason of a map that cannot be decoded
+```
+
+`Breakpoints` uses `expiry/`, `location/` and `source-maps/`; the last two use `source-map-decoder/`, and `location/`
+uses `source-maps/` for what is known of a map; `Capture` uses `source-maps/` only for the type
+of a frame's position, which it gets from `Breakpoints.locateFrame`. `Pauses` uses `capture/` and `rate-limiter/`,
+and `Breakpoints` through an interface it declares, so the two do not import each other. `Debugger` creates the
+`RateLimiter` it gives to `Pauses`, and uses `redaction/`; `Capture` gets only its `isSecret`.
 
 ## Key flows
 
 ### Starting
 
-1. `run()` with `enabled` false logs one info line and does nothing.
-2. It resolves the options: the value from `configure()`, then the environment, then the default. Without a hub URL
-   and without a custom connector it logs an error and does not start.
-3. It creates a `HubConnector` or takes the custom one, subscribes to its messages and calls `connect()`.
+1. `run()` with `enabled` false logs one info line and does nothing. When `inspector.url()` returns a URL, another
+   debugger may be attached: it logs a warning and does nothing.
+2. It resolves the options: the value from `configure()`, then the environment, then the default. Without a custom
+   connector it resolves the hub URL and token as `HubConnector` does and checks them with the connector's own
+   `checkHubTarget`; without a URL, or with one the connector would refuse, it logs an error and does not start.
+3. It resolves the [redaction rules](#redacting-secrets), once. It creates a `HubConnector` or takes the custom one,
+   subscribes to its messages and status, and calls `connect()`. The `HubConnector` gets `url`, `token`, `service`,
+   `labels`, `commit` and the tuning of `hubConnector`, the debugger's logger under `Symbol.for("micafox.logger")`
+   and the modules the SDK runs, `["debugger"]`, under `Symbol.for("micafox.modules")`. A custom connector with hub
+   fields set logs one warning and the fields are ignored. When a connector reports
+   `closed`, the debugger logs a warning and stops itself.
 4. It connects the inspector session; the `Debugger` domain stays off until there are breakpoints.
 5. If any step fails, an error is logged, what was started is stopped and the debugger is not running.
+6. It logs one info line, `started`, with the service and the host of the hub URL (or `a custom connector`) and the
+   number of redaction rules. Never the token, and not the user info, path or query of the URL.
 
 ### Applying breakpoints
 
-1. A [`breakpoints`](../../api/protocol.md#breakpoints) message arrives. Invalid entries and those after the 100th
-   get status `error`. When an `id` appears more than once, the first entry is used and the others get status
-   `error`.
+1. A [`breakpoints`](../../api/protocol.md#breakpoints) message arrives; the debugger's handler takes only messages
+   whose `module` is `debugger`. Only its first 200 entries are read; the rest are ignored with one warning. An
+   entry without a string `id` is skipped with a warning. An invalid entry, such as a limit that is not a positive
+   integer or an `expiresInMs` that is not an integer of at least `0`, and those after the 100th get status
+   `error`. When an `id` appears more than once, the first entry is used and the others are ignored with a warning.
 2. Entries are compared by `id` with the current ones. An entry with the same `file`, `line` and `limits` is left
-   as it is, with no V8 calls. Removed and changed entries lose their V8 breakpoint; new and changed entries are
-   resolved.
-3. The first non-empty list turns the `Debugger` domain on: V8 reports every loaded script with `scriptParsed`, and
-   later ones as they load. An empty list turns it off.
-4. Resolving: candidate scripts are those whose file name, without extension, equals the entry's. For a candidate
-   with a source map the entry's `file` is compared with the map's sources, otherwise with the script's path. The
-   source whose path ends with the most segments of `file` wins; a tie gives status `error`, no candidate gives
-   `pending`.
+   as it is, with no V8 calls; its time left is set from `expiresInMs`, see
+   [Expiring a breakpoint](#expiring-a-breakpoint). Removed and changed entries lose their V8 breakpoint; new and
+   changed entries are resolved. An `id` that expired and is still listed stays expired, whatever its fields.
+3. The first list with a valid entry that has not expired turns the `Debugger` domain on: V8 reports every loaded
+   script with `scriptParsed`, and later ones as they load. A list without one, such as an empty list, turns it
+   off.
+4. Resolving: script URLs are turned from `file://` into paths, map sources are resolved against the map's
+   `sourceRoot` and URL, and all paths use `/`; a scheme and host, as in `webpack://app/./src/x.ts`, are dropped
+   with the path's `.` segments. A script or source with a `node_modules` segment is never a candidate. Candidates
+   by name are the sources of the maps of scripts whose file name without its extension equals the entry's, such as
+   `dist/checkout.js` for `src/checkout.ts`, that end in the entry's last segment, and scripts without a map whose
+   path does, extension included. While a map of such a script is unread or loading, the entry stays `pending`, see
+   [Loading a source map](#loading-a-source-map). When no candidate by name ends with every segment of `file`, the
+   entry searches the bundles: the sources of the maps of every other recorded script with a map that end in its
+   last segment are candidates too, and it stays `pending` until each of those maps is read
+   ([ADR 0020](../../adr/sdk/debugger/0020-find-a-bundle-by-reading-maps-on-demand.md)). Then the candidate whose
+   path ends with the most segments of `file` wins. Candidates with that same path in several scripts, such as a
+   file two chunks of a bundle hold, all win, and the entry is set in each. Two different paths that end with as
+   many segments give status `error`; no candidate gives `pending`, or `error` with the reason of a map that could
+   not be used, see [Loading a source map](#loading-a-source-map).
 5. The line is mapped to the first generated position of that original line, or of the next line that has one, and
-   the breakpoint is set by script and position. V8 moves it to the next position that has code. Entries that
-   resolve to the same script and position share one V8 breakpoint, which is removed with the last of them.
+   the breakpoint is set with `Debugger.setBreakpointByUrl` by the script's URL and position, so V8 also sets it in
+   every later script with the same URL, such as a module reloaded by a test runner. V8 moves it to the next
+   position that has code. Entries that resolve to the same URL and position share one V8 breakpoint, which is
+   removed with the last of them. An entry set in several scripts holds one V8 breakpoint in each; its status is
+   that of the entry, and its source maps count once each against the limit of held segments.
 6. After each message, the status of every listed breakpoint is sent as a
-   [`breakpointStatus`](../../api/protocol.md#breakpointstatus), a control message.
-7. A `pending` breakpoint is resolved again on every `scriptParsed` with a matching file name.
+   [`breakpointStatus`](../../api/protocol.md#breakpointstatus), a control message. Later changes, such as a map
+   finishing to load or a rate limit, are sent when they happen.
+7. A `pending` breakpoint is resolved again on every `scriptParsed` with a matching file name, or with a matching
+   base name for a script with a map, and when a map it waits for is read. An entry that searches the bundles is
+   resolved again when the last map it waits for is read; while one is listed, every script with a map outside
+   `node_modules` that loads queues its map for the search. An entry set through a search is also set in a script
+   that loads later and whose map holds the winning path. A script with the URL of a recorded one replaces it: its
+   map, its sources found by a search and the breakpoints set through its map are dropped, an entry left with none is
+   resolved again, and its map is read again when it is needed; a breakpoint in a script without a map stays, as V8
+   sets it in the new script by URL.
 
 ### Loading a source map
 
-1. On `scriptParsed`, the script's id, URL and `sourceMapURL` are recorded; nothing is read.
-2. When a breakpoint needs the map, a `data:` URL is decoded in place; any other URL is resolved against the
-   script's path and read with `node:fs/promises`.
-3. A map larger than 8 MiB, unreadable or invalid gives the breakpoint status `error` with the reason and logs a
-   warning.
-4. The mappings are decoded into indexes from original line to generated position and back, kept while the script
-   has breakpoints.
+1. On `scriptParsed`, the script's URL and `sourceMapURL` are recorded; nothing is read.
+2. A map is read for one of two needs. By name: an entry needs the maps of the recorded scripts with a
+   `sourceMapURL` whose file name without its last extension equals that of the entry's `file`: `checkout.js` and
+   `checkout.mjs` for `checkout.ts`, `checkout.test.js` for `checkout.test.ts`. For a search: an entry that searches
+   the bundles needs the maps of every other recorded script with a `sourceMapURL` and no `node_modules` segment in
+   its path. No other map is read. A `data:` URL with the `application/json` media type is decoded in place; a URL
+   without a scheme is resolved against the script's path and read with `node:fs/promises`; any other scheme,
+   `file:` included, is not read. Maps are read one at a time, every read by name before any read for a search, each
+   kind in the order it was asked for. Entries that need the same map share one read, and a map is read once per
+   script record for each need and again only to bring back a dropped index.
+3. When the read ends, the entries still waiting for it are resolved again from the current list, so an entry is
+   set only if it is still listed with the same fields; after `stop()` or with the domain off the read is ignored.
+4. A map read by name that is larger than 8 MiB, unreadable, invalid or with another scheme logs a warning and is
+   left out of resolving; an entry with no other candidate gets the status `error` with the reason, and is resolved
+   again when a script it may match loads. A map read for a search that goes over a limit, 8 MiB, 1,500,000
+   segments or 50,000 values, logs a warning once and gives its reason to a searching entry that finds no
+   candidate, so the hub shows why, and the entry is resolved again when a script it may match loads. Any other
+   failure of a read for a search, such as the index map of a bundler's own runtime, is logged at debug and is no
+   reason. Other entries are unaffected.
+5. A read by name decodes the mappings into indexes from original line to generated position and back, one index for
+   the whole map, so a frame in any of its sources is shown at its original position; a frame's source is found by
+   its id in the map. The index is kept while the script has breakpoints set through it and dropped with the last
+   one, and the indexes kept hold at most 3,000,000 segments in all: an entry whose map would go over gets the
+   status `error`, `source maps of breakpoints over the memory limit`. For other scripts only the resolved sources
+   are kept, so a pending entry does not read their maps again, and a script that wins later is read again. A read
+   for a search stops after the parse and keeps only the map's sources without a `node_modules` segment, by file
+   name, at most 100,000 across all scripts; past that the oldest script record's are dropped, and that script is
+   not searched again until it is recorded again. A script whose source wins is read again by name. All of it is
+   dropped with the script's record, and every map is forgotten when the `Debugger` domain goes off. Decoding runs in slices of fixed work and yields to the event loop between them. Only
+   `JSON.parse` runs in one piece; a check before it bounds the text to a depth of 8 and 50,000 values, which keeps
+   it to a few milliseconds. Index maps (`sections`), mappings that are not in generated order and maps of more than
+   1,500,000 segments are invalid; a `null` entry of `sources` maps to nothing. A breakpoint on the top-level code of
+   a module with a source map, inline or in a file, can miss the module's first run, because the map is read and
+   decoded after the script is loaded; for the same reason a breakpoint in a chunk that a bundler loads on first use,
+   such as a Next.js route's on its first request, is set only after that first use.
 
 ### Capturing a snapshot
 
-1. V8 reaches a breakpoint and pauses the thread; `Debugger.paused` reaches the session synchronously.
-2. A pause without one of our breakpoints in `hitBreakpoints` is resumed at once.
-3. The rate limiter checks each entry on the hit V8 breakpoint: an entry is allowed if it has a token (10 per
-   second), the process has one (50 per second) and the pause budget (20 ms per second) is not spent. With no entry
-   allowed the thread resumes. An entry out of tokens gets status `rateLimited` and `active` again when its bucket
-   refills; once every entry on a V8 breakpoint is out of tokens, the V8 breakpoint is removed until one refills, so
-   a hot line stops pausing.
-4. `Capture` reads up to 20 frames of the stack, mapped back to original positions where a decoded map exists, then
-   `this` and the scopes of the innermost frame with synchronous `Runtime.getProperties` calls, depth first, within
-   the largest limits of the allowed entries. At 10 ms or 64 KiB it stops: what is left is `unavailable` and the
-   snapshot is `truncated`.
-5. The thread resumes, and the pause time is charged to the budget. One pause serves every entry on the breakpoint.
-6. For each allowed entry, the capture is cut to that entry's own limits, without V8 calls, and sent as a
-   [`snapshot`](../../api/protocol.md#snapshot) through the connector as a data message.
+1. V8 reaches a breakpoint and pauses the thread; `Debugger.paused` reaches the session synchronously. The
+   [logger holds](logger.md#holding-lines-during-a-pause) every line until the handler returns.
+2. A pause without one of our active entries in `hitBreakpoints` is resumed at once.
+3. The rate limiter checks each active entry on the hit V8 breakpoint. Each entry's bucket holds 10 tokens and the
+   process bucket 50, refilled continuously at that many per second; the pause budget is a bucket of 20 ms refilled
+   at 20 ms per second. An entry is allowed if it has a token, the process has one and the budget is not spent; each
+   allowed entry takes one of each. With no entry allowed the thread resumes. Buckets are kept per entry `id` while
+   it is listed, also when the list changes it, so sending the list again does not reset a limit.
+4. An entry out of tokens gets status `rateLimited` and leaves its V8 breakpoint, which is removed with the last
+   entry on it; entries on it that still have tokens keep capturing. When, after a pause, the process bucket or the
+   budget is empty, `Debugger.setBreakpointsActive(false)` turns every breakpoint off, so the next hit does not pause,
+   and every active entry gets `rateLimited`, also one set while they are off. One unref'd timer, set to the nearest
+   wait, restores what is due, never an expired entry, and sends `active`: an entry limited by its own bucket when that bucket is full, and
+   all of them, with `setBreakpointsActive(true)`, when the process bucket, the budget and their buckets are full.
+   V8 keeps breakpoints off across `Debugger.disable`, so only that timer turns them on again. If the inspector
+   refuses either call, the debugger stops itself.
+5. `Capture` reads up to 20 frames of the stack, then `this` and the scopes of the innermost frame with synchronous
+   `Runtime.getProperties` calls, depth first, within the largest limits of the allowed entries. It reads the
+   variables in two passes, so a large one cannot leave the others out: first every variable gets what costs no
+   call, a primitive in full and an object, array, `Set` or `Map` as its shell without children, checked against the
+   size limit only, though listing each scope is a call and counts against the 10 ms; then the values are read on within both limits. The innermost scope is read on from its last
+   variable to its first, since V8 lists a function's own variables after its parameters, such as a handler's
+   `request` and `response`; then `this`, then the outer scopes, each from its last variable. V8 names the script
+   of a frame by id, so `Breakpoints` finds its URL by id and gives the position: the original one where the script's
+   map is decoded, else the generated path (from `file://`) or URL. The scopes read are `local`, `block`, `catch`,
+   `with`, `eval`, `closure` and `module`; `global` and `script` are left out. An object keeps its own enumerable
+   properties, read in one call; a getter is `accessor` and never run. The size of an array, typed array, `Set` or
+   `Map` comes from V8's description of it; with more children than `maxItems` only the size is kept, without
+   reading them. A function's name and an error's message and stack cost one call each; a date comes from its
+   description, to the second. V8 gives no object identity, so a cycle is read again down to `maxDepth` and
+   `circular` is never produced. At 10 ms or 64 KiB it stops and the snapshot is `truncated`: the first value not
+   read is `unavailable` with the reason, the rest of the object or array it is in is left out (an object is
+   `truncated`, an array, `Set` or `Map` loses its children), a variable not read on keeps its shell, and a function
+   or error not read on is `unavailable` with the reason. The size limit stops the first pass too, which leaves the
+   further variables out. A name that matches the redaction rules, see [Redacting secrets](#redacting-secrets),
+   gets the value `redacted` and its children are not read.
+6. The thread resumes, also when the capture threw, and the pause time, from the start of the handler, is charged
+   to the budget, also for a pause resumed at once; a budget can go into debt and refills from there. One pause
+   serves every entry on the breakpoint. A capture that threw then stops the debugger.
+7. For each allowed entry, the capture is cut to that entry's own limits, without V8 calls, and sent as a
+   [`snapshot`](../../api/protocol.md#snapshot) through the connector as a data message. With `debug` on, each logs
+   its `breakpointId`, the pause time, its size in bytes and `truncated`, never a value.
+
+### Redacting secrets
+
+1. At `run()` the rules are resolved once: the built-in names, plus the names from `redact` and from
+   `MICAFOX_REDACT`, at most 100 together, copied from the app's array entry by entry. The app adds names; it cannot
+   remove the built-in ones.
+2. Names are normalized before matching: lowercased, with `_`, `-` and `.` removed, so `api_key`, `API-KEY` and
+   `apiKey` are all `apikey`. A rule that is empty after normalizing is skipped with a warning.
+3. A name matches when its normalized form contains a normalized rule, so `dbPassword` matches `password`. Only
+   its first 256 characters are matched, so a map keyed by huge strings costs little per entry. A
+   false match hides a harmless value; a missed one leaks a secret, so matching errs towards hiding.
+4. Rules apply to every name in the tree at any depth: variables, `this`, object properties and map entries whose
+   key is a string. Array items have no name and are not matched.
+5. A matching name keeps its place with the value `{ type: "redacted" }`; its children are never read, and a
+   primitive value that came with its siblings is dropped.
+6. Built-in names: `password`, `passwd`, `pwd`, `secret`, `token`, `apikey`, `accesskey`, `privatekey`,
+   `credential`, `authorization`, `cookie`, `session`, `jwt`, `bearer`, `signature`.
+7. String contents are not scanned: a secret inside a value under a harmless name, such as a URL with a password,
+   is captured as is.
+
+### Expiring a breakpoint
+
+1. Every valid entry has a deadline on the monotonic clock: when its list arrived plus its `expiresInMs`, lowered
+   to 24 h. Each later list that holds the `id` sets the deadline again from its own `expiresInMs`, so the hub can
+   extend or shorten it; this costs no V8 call. `0` expires the entry at once.
+2. One unref'd timer is set to the nearest deadline. When it fires, every entry past its deadline expires: it loses
+   its V8 breakpoint, removed with the last entry on it, and the source map index it held, and gets status
+   `expired`, sent as a control message.
+3. An expired entry is final while it is listed: the rate limits never restore it, it is never resolved again on
+   `scriptParsed` or when a map read ends, and it does not keep the `Debugger` domain on. When no valid entry that
+   has not expired is left, the domain goes off, so V8 runs the app as if MicaFox were not there.
+4. Every reply to a list holds `expired` for each listed `id` that has expired. An `id` missing from a list is
+   forgotten, and so is every expired `id` on `stop()`.
+5. Expiry runs whether or not the hub is reachable. Why:
+   [ADR 0018](../../adr/sdk/debugger/0018-expire-breakpoints-in-the-sdk-by-a-time-left-from-the-hub.md).
 
 ### Losing the connection
 
-1. Breakpoints stay set and snapshots wait in the connector's data buffer, which drops the oldest when full.
-2. After the reconnect the hub sends the full list again, and it is applied like any other.
+1. Breakpoints stay set until they expire, and snapshots wait in the connector's data buffer, which drops the oldest
+   when full.
+2. After the reconnect the hub sends the full list again, with the time each breakpoint has left, and it is applied
+   like any other.
 
 ### Stopping
 
-1. `stop()` removes every V8 breakpoint, turns the `Debugger` domain off, disconnects the inspector session and
-   unsubscribes from the connector.
+1. `stop()` removes every V8 breakpoint, turns the `Debugger` domain off, clears the rate limits' timer,
+   disconnects the inspector session and unsubscribes from the connector. Source map reads still running are
+   ignored when they end.
 2. It closes the connector it created, which sends buffered snapshots for up to `closeTimeoutMs`; a custom
    connector is left open.
-3. The debugger is not running; `run()` can start it again.
+3. It [flushes the logger](logger.md#flushing). The debugger is not running; `run()` can start it again.
 4. An unexpected error in any part logs an error and runs the same steps, so the app keeps running without the
    debugger.
 
 ## Decisions
 
-- [0003. Configure the connector from options, then env](../../adr/0003-configure-the-connector-from-options-then-env.md)
-- [0007. Deliver messages to the hub at most once](../../adr/0007-deliver-messages-to-the-hub-at-most-once.md)
-- [0010. Send the full breakpoint set on every change](../../adr/0010-send-the-full-breakpoint-set-on-every-change.md)
-- [0011. Encode snapshot values as a nested tree](../../adr/0011-encode-snapshot-values-as-a-nested-tree.md)
+- [0003. Configure the SDK from options, then env](../../adr/sdk/0003-configure-the-sdk-from-options-then-env.md)
+- [0007. Deliver messages to the hub at most once](../../adr/protocol/0007-deliver-messages-to-the-hub-at-most-once.md)
+- [0010. Send the full breakpoint set on every change](../../adr/protocol/0010-send-the-full-breakpoint-set-on-every-change.md)
+- [0011. Encode snapshot values as a nested tree](../../adr/protocol/0011-encode-snapshot-values-as-a-nested-tree.md)
+- [0012. Redact secrets by name inside the SDK](../../adr/sdk/debugger/0012-redact-secrets-by-name-inside-the-sdk.md)
+- [0013. Publish the packages as ES modules and CommonJS](../../adr/packages/0013-publish-the-packages-as-es-modules-and-commonjs.md)
+- [0017. Tag messages with their module and agree on modules](../../adr/protocol/0017-tag-messages-with-their-module-and-agree-on-modules.md)
+- [0018. Expire breakpoints in the SDK by a time left from the hub](../../adr/sdk/debugger/0018-expire-breakpoints-in-the-sdk-by-a-time-left-from-the-hub.md)
+- [0020. Find a bundle by reading maps on demand](../../adr/sdk/debugger/0020-find-a-bundle-by-reading-maps-on-demand.md)

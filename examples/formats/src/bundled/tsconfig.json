@@ -1,0 +1,15 @@
+{
+  "extends": "@micafox/configs/tsconfig/base.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": ["${configDir}"],
+  "references": [
+    {
+      "path": "../../../../packages/protocol"
+    },
+    {
+      "path": "../../../../packages/sdk"
+    }
+  ]
+}

@@ -1,15 +1,15 @@
 <!--
-API doc template, used by /architect and /do-task.
+API doc template, used by /architect and /task.
 Copy to `docs/api/<package>.md` or `docs/api/<package>/<part>.md` and remove this comment. Rules:
 `.claude/rules/docs.md`.
 -->
 
-# @probex-platform/package API
+# @micafox/package API
 
 ## Installation
 
 ```sh
-pnpm add @probex-platform/package
+pnpm add @micafox/package
 ```
 
 ## Exports
@@ -31,7 +31,7 @@ One sentence: what it does and when to use it.
 **Errors** — what fails and how it is reported. Never throws into the host app: say what happens instead.
 
 ```ts
-import { exportName } from "@probex-platform/package";
+import { exportName } from "@micafox/package";
 
 exportName({ field: "value" });
 ```
@@ -45,7 +45,7 @@ Renamed to [`exportName()`](#exportname). Removed in the next major version.
 The common case end to end: set up, use, shut down. Link each export above instead of re-explaining it.
 
 ```ts
-import { exportName } from "@probex-platform/package";
+import { exportName } from "@micafox/package";
 
 exportName({ field: "value" });
 ```

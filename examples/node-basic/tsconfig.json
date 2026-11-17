@@ -1,3 +1,0 @@
-{
-  "extends": "@probex-platform/configs/tsconfig/workspace.json"
-}

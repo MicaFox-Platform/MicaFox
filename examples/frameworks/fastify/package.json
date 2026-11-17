@@ -1,0 +1,30 @@
+{
+  "name": "@micafox/example-fastify",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Demo app for the MicaFox SDK",
+  "type": "module",
+  "scripts": {
+    "start": "tsx --conditions=@micafox/source --env-file-if-exists=.env src/index.ts",
+    "dev": "tsx --conditions=@micafox/source --env-file-if-exists=.env --watch src/index.ts",
+    "build": "rm -rf ./dist && tsc -b",
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "keywords": [],
+  "author": "Artem Horovyi",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@micafox/protocol": "workspace:*",
+    "@micafox/sdk": "workspace:*",
+    "fastify": "^5.11.2"
+  },
+  "devDependencies": {
+    "@micafox/configs": "workspace:*",
+    "@micafox/testkit": "workspace:*",
+    "tsx": "^4.23.15"
+  }
+}

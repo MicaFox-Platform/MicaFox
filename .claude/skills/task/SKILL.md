@@ -1,32 +1,83 @@
 ---
-description: Discuss a piece of work and create one or more ready-to-implement cards in the tracker's Backlog.
-argument-hint: <topic>
+description: Implement a tracker card end to end and open a PR to staging.
+argument-hint: [card link]
 disable-model-invocation: true
-model: opus
+model: sonnet
 effort: high
 ---
 
-Topic: $ARGUMENTS
+Card: $ARGUMENTS
 
-Goal: cards that `/do-task` or another developer can implement without coming back with questions, each small
-enough to track progress card by card. This is a conversation, one step per reply. Do not implement anything.
+Board: Trello https://trello.com/b/hzrnwdVz/micafox. Card format: `.claude/templates/card.md`.
 
-1. **Understand.** Read the related code, docs and ADRs (use the Explore agent). Restate the topic in two sentences:
-   who has which problem and what changes for them.
-2. **Discuss.** Ask in rounds of at most 4 questions (AskUserQuestion, concrete options):
-   - who needs it and why now;
-   - expected behavior, including edge cases and what happens on failure;
-   - constraints: overhead in the host app, public API or protocol compatibility, security;
-   - what is explicitly out of scope.
-3. **Split.** One card is one PR: it ships on its own, keeps `pnpm verify` green and is size S or M. Work that is
-   size L or holds several independent deliverables is split, usually along packages or flows (for example
-   protocol types → SDK connector → SDK debugger). Propose the split as a list of titles with one line each and the
-   order they depend on; the user confirms or changes it. A topic that fits one card stays one card.
-4. **Draft and challenge.** For each card, propose acceptance criteria and point out what is missing or untestable.
-   Check that no acceptance line falls between two cards and none is in two. Repeat until the user confirms nothing
-   is missing.
-5. **Architecture check.** An open design question (for example "WebSocket or HTTP?") → stop and suggest
-   `/architect` first. The cards then link the resulting doc or ADR.
-6. **Create.** Show all cards filled from `.claude/templates/card.md`. Once the user confirms, create them in the
-   **Backlog** list of the tracker in `CLAUDE.md`, in dependency order with sequential positions, so each card can
-   link the cards it depends on. Print every link. Never put a card anywhere but Backlog.
+## 1. Pick
+
+- A link was given: take the card if it is in **Planned**, or in **In Progress** with your own
+  `Started by Claude · branch <name>` comment and that branch exists locally (resume it).
+- No link: take the top card of **Planned** without the Research label. None → stop.
+- Anything else (someone else's In Progress, In Review, Done, Backlog) → stop and say why. Never move or edit those.
+- The card's "Depends on" lists a card that is not in **Done** → stop and name it.
+- The card has the Research label → stop and suggest `/architect`; research ends in a decision, not a PR.
+- The card is not in the format of `.claude/templates/card.md` (a seed) → stop and suggest `/task-design <card link>`.
+
+## 2. Clarify
+
+Read the card, its comments, and the related code, docs and ADRs: directly with Grep and Read when the card is size
+S and its Technical context names the files, else through the Explore agent. List what blocks a confident
+implementation: missing acceptance criteria, unclear behavior or failure cases, conflicts with docs or ADRs.
+Ask them (AskUserQuestion). Post the answers as one card comment `Clarifications` (question → answer) before coding.
+An open design question → stop and suggest `/architect`.
+
+## 3. Start
+
+1. `git switch staging && git pull --ff-only`, then `pnpm verify:brief`. Red → stop and report; never build on red.
+2. Create `<type>/<kebab-case>` from `staging`.
+3. Move the card to **In Progress** and comment `Started by Claude · branch <name>`.
+
+## 4. Plan
+
+Every plan that adds, moves or removes a file names where each file goes, from the `## Layout` of the component's
+architecture doc. A file that has no place there, or a folder it would push past 8 source files, means the plan
+first updates the Layout (`.claude/rules/code-quality.md#structure`); a new sub-component folder is part of the plan.
+
+- **S** — ≤ 2 files, behavior is clear: go.
+- **M** — several files, clear goal: a 3–6 line plan inline, then go.
+- **L** — public API, protocol, new package or dependency, or ambiguity: write the plan, delegate to `critic` without
+  a `model` override with the card link and the plan, and revise the plan for every blocker and major or say why
+  not. Show the plan with the critic's points and wait for approval.
+
+## 5. Implement with tests
+
+Follow `.claude/rules/`. Every acceptance line becomes at least one test. While you work, run only the tests you
+touch: `pnpm test <test file paths>`; the full run comes in step 7.
+
+## 6. Blast radius
+
+- **S** — run `.claude/scripts/impact.sh` yourself and act on its facts: a test for each changed behavior no
+  existing test proves, `docs/api/` when a public export changed, `docs/architecture/` and the overviews above it
+  when the design changed. A choice that meets the bar in `.claude/rules/adr.md` → ask the user, as for M and L.
+- **M, L** — delegate to `impact`. Write a test for every item under "Tests required" (gaps in 3+ files →
+  delegate to `unit-tester` with the list). Update `docs/api/` when it says so. "ADR: needed" → ask the user whether the choice
+  meets the bar in `.claude/rules/adr.md`; if yes, stop and suggest `/architect`.
+
+## 7. Verify and review
+
+`pnpm verify:brief` must be green. Delegate to `reviewer` without a `model` override, with the report from step 6:
+the `impact` reply with its **Facts**, or the `impact.sh` output for S. Fix every blocker and major, then re-run
+`pnpm verify:brief`.
+
+## 8. Hand over and ship
+
+Hand over per the Workflow section of `CLAUDE.md`. On the user's OK:
+
+1. Commit, `git push -u origin <branch>`.
+2. `gh pr create --base staging`: title = commit subject; body = card link, what changed, how it was tested.
+3. Print the PR link, move the card to **In Review** and comment the PR link. Never touch the card again.
+
+## Rework
+
+The user asks for changes on an open PR: switch to its branch and pull it. The base is the last commit `/task`
+pushed to it, which the last review saw; when others pushed or `staging` was merged into the PR since, take the
+merge-base with `origin/staging` instead. Run steps 5–8 on the delta from the base: pass it to
+`.claude/scripts/impact.sh` or `impact`, and give `reviewer` the base and the changes the user requested. On OK
+commit and push to the same branch. Do not move the card.

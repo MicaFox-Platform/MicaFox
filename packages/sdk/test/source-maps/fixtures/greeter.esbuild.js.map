@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["greeter.ts"],
+  "sourcesContent": ["// A small module for the source map fixtures: comments and blank lines have no code, so they have no mapping.\n\nexport interface Greeting {\n  readonly text: string;\n}\n\nexport class Greeter {\n  constructor(private readonly name: string) {}\n\n  greet(times: number): Greeting {\n    let text = \"\";\n    for (let index = 0; index < times; index += 1) {\n      text += `Hello, ${this.name}! `;\n    }\n\n    return { text: text.trim() };\n  }\n}\n\nexport const greetTwice = (name: string): Greeting => new Greeter(name).greet(2);\n"],
+  "mappings": "AAMO,MAAM,QAAQ;AAAA,EACnB,YAA6B,MAAc;AAAd;AAAA,EAAe;AAAA,EAAf;AAAA,EAE7B,MAAM,OAAyB;AAC7B,QAAI,OAAO;AACX,aAAS,QAAQ,GAAG,QAAQ,OAAO,SAAS,GAAG;AAC7C,cAAQ,UAAU,KAAK,IAAI;AAAA,IAC7B;AAEA,WAAO,EAAE,MAAM,KAAK,KAAK,EAAE;AAAA,EAC7B;AACF;AAEO,MAAM,aAAa,CAAC,SAA2B,IAAI,QAAQ,IAAI,EAAE,MAAM,CAAC;",
+  "names": []
+}

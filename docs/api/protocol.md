@@ -1,13 +1,13 @@
-# @probex-platform/protocol API
+# @micafox/protocol API
 
 ## Installation
 
 ```sh
-pnpm add @probex-platform/protocol
+pnpm add @micafox/protocol
 ```
 
-Types and constants only. `@probex-platform/sdk` installs it for you; install it yourself to write a custom
-connector or hub.
+Types and constants only, for `import` and `require()`. `@micafox/sdk` installs it for you; install it
+yourself to write a custom connector or hub.
 
 ## Exports
 
@@ -25,20 +25,30 @@ interface Connector {
 
 Carries protocol messages between the SDK and a hub. The SDK ships
 [`HubConnector`](sdk/connector.md#hubconnector); implement this interface for any other transport. Why this shape:
-[ADR 0004](../adr/0004-use-handler-functions-in-the-connector-interface.md).
+[ADR 0004](../adr/protocol/0004-use-handler-functions-in-the-connector-interface.md).
 
 Every implementation keeps this contract:
 
 - `connect()` returns at once and connects in the background; a second call does nothing.
 - `send(message)` returns at once; the connector may buffer, batch or, when full, drop messages.
-- `onMessage(handler)` and `onStatus(handler)` return a function that removes the handler.
-- `close()` resolves once the connector is closed; no handler is called after that.
+- `onMessage(handler)` and `onStatus(handler)` return a function that removes the handler. A message reaching an
+  `onMessage` handler has the session's `version`, a `module` the session agreed on and a `type` the hub sends; its
+  other fields are unchecked, so the handler checks them before it trusts them, and a module's handler skips
+  messages of other modules. A new status handler is not called with the current status, only with
+  later changes.
+- A connector carries messages only of the modules the session agreed on, see [`Welcome`](#welcome); it drops the
+  others on the way out and ignores them on the way in.
+- Handlers are never called synchronously from inside `connect()`, `send()` or `close()`, and a status is never
+  reported twice in a row.
+- `close()` resolves once the connector is closed; no handler is called after that. `closed` is reported once and
+  is final: the SDK stops its debugger when a connector reports it. A second `close()` returns the same promise;
+  `connect()` and `send()` after it do nothing.
 
 **Errors** — no method throws and `close()` never rejects: the connector runs inside the host app. A handler that
 throws must not stop the connector or the other handlers.
 
 ```ts
-import type { Connector } from "@probex-platform/protocol";
+import type { Connector } from "@micafox/protocol";
 
 function watch(connector: Connector): () => void {
   return connector.onStatus((status) => {
@@ -55,10 +65,10 @@ type ConnectorStatus = "connecting" | "connected" | "disconnected" | "closed";
 
 The state of a [`Connector`](#connector): `disconnected` before `connect()` and between reconnect attempts,
 `connecting` until the hub accepts the session with [`welcome`](#welcome), `connected` after it, `closed` after
-`close()`.
+`close()`. Any status but `closed` may follow any other; `closed` follows only `close()` and nothing follows it.
 
 ```ts
-import type { ConnectorStatus } from "@probex-platform/protocol";
+import type { ConnectorStatus } from "@micafox/protocol";
 
 const canSend = (status: ConnectorStatus): boolean => status === "connected";
 ```
@@ -69,11 +79,19 @@ const canSend = (status: ConnectorStatus): boolean => status === "connected";
 const PROTOCOL_VERSION = 1;
 ```
 
-The protocol version this package describes. Every message carries it in `version`. Additions that old peers can
-ignore keep it; renaming, removing or retyping anything a peer reads bumps it.
+The protocol version this package describes. Every message carries it in `version`; the message types below are
+version 1 and fix `version` to `1`. Additions that old peers can ignore keep it: an optional field, a new module, a
+new message type, and a new value of an enumerated field whose reader fallback is documented, such as a
+[`BreakpointStatus`](#breakpointstatus) `status`. Renaming, removing or retyping anything a peer reads bumps it.
+Until the packages' first release on npm, version 1 still changes in place.
+
+A session uses the version of its `hello`: `welcome` and every later message in both directions carry it, and a
+message with another version is a protocol error. A hub accepts every version it still has types for and closes
+with `incompatibleVersion` otherwise. The SDK speaks only its own `PROTOCOL_VERSION`. Why:
+[ADR 0016](../adr/protocol/0016-use-the-hellos-protocol-version-for-the-session.md).
 
 ```ts
-import { PROTOCOL_VERSION } from "@probex-platform/protocol";
+import { PROTOCOL_VERSION } from "@micafox/protocol";
 
 const speaksSameVersion = (version: number): boolean => version === PROTOCOL_VERSION;
 ```
@@ -84,20 +102,36 @@ const speaksSameVersion = (version: number): boolean => version === PROTOCOL_VER
 type Message = Hello | Welcome | Breakpoints | BreakpointStatus | Snapshot;
 ```
 
-Every protocol message: one JSON object with `version` and a `type` string. A peer ignores a message whose `type`
-it does not know.
+Every protocol message: one JSON object with a numeric `version` and a `type` string. Anything that is not UTF-8
+JSON text of an object with those two fields is not a protocol message.
+
+`hello`, `welcome` and `batch` are session frames: they carry no `module`, and no module uses these type names.
+Every other message belongs to an SDK module and names it in `module`; version 1 has one module, `debugger`, with
+the messages [`breakpoints`](#breakpoints), [`breakpointStatus`](#breakpointstatus) and [`snapshot`](#snapshot).
+Type names are unique within a module only, so a peer reads a message in this order:
+
+1. A session frame is handled by its `type`; a repeated `hello` or `welcome` is ignored, on its own or inside a
+   [`Batch`](#batch).
+2. Any other message without a string `module` is ignored with a warning.
+3. A message of a module that is missing from the session's [`hello`](#hello) or [`welcome`](#welcome) `modules`,
+   or that the peer does not know, is ignored.
+4. A message whose `type` the peer does not know within its module, or that only the other side sends, is ignored.
+
+Why: [ADR 0017](../adr/protocol/0017-tag-messages-with-their-module-and-agree-on-modules.md). With TypeScript, check `module`
+before `type` to narrow a message.
 
 ```ts
-import type { Message } from "@probex-platform/protocol";
+import type { Message, Snapshot } from "@micafox/protocol";
 
-const isHello = (message: Message): boolean => message.type === "hello";
+const isSnapshot = (message: Message): message is Snapshot =>
+  "module" in message && message.module === "debugger" && message.type === "snapshot";
 ```
 
 ### `Hello`
 
 ```ts
 interface Hello {
-  version: typeof PROTOCOL_VERSION;
+  version: 1;
   type: "hello";
   instanceId: string;
   service?: string;
@@ -106,22 +140,44 @@ interface Hello {
   pid: number;
   sdk: { name: string; version: string };
   runtime: { name: string; version: string };
+  modules: string[];
+  commit?: string;
 }
 ```
 
 The first message the SDK sends on every connection. `instanceId` is a random UUID that stays the same across
 reconnects of one connector; `service` and `labels` are what the hub targets breakpoints by. Why the connector sends
-it: [ADR 0009](../adr/0009-run-the-hub-handshake-in-the-connector.md).
+it: [ADR 0009](../adr/sdk/connector/0009-run-the-hub-handshake-in-the-connector.md).
+
+- `modules` — the SDK modules this instance runs, such as `["debugger"]`. A hub ignores names it does not know.
+  `HubConnector` gets the list from the SDK; a connector you write, or a `HubConnector` you create yourself, sends
+  `["debugger"]`.
+- `commit` — the commit the instance runs, as a lowercase hexadecimal hash of 7 to 64 characters; left out when
+  unknown. See [ADR 0019](../adr/protocol/0019-report-the-deployed-commit-in-hello.md).
 
 Every connector and hub keeps this handshake:
 
-1. The connector sends `hello` as the first frame and nothing else until it receives `welcome`.
-2. The hub checks the token on the upgrade request (HTTP 401 or 403 when it is missing or invalid), then replies
-   `welcome` within 10 s, or closes with [`CLOSE_CODES`](#close_codes) `incompatibleVersion` or `protocolError`.
-3. After `welcome`, the hub sends the full breakpoint state.
+1. The connector sends the token as `Authorization: Bearer <token>` on the WebSocket upgrade. The token is the
+   secret project key the hub issued: the hub finds the project by it, and answers HTTP 401 or 403 when it is
+   missing or invalid. A project may have several valid keys, so one can be rotated without downtime. See
+   [ADR 0006](../adr/sdk/connector/0006-authenticate-to-the-hub-with-a-bearer-token.md).
+2. The connector sends `hello` as the first frame and nothing else until it receives `welcome`.
+3. The hub sends nothing before `welcome`, and replies `welcome` within 10 s of the `hello`, or closes with
+   [`CLOSE_CODES`](#close_codes) `incompatibleVersion` or `protocolError`.
+4. When both `hello` and `welcome` list `debugger`, the hub sends the full breakpoint state right after `welcome` as
+   a [`breakpoints`](#breakpoints) message, an empty list included.
+5. Each side sends messages only of the modules that both `hello` and `welcome` list.
+
+On the wire:
+
+- Every frame is a text frame holding one message or one [`Batch`](#batch).
+- The SDK closes a connection with code 1009 when a frame from the hub is larger than 1 MiB. A hub accepts frames
+  up to 1 MiB, or up to the SDK's `buffer.maxBytes` when it is set higher.
+- The SDK sends a WebSocket ping every 15 s and drops a connection that sends nothing back within 10 s; a hub
+  answers pings.
 
 ```ts
-import { PROTOCOL_VERSION, type Hello } from "@probex-platform/protocol";
+import { PROTOCOL_VERSION, type Hello } from "@micafox/protocol";
 
 const hello: Hello = {
   version: PROTOCOL_VERSION,
@@ -131,8 +187,10 @@ const hello: Hello = {
   labels: { region: "eu" },
   hostname: "checkout-7d9f",
   pid: 1,
-  sdk: { name: "@probex-platform/sdk", version: "0.1.0" },
+  sdk: { name: "@micafox/sdk", version: "0.1.0" },
   runtime: { name: "node", version: process.versions.node },
+  modules: ["debugger"],
+  commit: "3f9c2e1a7b6d4c0e9f8a1b2c3d4e5f6a7b8c9d0e",
 };
 ```
 
@@ -140,35 +198,47 @@ const hello: Hello = {
 
 ```ts
 interface Welcome {
-  version: typeof PROTOCOL_VERSION;
+  version: 1;
   type: "welcome";
+  modules: string[];
 }
 ```
 
 The hub's reply to [`hello`](#hello): it accepts the session. A connector reports `connected` and starts sending
 other messages only after it.
 
-```ts
-import { PROTOCOL_VERSION, type Welcome } from "@probex-platform/protocol";
+- `modules` — the modules of the `hello` the hub accepts for this session, at most 32. Only these exchange
+  messages; a hub lists none it does not support or that the project may not use. Names the `hello` did not list,
+  names the connector does not know and entries that are not strings are ignored, and only the first 32 entries
+  are read. An empty list keeps the session open with no module messages.
+- A `welcome` without a `modules` array is invalid: the connector closes with `protocolError`.
 
-const welcome: Welcome = { version: PROTOCOL_VERSION, type: "welcome" };
+The connector logs one warning per session for each module of its `hello` that `welcome` leaves out, and drops that
+module's outgoing messages. Why: [ADR 0017](../adr/protocol/0017-tag-messages-with-their-module-and-agree-on-modules.md).
+
+```ts
+import { PROTOCOL_VERSION, type Welcome } from "@micafox/protocol";
+
+const welcome: Welcome = { version: PROTOCOL_VERSION, type: "welcome", modules: ["debugger"] };
 ```
 
 ### `Batch`
 
 ```ts
 interface Batch {
-  version: typeof PROTOCOL_VERSION;
+  version: 1;
   type: "batch";
   messages: Message[];
 }
 ```
 
-A frame from the SDK to the hub that carries several messages in order. A hub accepts it alongside single messages;
-a connector may send either. Never used for `hello`. Why: [ADR 0005](../adr/0005-batch-and-rate-limit-messages-in-the-connector.md).
+A frame from the SDK to the hub that carries one or more messages; the hub handles them in order, as if they came
+one by one, and each keeps its own `version`. A hub accepts it alongside single messages; a connector may send
+either. A batch never holds `hello` or another batch. Why:
+[ADR 0005](../adr/sdk/connector/0005-batch-and-rate-limit-messages-in-the-connector.md).
 
 ```ts
-import { PROTOCOL_VERSION, type Batch, type Message } from "@probex-platform/protocol";
+import { PROTOCOL_VERSION, type Batch, type Message } from "@micafox/protocol";
 
 const toBatch = (messages: Message[]): Batch => ({ version: PROTOCOL_VERSION, type: "batch", messages });
 ```
@@ -177,25 +247,33 @@ const toBatch = (messages: Message[]): Batch => ({ version: PROTOCOL_VERSION, ty
 
 ```ts
 interface Breakpoints {
-  version: typeof PROTOCOL_VERSION;
+  version: 1;
+  module: "debugger";
   type: "breakpoints";
   breakpoints: Breakpoint[];
 }
 ```
 
-From the hub: the complete list of [breakpoints](#breakpoint) the instance should have, sent after
+From the hub: the complete list of [breakpoints](#breakpoint) the instance should have, sent right after
 [`welcome`](#welcome) and on every change. The SDK sets the new ones, removes those missing from the list and sends
-a [`breakpointStatus`](#breakpointstatus) for every listed breakpoint. An empty list removes all of them. An
-instance holds at most 100; the rest get status `error`. Why a full list:
-[ADR 0010](../adr/0010-send-the-full-breakpoint-set-on-every-change.md).
+a [`breakpointStatus`](#breakpointstatus) for every listed breakpoint. An empty list removes all of them. Why a
+full list: [ADR 0010](../adr/protocol/0010-send-the-full-breakpoint-set-on-every-change.md).
+
+A hub builds the list on every send, with each `expiresInMs` computed at that moment, and never sends a list it
+cached earlier: a replayed list would give every breakpoint its full time back. See
+[ADR 0018](../adr/sdk/debugger/0018-expire-breakpoints-in-the-sdk-by-a-time-left-from-the-hub.md).
+
+A hub sends at most 100 entries. In list order, entries after the 100th get status `error`; entries after the
+200th, entries without a string `id`, and repeats of an `id` get no status.
 
 ```ts
-import { PROTOCOL_VERSION, type Breakpoints } from "@probex-platform/protocol";
+import { PROTOCOL_VERSION, type Breakpoints } from "@micafox/protocol";
 
 const breakpoints: Breakpoints = {
   version: PROTOCOL_VERSION,
+  module: "debugger",
   type: "breakpoints",
-  breakpoints: [{ id: "bp-1", file: "src/orders/checkout.ts", line: 42 }],
+  breakpoints: [{ id: "bp-1", file: "src/orders/checkout.ts", line: 42, expiresInMs: 3_600_000 }],
 };
 ```
 
@@ -206,25 +284,40 @@ interface Breakpoint {
   id: string;
   file: string;
   line: number;
+  expiresInMs: number;
   limits?: CaptureLimits;
 }
 ```
 
 One breakpoint in [`breakpoints`](#breakpoints).
 
-- `id` — unique within the list; when an `id` appears again, the SDK uses the first entry and reports the others
-  as `error`. A later list with the same `id` and the same fields leaves the breakpoint as it is; a different
-  `file`, `line` or `limits` replaces it. Breakpoints with different ids at the same place each get their own
-  snapshots.
-- `file` — the path as in the repository, separated by `/`, such as `src/orders/checkout.ts`. The SDK matches it to
-  the loaded file whose path ends with the most of its segments, through source maps for TypeScript.
+- `id` — at most 256 characters, unique within the list; when an `id` appears again, the SDK uses the first entry
+  and ignores the others. A later list with the same `id` and the same fields leaves the breakpoint as it is; a
+  different `file`, `line` or `limits` replaces it. Breakpoints with different ids at the same place each get
+  their own snapshots.
+- `file` — the path as in the repository, separated by `/`, at most 1024 characters, such as
+  `src/orders/checkout.ts`. The SDK matches it to the loaded file whose path ends with the most of its segments,
+  through source maps for TypeScript.
 - `line` — 1-based line in `file`. A line without code moves to the next line that has code.
+- `expiresInMs` — the milliseconds the breakpoint has left, an integer of at least `0`; anything else gives status
+  `error`. The SDK counts it down from when the list arrives, also while the hub is unreachable, and lowers a value
+  above 24 h (`86400000`) to 24 h; `0` expires the breakpoint at once. Each list sets the time left again, so the
+  hub extends or shortens a breakpoint by sending a new value; a change of `expiresInMs` alone does not move the
+  breakpoint. When the time runs out, the SDK removes the breakpoint and reports `expired`. An expired `id` stays
+  expired while it is listed: to set it again, the hub sends it under a new `id`. A hub with no expiry chosen by the
+  user sends 1 h. Why: [ADR 0018](../adr/sdk/debugger/0018-expire-breakpoints-in-the-sdk-by-a-time-left-from-the-hub.md).
 - `limits` — [`CaptureLimits`](#capturelimits) for this breakpoint's snapshots.
 
 ```ts
-import type { Breakpoint } from "@probex-platform/protocol";
+import type { Breakpoint } from "@micafox/protocol";
 
-const breakpoint: Breakpoint = { id: "bp-1", file: "src/orders/checkout.ts", line: 42, limits: { maxDepth: 2 } };
+const breakpoint: Breakpoint = {
+  id: "bp-1",
+  file: "src/orders/checkout.ts",
+  line: 42,
+  expiresInMs: 3_600_000,
+  limits: { maxDepth: 2 },
+};
 ```
 
 ### `CaptureLimits`
@@ -237,14 +330,16 @@ interface CaptureLimits {
 }
 ```
 
-How much of each value a snapshot keeps. The SDK lowers a larger value to its cap.
+How much of each value a snapshot keeps. Each limit is a positive integer; anything else gives the breakpoint
+status `error`. The SDK lowers a larger value to its cap.
 
 - `maxDepth` — levels of nested objects below a variable. Default `3`, at most `5`.
 - `maxItems` — properties of an object, items of an array or set, entries of a map. Default `20`, at most `100`.
-- `maxStringLength` — characters of a string. Default `256`, at most `4096`.
+- `maxStringLength` — UTF-16 code units of a string, as `String.prototype.length` counts them. Default `256`, at
+  most `4096`.
 
 ```ts
-import type { CaptureLimits } from "@probex-platform/protocol";
+import type { CaptureLimits } from "@micafox/protocol";
 
 const deep: CaptureLimits = { maxDepth: 5, maxItems: 50 };
 ```
@@ -253,10 +348,11 @@ const deep: CaptureLimits = { maxDepth: 5, maxItems: 50 };
 
 ```ts
 interface BreakpointStatus {
-  version: typeof PROTOCOL_VERSION;
+  version: 1;
+  module: "debugger";
   type: "breakpointStatus";
   breakpointId: string;
-  status: "pending" | "active" | "rateLimited" | "error";
+  status: "pending" | "active" | "rateLimited" | "expired" | "error";
   message?: string;
 }
 ```
@@ -264,17 +360,26 @@ interface BreakpointStatus {
 From the SDK: the state of one breakpoint, sent for every breakpoint of each [`breakpoints`](#breakpoints) message
 and whenever it changes.
 
-- `pending` — no loaded file matches `file` yet; the breakpoint is set when one loads.
+- `pending` — no loaded file matches `file` yet, or its source map is still being read; the breakpoint is set
+  when one loads or the read ends.
 - `active` — set; every hit captures a snapshot within the rate limit.
-- `rateLimited` — it hit its rate limit and is off until the limit refills, then `active` again.
-- `error` — it cannot be set; `message` says why: invalid fields, a repeated `id`, `file` matches several loaded files, no code at or
-  after `line`, the source map cannot be read, or more than 100 breakpoints.
+- `rateLimited` — it ran out of its own rate limit, or the process ran out of its rate limit or pause time, which
+  turns every breakpoint off; it is off until the limit refills, then `active` again.
+- `expired` — its [`expiresInMs`](#breakpoint) ran out and it is removed. It stays `expired` while the hub lists
+  its `id`, and is sent again in reply to every such list. A hub that gets `expired` for a breakpoint it still
+  wants, such as after an extension that arrived late, sends it under a new `id`.
+- `error` — it cannot be set. `message` is always set for `error` and says why, for example: invalid fields, `file`
+  matches several loaded files, no code at or after `line`, the source map cannot be read, or more than 100
+  breakpoints.
+
+Later versions may add statuses: a hub shows a `status` it does not know as unknown and keeps the breakpoint.
 
 ```ts
-import { PROTOCOL_VERSION, type BreakpointStatus } from "@probex-platform/protocol";
+import { PROTOCOL_VERSION, type BreakpointStatus } from "@micafox/protocol";
 
 const status: BreakpointStatus = {
   version: PROTOCOL_VERSION,
+  module: "debugger",
   type: "breakpointStatus",
   breakpointId: "bp-1",
   status: "active",
@@ -285,7 +390,8 @@ const status: BreakpointStatus = {
 
 ```ts
 interface Snapshot {
-  version: typeof PROTOCOL_VERSION;
+  version: 1;
+  module: "debugger";
   type: "snapshot";
   breakpointId: string;
   time: number;
@@ -310,16 +416,61 @@ interface Variable {
 From the SDK: the state of the app at one hit of a breakpoint.
 
 - `time` — milliseconds since the Unix epoch.
-- `stack` — the call stack, innermost first, at most 20 frames. `file` is the original source path when the file
-  has a source map, otherwise the file's path or URL; `line` and `column` are 1-based.
-- `variables` — of the innermost frame: `this`, then the local, block and closure scopes, innermost first; a name
-  shadowed by an inner scope appears once. Global variables are not captured.
-- `truncated` — `true` when the snapshot reached 64 KiB or 10 ms; values not read by then are `unavailable`.
+- `stack` — the call stack, innermost first, at most 20 frames. `file`, `line` and `column` are the original source
+  position when the SDK has the file's source map loaded, which it does for files with breakpoints; otherwise the
+  generated file's path or URL and position. `line` and `column` are 1-based.
+- `variables` — of the innermost frame: `this`, then the local, block, catch, `with`, `eval`, closure and module
+  scopes, innermost first; a name shadowed by an inner scope appears once. Global variables are not captured. A
+  scope that cannot be read appears as one variable named after its type, such as `<closure scope>`, whose value is
+  `unavailable`.
+- `truncated` — `true` when the snapshot reached 64 KiB of JSON or 10 ms. The first value not read by then is
+  `unavailable` with the reason, and the rest is left out: the remaining properties, with `truncated` on their
+  object, and the children of an `array`, `set` or `map`. A variable not read by then keeps the value its scope gave:
+  a primitive in full, an `object`, `array`, `set` or `map` without children; a `function` or `error` is
+  `unavailable`. At 64 KiB the remaining variables are left out.
 
 ```ts
-import type { Snapshot } from "@probex-platform/protocol";
+import type { Snapshot, Value } from "@micafox/protocol";
 
-const total = (snapshot: Snapshot) => snapshot.variables.find((variable) => variable.name === "total")?.value;
+const total = (snapshot: Snapshot): Value | undefined =>
+  snapshot.variables.find((variable) => variable.name === "total")?.value;
+```
+
+### `StackFrame`
+
+```ts
+interface StackFrame {
+  function: string;
+  file: string;
+  line: number;
+  column: number;
+}
+```
+
+One frame of a [`Snapshot`](#snapshot)'s stack: the function's name, empty for an anonymous one, and its position as
+described under `stack` there.
+
+```ts
+import type { StackFrame } from "@micafox/protocol";
+
+const where = (frame: StackFrame): string => `${frame.file}:${String(frame.line)}`;
+```
+
+### `Variable`
+
+```ts
+interface Variable {
+  name: string;
+  value: Value;
+}
+```
+
+A named [`Value`](#value): a variable of a [`Snapshot`](#snapshot) or a property of an `object` value.
+
+```ts
+import type { Variable } from "@micafox/protocol";
+
+const names = (variables: Variable[]): string[] => variables.map((variable) => variable.name);
 ```
 
 ### `Value`
@@ -339,27 +490,36 @@ type Value =
   | { type: "object"; className: string; properties?: Variable[]; truncated?: boolean }
   | { type: "array"; length: number; items?: Value[] }
   | { type: "set"; size: number; items?: Value[] }
-  | { type: "map"; size: number; entries?: { key: Value; value: Value }[] }
+  | { type: "map"; size: number; entries?: Array<{ key: Value; value: Value }> }
   | { type: "accessor" }
   | { type: "circular" }
+  | { type: "redacted" }
   | { type: "unavailable"; reason: string };
 ```
 
 One captured value, with its children inline. Why a tree:
-[ADR 0011](../adr/0011-encode-snapshot-values-as-a-nested-tree.md). What the [limits](#capturelimits) cut is
+[ADR 0011](../adr/protocol/0011-encode-snapshot-values-as-a-nested-tree.md). What the [limits](#capturelimits) cut is
 marked in place:
 
-- a `string` keeps at most `maxStringLength` characters; `length` is the full length;
-- an `array`, `set` or `map` keeps at most `maxItems` children; `length` or `size` is the full count;
-- an `object` keeps at most `maxItems` own properties and sets `truncated` when it has more;
-- below `maxDepth`, `properties`, `items` and `entries` are left out;
-- `circular` stands for an object already on the path from the variable; `accessor` for a getter, which is never
-  run; `unavailable` for a value not read because of a limit or a failure, with the `reason`.
+- a `string` keeps at most `maxStringLength` UTF-16 code units, never splitting a surrogate pair; `length` is the
+  full length;
+- an `array`, `set` or `map` with at most `maxItems` children keeps them all; a larger one keeps none, only its
+  `length` or `size`, so a huge container is never read;
+- an `object` keeps at most `maxItems` of its own enumerable properties and sets `truncated` when it has more;
+- below `maxDepth`, `properties`, `items` and `entries` are left out; a missing one means not read, an empty one
+  means empty;
+- `accessor` stands for a getter, which is never run; `unavailable` for a value not read because of a limit or a
+  failure, with the `reason`;
+- `circular` stands for an object that contains itself. The SDK does not produce it, because V8 gives no object
+  identity: an object that refers to itself is read again down to `maxDepth`. A reader still shows it;
+- `redacted` stands for a value whose name matches the SDK's
+  [redaction rules](sdk/debugger.md#debuggeroptions); its children were never read and its value is not sent.
 
-A `date` is an ISO 8601 string. A reader shows a `type` it does not know as `unavailable`.
+A typed array or `Buffer` is an `array` of numbers. A `date` is an ISO 8601 string, to the whole second; an invalid
+date is `unavailable`. A reader shows a `type` it does not know as `unavailable`.
 
 ```ts
-import type { Value } from "@probex-platform/protocol";
+import type { Value } from "@micafox/protocol";
 
 const order: Value = {
   type: "object",
@@ -377,11 +537,14 @@ const CLOSE_CODES = {
 } as const;
 ```
 
-WebSocket close codes a hub uses to end a session: `protocolError` when the first frame is not a valid `hello` or a
-frame is not a protocol message, `incompatibleVersion` when it does not speak the `hello`'s `version`.
+WebSocket close codes either peer uses to end a session: `protocolError` when the first frame is not a valid
+`hello` or `welcome`, a frame is not a protocol message, or a message has another version than the session;
+`incompatibleVersion` when the hub does not speak the `hello`'s `version`. The SDK also closes a session the hub
+has welcomed with 1000 when it closes, aborts one the hub has not welcomed yet without a close code, and closes with
+1009 when a frame is too large, see [`Hello`](#hello).
 
 ```ts
-import { CLOSE_CODES } from "@probex-platform/protocol";
+import { CLOSE_CODES } from "@micafox/protocol";
 
 const isRejected = (code: number): boolean => Object.values<number>(CLOSE_CODES).includes(code);
 ```
@@ -391,7 +554,7 @@ const isRejected = (code: number): boolean => Object.values<number>(CLOSE_CODES)
 A custom connector, here an in-memory one for tests, implements [`Connector`](#connector):
 
 ```ts
-import type { Connector, ConnectorStatus, Message } from "@probex-platform/protocol";
+import type { Connector, ConnectorStatus, Message } from "@micafox/protocol";
 
 type Handler<T> = (value: T) => void;
 
@@ -399,13 +562,20 @@ export class MemoryConnector implements Connector {
   readonly sent: Message[] = [];
   private readonly messageHandlers = new Set<Handler<Message>>();
   private readonly statusHandlers = new Set<Handler<ConnectorStatus>>();
+  private status: ConnectorStatus = "disconnected";
+  private closing: Promise<void> | undefined;
 
   connect(): void {
-    this.emit(this.statusHandlers, "connected");
+    if (this.status === "disconnected") {
+      this.report("connecting");
+      this.report("connected");
+    }
   }
 
   send(message: Message): void {
-    this.sent.push(message);
+    if (this.status !== "closed") {
+      this.sent.push(message);
+    }
   }
 
   onMessage(handler: Handler<Message>): () => void {
@@ -419,23 +589,39 @@ export class MemoryConnector implements Connector {
   }
 
   receive(message: Message): void {
-    this.emit(this.messageHandlers, message);
+    queueMicrotask(() => {
+      emit(this.messageHandlers, message);
+    });
   }
 
-  async close(): Promise<void> {
-    this.emit(this.statusHandlers, "closed");
-    this.messageHandlers.clear();
-    this.statusHandlers.clear();
+  close(): Promise<void> {
+    this.closing ??= new Promise((resolve) => {
+      queueMicrotask(() => {
+        this.status = "closed";
+        emit(this.statusHandlers, "closed");
+        this.messageHandlers.clear();
+        this.statusHandlers.clear();
+        resolve();
+      });
+    });
+    return this.closing;
   }
 
-  private emit<T>(handlers: Set<Handler<T>>, value: T): void {
-    for (const handler of handlers) {
-      try {
-        handler(value);
-      } catch {
-        // a failing handler must not stop the others
-      }
-    }
+  private report(status: ConnectorStatus): void {
+    this.status = status;
+    queueMicrotask(() => {
+      emit(this.statusHandlers, status);
+    });
   }
 }
+
+const emit = <T>(handlers: Set<Handler<T>>, value: T): void => {
+  for (const handler of [...handlers]) {
+    try {
+      handler(value);
+    } catch {
+      // a failing handler must not stop the others
+    }
+  }
+};
 ```

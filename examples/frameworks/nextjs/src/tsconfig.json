@@ -1,0 +1,18 @@
+{
+  "extends": "@micafox/configs/tsconfig/base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noEmit": true
+  },
+  "include": ["**/*.ts"],
+  "exclude": [".next"],
+  "references": [
+    {
+      "path": "../../../../packages/protocol"
+    },
+    {
+      "path": "../../../../packages/sdk"
+    }
+  ]
+}

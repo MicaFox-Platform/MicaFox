@@ -6,7 +6,7 @@ paths:
 
 # Docs
 
-The reader is a developer integrating ProbeX, not us. Write for someone who has not seen the code. Short beats
+The reader is a developer integrating MicaFox, not us. Write for someone who has not seen the code. Short beats
 complete: a doc that takes more than a few minutes to read gets split.
 
 - One `#` title per file, ≤ 60 chars. Sentence case.
@@ -32,7 +32,9 @@ Only the decided design. No alternatives, no "we considered", no open questions:
 made from `.claude/templates/architecture.md` is input for `/architect` only and is never merged as a draft.
 
 `overview.md` has the sections Components (diagram), Packages, Key flows, Decisions (ADR links).
-`<component>.md` has the sections Purpose, Boundaries, Interactions (diagram), Key flows, Decisions. A package that
+`<component>.md` has the sections Purpose, Boundaries, Interactions (diagram), Layout (folder tree), Key flows,
+Decisions. Layout is the decided folder tree of the component; a change that adds, moves or removes a folder or a
+source file updates it in the same PR. A package that
 is one component gets `<package>.md`; a package with several large components gets a folder `<package>/` with one
 `<component>.md` per component (`sdk/connector.md`, `sdk/debugger.md`).
 
@@ -59,5 +61,5 @@ We could use WebSocket or HTTP. WebSocket is probably better because...
 ## Transport
 
 The connector opens one WebSocket to the hub and keeps it alive with heartbeats. See
-[ADR 0003](../adr/0003-use-websocket-between-the-sdk-and-the-hub.md).
+[ADR 0008](../adr/protocol/0008-use-websocket-for-the-hub-connection.md).
 ```

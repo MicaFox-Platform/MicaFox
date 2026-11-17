@@ -1,34 +1,43 @@
 {
-  "name": "@probex-platform/sdk",
-  "version": "1.0.0",
-  "description": "",
+  "name": "@micafox/sdk",
+  "version": "0.1.0",
+  "description": "MicaFox SDK: the debugger and the default hub connector, run inside the host app",
+  "type": "module",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
+      "@micafox/source": "./src/index.ts",
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.js"
+      }
     }
   },
   "files": [
     "dist"
   ],
-  "type": "module",
   "scripts": {
-    "dev": "tsx --conditions=@probex-platform/source --watch src/index.ts",
-    "build": "rm -rf ./dist && tsc -b",
-    "typecheck": "tsc -b",
-    "test": "vitest run"
+    "dev": "tsx --conditions=@micafox/source --watch src/index.ts",
+    "build": "rm -rf ./dist && tsc -b tsconfig.json tsconfig.cjs.json && echo '{ \"type\": \"commonjs\" }' > dist/cjs/package.json",
+    "typecheck": "tsc -b tsconfig.json tsconfig.cjs.json && echo '{ \"type\": \"commonjs\" }' > dist/cjs/package.json",
+    "test": "vitest run",
+    "test:build": "vitest run --config vitest.build.config.ts"
   },
   "keywords": [],
   "author": "Artem Horovyi",
   "license": "MIT",
-  "packageManager": "pnpm@10.26.2",
   "engines": {
     "node": ">=22"
   },
   "dependencies": {
-    "@probex-platform/protocol": "workspace:*"
+    "@micafox/protocol": "workspace:*",
+    "ws": "^8.22.1"
   },
   "devDependencies": {
-    "@probex-platform/configs": "workspace:*"
+    "@micafox/configs": "workspace:*",
+    "@types/ws": "^8.18.2"
   }
 }
