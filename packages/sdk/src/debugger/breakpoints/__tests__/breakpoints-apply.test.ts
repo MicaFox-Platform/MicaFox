@@ -1,5 +1,5 @@
 import type { BreakpointStatus } from "@micafox/protocol";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   CHECKOUT_SOURCE,
@@ -11,11 +11,14 @@ import {
 let test: BreakpointsUnderTest;
 
 beforeEach(() => {
+  // The harness charges the pause budget on Date.now(): a frozen clock keeps a pause slowed by a busy runner from spending it
+  vi.useFakeTimers({ toFake: ["Date"] });
   test = createBreakpoints();
 });
 
 afterEach(() => {
   test.dispose();
+  vi.useRealTimers();
 });
 
 const statusOf = (breakpointId: string): BreakpointStatus | undefined =>
