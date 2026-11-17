@@ -48,8 +48,10 @@ first updates the Layout (`.claude/rules/code-quality.md#structure`); a new sub-
 
 ## 5. Implement with tests
 
-Follow `.claude/rules/`. Every acceptance line becomes at least one test. While you work, run only the tests you
-touch: `pnpm test <test file paths>`; the full run comes in step 7.
+Follow `.claude/rules/`. Every acceptance line becomes at least one test. A change to what a public package ships
+adds a changeset with `pnpm changeset` (`docs/development.md#releasing`); `pnpm changeset --empty` when its users
+see no change. While you work, run only the tests you touch: `pnpm test <test file paths>`; the full run comes in
+step 7.
 
 ## 6. Blast radius
 

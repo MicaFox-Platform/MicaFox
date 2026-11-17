@@ -8,8 +8,8 @@
 set -uo pipefail
 
 # The only allowed types, for branches, PR titles and commits; keep the table in docs/development.md in sync
-types_help='feat      new behavior for users of the packages (minor release)
-fix       bug fix for users of the packages (patch release)
+types_help='feat      new behavior for users of the packages
+fix       bug fix for users of the packages
 perf      faster or lighter, same behavior
 refactor  code change with the same behavior
 docs      documentation only

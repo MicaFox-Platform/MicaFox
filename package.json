@@ -22,6 +22,7 @@
     "verify": "pnpm lint && pnpm format && pnpm typecheck && pnpm build && pnpm test:pack && pnpm test:build && pnpm test:coverage",
     "verify:brief": "bash .claude/scripts/verify-brief.sh",
     "verify:fix": "pnpm lint:fix && pnpm format:fix",
+    "version-packages": "changeset version && bash .github/scripts/sync-sdk-version.sh && pnpm format:fix",
     "docker:up": "docker compose -f examples/compose.yaml up --build",
     "docker:down": "docker compose -f examples/compose.yaml down",
     "prepare": "git config core.hooksPath .githooks || true"
@@ -35,6 +36,8 @@
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",
+    "@changesets/changelog-github": "^1.0.1",
+    "@changesets/cli": "^3.0.3",
     "@micafox/configs": "workspace:*",
     "@types/node": "^26.1.2",
     "@vitest/coverage-v8": "^4.1.11",

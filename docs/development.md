@@ -78,7 +78,8 @@ stack afterwards, also after a failure. `NODE_IMAGE=node:22-alpine pnpm test:doc
 - Unit tests live in the `__tests__/` folder of the folder that holds their module, so folders list only code.
   Tests that are not about one module (doc examples, lint boundaries, end-to-end) live in `packages/<name>/test/`, or in
   `examples/<name>/tests/` and `examples/frameworks/<name>/tests/` for the whole system; the configs package keeps all
-  its tests there, and `tools/testkit/test/` the checks of the examples' `.env.example` files and Docker setup.
+  its tests there, and `tools/testkit/test/` the checks of the examples' `.env.example` files and Docker setup and
+  of the changeset checks of CI.
   Coverage of `packages/*/src` must stay ≥ 80% in lines, branches and functions; a line no meaningful test can
   reach is excluded in `vitest.config.ts` with the reason, never covered by a hollow test.
 - Test behavior through the public surface. Mock only at the boundaries: the WebSocket, time and `node:inspector`.
@@ -205,15 +206,20 @@ CI runs on every pull request into `staging` or `main`, and again on each new co
 runs on Node 22.13 (the oldest 22.x the dev toolchain runs on) and Node 24; the `ci` job passes when both
 legs pass. Steps, in order:
 
-| Step            | Fails when                                                                                  |
-| --------------- | ------------------------------------------------------------------------------------------- |
-| Only staging    | a pull request into `main` comes from a branch other than `staging`                         |
-| PR title        | the title breaks [Naming](#naming); fix it with `gh pr edit <number> --title "…"`           |
-| Commit messages | a non-merge commit subject breaks [Naming](#naming); skipped for release PRs from `staging` |
-| Linter … Tests  | `pnpm lint`, `pnpm format`, `pnpm typecheck` or `pnpm test` fails; coverage is checked once |
-| Build           | `pnpm build` fails, `pnpm test:pack` fails on a tarball, or `pnpm test:build` on the build  |
+| Step              | Fails when                                                                                            |
+| ----------------- | ----------------------------------------------------------------------------------------------------- |
+| Only staging      | a pull request into `main` comes from a branch other than `staging`                                   |
+| PR title          | the title breaks [Naming](#naming); fix it with `gh pr edit <number> --title "…"`                     |
+| Commit messages   | a non-merge commit subject breaks [Naming](#naming); skipped for release PRs from `staging`           |
+| Changesets        | into `staging`: a public package's shipped files changed without a changeset, or a `major` one at 0.x |
+| No changeset left | into `main`: a changeset that names a package is left; merge the version PR first                     |
+| Linter … Tests    | `pnpm lint`, `pnpm format`, `pnpm typecheck` or `pnpm test` fails; coverage is checked once           |
+| Build             | `pnpm build` fails, `pnpm test:pack` fails on a tarball, or `pnpm test:build` on the build            |
 
-Only the Node 22.13 leg runs the name steps and the coverage run (`pnpm test:coverage`).
+Only the Node 22.13 leg runs the name steps, the changeset steps and the coverage run (`pnpm test:coverage`). The
+changeset steps run `.github/scripts/check-changesets.sh`; check a branch before you push with
+`bash .github/scripts/check-changesets.sh pr`, after `git add`: it sees no untracked file. The version PR and
+Dependabot skip the Changesets step.
 
 On pull requests into `staging` the `docker` job runs `pnpm test:docker` once per base image (`node:22-slim`,
 `node:22-alpine`, `node:24-slim`), in parallel, within 10 minutes each, and fails when the run left containers or
@@ -254,10 +260,11 @@ Agents are also denied force-pushes, `gh pr merge` and edits to `pnpm-lock.yaml`
 
 `@micafox/sdk`, `@micafox/protocol` and `@micafox/configs` are published to npm with
 [Changesets](https://github.com/changesets/changesets), each with its own version and `CHANGELOG.md`. Why:
-[ADR 0021](adr/packages/0021-version-and-publish-the-packages-with-changesets.md). The release workflow is not set
-up yet; until it is, nothing is published, and `@micafox/sdk` and `@micafox/protocol` stay `private` until their
-first release. `pnpm test:pack` checks every package's tarball on each `pnpm verify`; the published `exports` come
-from `publishConfig.exports`, the repo's `exports` without the `@micafox/source` condition, so change both together.
+[ADR 0021](adr/packages/0021-version-and-publish-the-packages-with-changesets.md). The version pull request is
+set up; publishing is not yet, so nothing is published. `@micafox/sdk` and `@micafox/protocol` stay `private` until
+their first release, so until then only changes to `@micafox/configs` need a changeset. `pnpm test:pack` checks every
+package's tarball on each `pnpm verify`; the published `exports` come from `publishConfig.exports`, the repo's
+`exports` without the `@micafox/source` condition, so change both together.
 
 ```text
 PR + changeset ──▶ staging ──▶ version PR into staging ──▶ release PR into main ──▶ npm, tags, GitHub Releases
@@ -265,9 +272,19 @@ PR + changeset ──▶ staging ──▶ version PR into staging ──▶ rel
 
 1. **Describe the change.** A pull request that changes what a public package ships adds a changeset with
    `pnpm changeset`: the packages, the bump and one line for their users. While a package is 0.x, a breaking change
-   is `minor`; CI rejects `major`.
-2. **Version.** Each push to `staging` opens or updates `chore(release): version packages` into `staging`: it bumps
-   the versions, writes the changelogs and deletes the changesets it applied.
+   is `minor`; CI rejects `major`. What ships is set by `changedFilePatterns` in `.changeset/config.json`: sources,
+   the configs' preset folders, `tsconfig*.json`, `package.json` and `README.md`, without tests. A change there that users do not see,
+   such as a script or a dev dependency in `package.json`, takes `pnpm changeset --empty`.
+2. **Version.** Each push to `staging` with changesets opens or updates `chore(release): version packages` from
+   `changeset-release/staging` into `staging`: it bumps the versions, writes the changelogs and deletes the changesets
+   it applied. A GitHub App opens it and signs its commits, so CI runs on it and a code owner approves it like any
+   other. Empty changesets alone open no version pull request. `pnpm version-packages` runs `changeset version` and
+   then `.github/scripts/sync-sdk-version.sh`, which keeps `SDK_VERSION` equal to the SDK's `package.json`.
+
+   It needs a one-time setup by a repository admin: a GitHub App with Contents and Pull requests write, installed on
+   this repository and not in the ruleset's bypass list; an environment `release-pr` whose deployment branches are
+   `staging` only; and in it the secrets `RELEASE_APP_CLIENT_ID` and `RELEASE_APP_PRIVATE_KEY` of the App.
+
 3. **Release.** Merge the version pull request last, then open the release pull request from `staging` into `main`;
    CI rejects it while a changeset is left. After the merge, the publish job waits for approval in the `npm`
    environment, then publishes every version not yet on npm, with provenance, and adds a

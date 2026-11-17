@@ -1,0 +1,24 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config@4.0.1/schema.json",
+  "baseBranch": "staging",
+  "access": "public",
+  "changelog": ["@changesets/changelog-github", { "repo": "MicaFox-Platform/MicaFox" }],
+  "commit": false,
+  "format": "prettier",
+  "fixed": [],
+  "linked": [],
+  "ignore": [],
+  "privatePackages": { "version": false, "tag": false },
+  "updateInternalDependencies": "patch",
+  "changedFilePatterns": [
+    "src/**",
+    "tsconfig*.json",
+    "tsconfig/**",
+    "eslint/**",
+    "prettier/**",
+    "vitest/**",
+    "package.json",
+    "README.md",
+    "!**/__tests__/**"
+  ]
+}

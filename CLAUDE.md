@@ -12,15 +12,15 @@ the long-term shape of the code, and you push back on anything that breaks the r
 
 pnpm monorepo, Node >= 22, TypeScript (strict, NodeNext), Vitest, ESLint, Prettier.
 
-| Package                       | Role                                           | May depend on          |
-| ----------------------------- | ---------------------------------------------- | ---------------------- |
-| `packages/configs`            | shared tsconfig / eslint / prettier / vitest   | -                      |
-| `packages/protocol`           | messages, protocol version, `Connector`        | -                      |
-| `packages/sdk`                | debugger and default connector, in host app    | protocol               |
-| `tools/testkit`               | private E2E kit and benchmark of the examples  | protocol               |
-| `examples/formats`            | apps that load the built SDK per module format | sdk, protocol, testkit |
-| `examples/frameworks/fastify` | demo app, full debugger E2E                    | sdk, protocol, testkit |
-| `examples/frameworks/<name>`  | `express`, `nestjs`, `nextjs` on built SDK     | sdk, testkit           |
+| Package                       | Role                                                                        | May depend on          |
+| ----------------------------- | --------------------------------------------------------------------------- | ---------------------- |
+| `packages/configs`            | shared tsconfig / eslint / prettier / vitest                                | -                      |
+| `packages/protocol`           | messages, protocol version, `Connector`                                     | -                      |
+| `packages/sdk`                | debugger and default connector, in host app                                 | protocol               |
+| `tools/testkit`               | private E2E kit and benchmark of the examples, tests of the release scripts | protocol               |
+| `examples/formats`            | apps that load the built SDK per module format                              | sdk, protocol, testkit |
+| `examples/frameworks/fastify` | demo app, full debugger E2E                                                 | sdk, protocol, testkit |
+| `examples/frameworks/<name>`  | `express`, `nestjs`, `nextjs` on built SDK                                  | sdk, testkit           |
 
 Dependencies point down this table only. Only examples depend on `tools/testkit`, which is never published.
 
@@ -49,8 +49,8 @@ Run checks only through `package.json` scripts, never retyped tool commands, so 
   are merged with merge commits, so every commit lands in history.
 - Before carrying out a plan that changes the public API or protocol, or adds a package or dependency, delegate it
   to `critic` and show its points with the plan; the skills above already do this at their own steps.
-- Hand-over: at most 6 lines (what changed, checks and coverage, review result, what is left for the user), then
-  the commit message in a code block and the question whether to ship.
+- Hand-over: at most 6 lines (what changed, the changeset or why none, checks and coverage, review result, what is
+  left for the user), then the commit message in a code block and the question whether to ship.
 - Ship only after the user's explicit OK: commit → `git push -u` → `gh pr create --base staging` → print the PR
   link. Fixes to an open PR: same flow, then commit and push to its branch.
 - Never merge PRs, push to `main`/`staging` or edit `pnpm-lock.yaml` by hand.

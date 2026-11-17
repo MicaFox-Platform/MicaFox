@@ -67,6 +67,21 @@ jobs:
           RANGE: ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}
         run: bash .github/scripts/check-names.sh commits "$RANGE"
 
+      # The version PR and Dependabot skip it only from a branch of this repo: a fork names its branch freely
+      - name: Changesets
+        if: >-
+          ${{ matrix.primary && github.base_ref == 'staging' && !(
+            github.event.pull_request.head.repo.full_name == github.repository &&
+            (github.head_ref == 'changeset-release/staging' || startsWith(github.head_ref, 'dependabot/'))
+          ) }}
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: bash .github/scripts/check-changesets.sh pr "$BASE"
+
+      - name: No changeset left
+        if: ${{ matrix.primary && github.base_ref == 'main' }}
+        run: bash .github/scripts/check-changesets.sh release
+
       - name: Linter
         run: pnpm lint
 
