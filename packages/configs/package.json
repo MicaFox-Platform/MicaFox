@@ -66,5 +66,17 @@
     "prettier": "^3.9.6",
     "typescript": "^6.0.3",
     "vitest": "^4.1.11"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MicaFox-Platform/MicaFox.git",
+    "directory": "packages/configs"
+  },
+  "homepage": "https://github.com/MicaFox-Platform/MicaFox/tree/main/packages/configs#readme",
+  "bugs": {
+    "url": "https://github.com/MicaFox-Platform/MicaFox/issues"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

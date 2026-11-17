@@ -25,7 +25,8 @@ they are.
   `welcome`, `breakpoints.ts` reads the breakpoints to set and counts their time left down.
 - `test/` — `env-examples.test.ts`: the `.env.example` files and `start` scripts of the examples; `docker.test.ts`:
   their Dockerfile and `compose.yaml` against those files, and the hub's `HOST`; `changesets.test.ts`: the changeset
-  checks of `.github/scripts/check-changesets.sh`, in a throwaway git repository.
+  checks of `.github/scripts/check-changesets.sh`, in a throwaway git repository; `packs.test.ts`: the tarball checks
+  of `.github/scripts/check-packs.sh` (`pnpm test:pack`), in a throwaway workspace.
 - `docker/` — the container tests of `pnpm test:docker`, run by `vitest.docker.config.ts` only, never by `pnpm test`:
   `compose.test.yaml` locks down every service of `examples/compose.yaml` (read-only root filesystem, a writable
   `/tmp`, 256 MB, SDK errors only) and reports it healthy once it serves; `stack.ts` starts, follows, stops and

@@ -103,6 +103,10 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # Packs each package under packages/ as npm would receive it and lints the tarball, so it follows the build
+      - name: Tests of the packed packages
+        run: pnpm test:pack
+
       # Loads `dist/` of each package through import and require() in child processes, so it follows the build
       - name: Tests of the built output
         run: pnpm test:build
