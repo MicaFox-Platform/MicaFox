@@ -11,6 +11,7 @@ writing one: [`.claude/rules/adr.md`](../../.claude/rules/adr.md).
 
 - [0001. Keep the protocol in its own package](packages/0001-keep-the-protocol-in-its-own-package.md)
 - [0013. Publish the packages as ES modules and CommonJS](packages/0013-publish-the-packages-as-es-modules-and-commonjs.md)
+- [0021. Version and publish the packages with Changesets](packages/0021-version-and-publish-the-packages-with-changesets.md)
 
 ## Protocol
 
