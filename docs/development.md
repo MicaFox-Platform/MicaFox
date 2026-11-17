@@ -50,7 +50,11 @@ pnpm lint         → one ESLint run over the repo
 pnpm format       → one Prettier check over the repo
 pnpm test:build   → tests of the built output: packages loaded with import and require(), examples/formats
                     and examples/frameworks/*; run pnpm build first
-pnpm verify       → lint → format → typecheck → build → test:build → test:coverage (≥ 80%), stops at the first failure
+pnpm test:pack    → pack each package under packages/ as npm would receive it and check the tarball: no src/ or
+                    tests, README.md and LICENSE, exports and workspace ranges, publint and Are the Types Wrong;
+                    run pnpm build first
+pnpm verify       → lint → format → typecheck → build → test:pack → test:build → test:coverage (≥ 80%), stops at the
+                    first failure
 pnpm verify:brief → the same steps, one line per green step and the start of a failure (for AI agents)
 pnpm verify:fix   → auto-fix lint and formatting
 pnpm docker:up    → optional, needs Docker: build an image per example app and start them with the fake hub
@@ -207,7 +211,7 @@ legs pass. Steps, in order:
 | PR title        | the title breaks [Naming](#naming); fix it with `gh pr edit <number> --title "…"`           |
 | Commit messages | a non-merge commit subject breaks [Naming](#naming); skipped for release PRs from `staging` |
 | Linter … Tests  | `pnpm lint`, `pnpm format`, `pnpm typecheck` or `pnpm test` fails; coverage is checked once |
-| Build           | `pnpm build` fails, or `pnpm test:build` fails on the built output                          |
+| Build           | `pnpm build` fails, `pnpm test:pack` fails on a tarball, or `pnpm test:build` on the build  |
 
 Only the Node 22.13 leg runs the name steps and the coverage run (`pnpm test:coverage`).
 
@@ -251,7 +255,9 @@ Agents are also denied force-pushes, `gh pr merge` and edits to `pnpm-lock.yaml`
 `@micafox/sdk`, `@micafox/protocol` and `@micafox/configs` are published to npm with
 [Changesets](https://github.com/changesets/changesets), each with its own version and `CHANGELOG.md`. Why:
 [ADR 0021](adr/packages/0021-version-and-publish-the-packages-with-changesets.md). The release workflow is not set
-up yet; until it is, nothing is published.
+up yet; until it is, nothing is published, and `@micafox/sdk` and `@micafox/protocol` stay `private` until their
+first release. `pnpm test:pack` checks every package's tarball on each `pnpm verify`; the published `exports` come
+from `publishConfig.exports`, the repo's `exports` without the `@micafox/source` condition, so change both together.
 
 ```text
 PR + changeset ──▶ staging ──▶ version PR into staging ──▶ release PR into main ──▶ npm, tags, GitHub Releases

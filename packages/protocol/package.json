@@ -1,6 +1,7 @@
 {
   "name": "@micafox/protocol",
   "version": "0.1.0",
+  "private": true,
   "description": "MicaFox protocol: messages, protocol version and the Connector interface",
   "type": "module",
   "exports": {
@@ -17,7 +18,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "!dist/**/*.tsbuildinfo"
   ],
   "scripts": {
     "build": "rm -rf ./dist && tsc -b tsconfig.json tsconfig.cjs.json && echo '{ \"type\": \"commonjs\" }' > dist/cjs/package.json",
@@ -33,5 +35,29 @@
   },
   "devDependencies": {
     "@micafox/configs": "workspace:*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MicaFox-Platform/MicaFox.git",
+    "directory": "packages/protocol"
+  },
+  "homepage": "https://github.com/MicaFox-Platform/MicaFox/tree/main/packages/protocol#readme",
+  "bugs": {
+    "url": "https://github.com/MicaFox-Platform/MicaFox/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "import": {
+          "types": "./dist/esm/index.d.ts",
+          "default": "./dist/esm/index.js"
+        },
+        "require": {
+          "types": "./dist/cjs/index.d.ts",
+          "default": "./dist/cjs/index.js"
+        }
+      }
+    }
   }
 }
