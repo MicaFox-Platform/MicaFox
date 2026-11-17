@@ -1,7 +1,7 @@
 // Prices an order line: the code to debug. Its local `apiKey` stands for a secret a real pricing call signs with; a
 // snapshot here shows it as `redacted`, never its value.
 
-import { createHash } from "node:crypto";
+import { createHmac } from "node:crypto";
 
 import { roundToCents } from "./a/util.js";
 import { normalizeSku } from "./b/util.js";
@@ -25,8 +25,8 @@ export const quote = (rawSku: string, quantity: number): Quote => {
   const sku = normalizeSku(rawSku);
   const unitPrice = UNIT_PRICES[sku] ?? DEFAULT_UNIT_PRICE;
   const total = roundToCents(unitPrice * quantity);
-  const signature = createHash("sha256")
-    .update(`${apiKey}:${sku}:${String(total)}`)
+  const signature = createHmac("sha256", apiKey)
+    .update(`${sku}:${String(total)}`)
     .digest("hex")
     .slice(0, 16);
   // tools/testkit/.env.example holds the number of the next line; its test/env-examples.test.ts fails when it moves

@@ -217,6 +217,10 @@ networks behind; `docker-result` passes when all three pass. It is not a require
 The `dependency-review` job fails when the pull request adds a dependency with a known vulnerability of high
 severity or worse. Dependabot pull requests skip the name steps.
 
+The `CodeQL` workflow scans the JavaScript/TypeScript code and the workflows on pull requests into `staging` and
+`main`, on pushes to both and weekly; GitHub's `CodeQL` check fails when the pull request adds an alert of high
+severity or worse, so an alert surfaces in the feature pull request, not first in the release one.
+
 ### Before merge
 
 `main` and `staging` change only through pull requests: no direct or force pushes, no deletion. A pull request
