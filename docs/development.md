@@ -150,22 +150,23 @@ agents also follow [CLAUDE.md](../CLAUDE.md).
 - **PR title.** Becomes the merge commit's title. Rename a PR with `gh pr edit <number> --title "…"`; CI re-runs.
   Release PRs from `staging` into `main` check only the title.
 
-Use one of these types; release tooling maps them to the changelog and semver. A change that spans several types is
-split into commits, or takes the main type and a scope: `ci(infra): …`.
+Use one of these types; they name the kind of change in history, while versions and changelogs come from changesets:
+[Releasing](#releasing). A change that spans several types is split into commits, or takes the main type and a
+scope: `ci(infra): …`.
 
-| Type       | For                                            |
-| ---------- | ---------------------------------------------- |
-| `feat`     | new behavior for users of the packages (minor) |
-| `fix`      | bug fix for users of the packages (patch)      |
-| `perf`     | faster or lighter, same behavior               |
-| `refactor` | code change with the same behavior             |
-| `docs`     | documentation only                             |
-| `test`     | tests only                                     |
-| `build`    | build, dependencies, package and tool configs  |
-| `ci`       | CI workflows, hooks and their scripts          |
-| `chore`    | anything else that does not reach users        |
-| `style`    | formatting only                                |
-| `revert`   | reverts an earlier commit                      |
+| Type       | For                                           |
+| ---------- | --------------------------------------------- |
+| `feat`     | new behavior for users of the packages        |
+| `fix`      | bug fix for users of the packages             |
+| `perf`     | faster or lighter, same behavior              |
+| `refactor` | code change with the same behavior            |
+| `docs`     | documentation only                            |
+| `test`     | tests only                                    |
+| `build`    | build, dependencies, package and tool configs |
+| `ci`       | CI workflows, hooks and their scripts         |
+| `chore`    | anything else that does not reach users       |
+| `style`    | formatting only                               |
+| `revert`   | reverts an earlier commit                     |
 
 `.github/scripts/check-names.sh` is the source of these rules; CI and the git hooks run it, and it prints the rules
 with examples on every failure. Check a name by hand: `bash .github/scripts/check-names.sh commit "<subject>"`.
@@ -244,3 +245,26 @@ Claude Code runs these hooks from [.claude/settings.json](../.claude/settings.js
 | `stop-verify.sh` | before the agent finishes | requires a green `pnpm verify:brief` (`format` if only Markdown changed) |
 
 Agents are also denied force-pushes, `gh pr merge` and edits to `pnpm-lock.yaml`.
+
+## Releasing
+
+`@micafox/sdk`, `@micafox/protocol` and `@micafox/configs` are published to npm with
+[Changesets](https://github.com/changesets/changesets), each with its own version and `CHANGELOG.md`. Why:
+[ADR 0021](adr/packages/0021-version-and-publish-the-packages-with-changesets.md). The release workflow is not set
+up yet; until it is, nothing is published.
+
+```text
+PR + changeset ──▶ staging ──▶ version PR into staging ──▶ release PR into main ──▶ npm, tags, GitHub Releases
+```
+
+1. **Describe the change.** A pull request that changes what a public package ships adds a changeset with
+   `pnpm changeset`: the packages, the bump and one line for their users. While a package is 0.x, a breaking change
+   is `minor`; CI rejects `major`.
+2. **Version.** Each push to `staging` opens or updates `chore(release): version packages` into `staging`: it bumps
+   the versions, writes the changelogs and deletes the changesets it applied.
+3. **Release.** Merge the version pull request last, then open the release pull request from `staging` into `main`;
+   CI rejects it while a changeset is left. After the merge, the publish job waits for approval in the `npm`
+   environment, then publishes every version not yet on npm, with provenance, and adds a
+   `@micafox/<package>@<version>` tag and a GitHub Release for each.
+4. **When it fails.** Re-run the publish job: it publishes what is missing and adds the missing tags and Releases. A
+   published version cannot be taken back: `npm deprecate` it and release a fix through `staging`.
