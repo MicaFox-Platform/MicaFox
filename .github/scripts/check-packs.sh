@@ -6,6 +6,8 @@ set -uo pipefail
 
 source_condition="@micafox/source"
 status=0
+# The tools of this repository, also when the script checks another workspace (its tests do)
+bin="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/node_modules/.bin"
 
 fail() {
   echo "✗ $1" >&2
@@ -64,7 +66,7 @@ for dir in packages/*/; do
   done < <(jq -r '(.dependencies // {}) + (.peerDependencies // {}) | to_entries[]
     | select(.value | startswith("workspace:")) | [.key, .value] | @tsv' "$dir/package.json")
 
-  pnpm exec publint run --strict "$tarball" >"$out/publint.log" 2>&1 || {
+  "$bin/publint" run --strict "$tarball" >"$out/publint.log" 2>&1 || {
     fail "$name: publint found problems:"
     cat "$out/publint.log" >&2
   }
@@ -72,7 +74,7 @@ for dir in packages/*/; do
   # A package with a require condition ships CommonJS too and must resolve for both; others ship ES modules only
   profile=esm-only
   jq -e '[.exports | .. | objects | has("require")] | any' <<<"$manifest" >/dev/null && profile=node16
-  pnpm exec attw --profile "$profile" --no-emoji --no-color "$tarball" >"$out/attw.log" 2>&1 || {
+  "$bin/attw" --profile "$profile" --no-emoji --no-color "$tarball" >"$out/attw.log" 2>&1 || {
     fail "$name: Are the Types Wrong found problems (profile $profile):"
     cat "$out/attw.log" >&2
   }
