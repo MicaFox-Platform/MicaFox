@@ -260,11 +260,10 @@ Agents are also denied force-pushes, `gh pr merge` and edits to `pnpm-lock.yaml`
 
 `@micafox/sdk`, `@micafox/protocol` and `@micafox/configs` are published to npm with
 [Changesets](https://github.com/changesets/changesets), each with its own version and `CHANGELOG.md`. Why:
-[ADR 0021](adr/packages/0021-version-and-publish-the-packages-with-changesets.md). The version pull request is
-set up; publishing is not yet, so nothing is published. `@micafox/sdk` and `@micafox/protocol` stay `private` until
-their first release, so until then only changes to `@micafox/configs` need a changeset. `pnpm test:pack` checks every
-package's tarball on each `pnpm verify`; the published `exports` come from `publishConfig.exports`, the repo's
-`exports` without the `@micafox/source` condition, so change both together.
+[ADR 0021](adr/packages/0021-version-and-publish-the-packages-with-changesets.md). `@micafox/sdk` and
+`@micafox/protocol` stay `private` until their first release, so until then only changes to `@micafox/configs` need a
+changeset. `pnpm test:pack` checks every package's tarball on each `pnpm verify`; the published `exports` come from
+`publishConfig.exports`, the repo's `exports` without the `@micafox/source` condition, so change both together.
 
 ```text
 PR + changeset ──▶ staging ──▶ version PR into staging ──▶ release PR into main ──▶ npm, tags, GitHub Releases
@@ -288,6 +287,22 @@ PR + changeset ──▶ staging ──▶ version PR into staging ──▶ rel
 3. **Release.** Merge the version pull request last, then open the release pull request from `staging` into `main`;
    CI rejects it while a changeset is left. After the merge, the publish job waits for approval in the `npm`
    environment, then publishes every version not yet on npm, with provenance, and adds a
-   `@micafox/<package>@<version>` tag and a GitHub Release for each.
+   `@micafox/<package>@<version>` tag and a GitHub Release with the version's changelog section for each. The
+   workflow is `.github/workflows/release.yml`; it runs on Node 24 with npm >= 11.5.1, and only its job has
+   `id-token: write` and `contents: write`. `.github/scripts/release-github.sh` adds the Releases.
+
+   It needs a one-time setup by a repository admin: an environment `npm` with a required reviewer and `main` as its
+   only deployment branch.
+
 4. **When it fails.** Re-run the publish job: it publishes what is missing and adds the missing tags and Releases. A
    published version cannot be taken back: `npm deprecate` it and release a fix through `staging`.
+5. **A package's first publish.** npm configures a trusted publisher only for a package that exists, so the first
+   release of each package goes through a token and every later one through OIDC:
+   1. Create a granular npm token: name `micafox-first-publish`, expiration 7 days, read and write for the `@micafox`
+      scope only, "Bypass two-factor authentication" on, since CI cannot answer a one-time password. Add it as the
+      secret `NPM_TOKEN` of the `npm` environment.
+   2. Release as above. With `NPM_TOKEN` set the job publishes with it, still with provenance.
+   3. On npmjs.com, in the package's Settings, add a Trusted Publisher: GitHub Actions, organization
+      `MicaFox-Platform`, repository `MicaFox`, workflow `release.yml`, environment `npm`. Under Publishing access
+      choose "Require two-factor authentication and disallow tokens".
+   4. Delete `NPM_TOKEN` from the environment and revoke the token on npm. Without it the job publishes through OIDC.

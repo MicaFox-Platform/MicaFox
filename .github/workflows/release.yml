@@ -1,0 +1,90 @@
+name: Release
+
+# Publishes the package versions that are not on npm yet, then adds their tags and GitHub Releases:
+# docs/development.md#releasing
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+# One run at a time: a newer push waits for the running one instead of cancelling a publish halfway through
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Waits for the required reviewer; its deployment branch rule admits only main. Holds NPM_TOKEN while a package's
+    # first publish needs one
+    environment: npm
+    # The only job with these: id-token for provenance and OIDC, contents for tags and Releases
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      # No step pushes with git, so the job's write token stays out of .git/config while dependency code runs
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      # Trusted publishing needs npm >= 11.5.1, which Node 22 does not ship
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.2
+
+      # pnpm hands the upload to the npm on PATH, so this is the one that talks to the registry. Pinned like every tool
+      # of the job that can publish; trusted publishing needs >= 11.5.1
+      - name: Update npm
+        run: |
+          npm install --global npm@11.21.3
+          npm --version
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Tests of the built output
+        run: pnpm test:build
+
+      # A package's first publish cannot use OIDC: its trusted publisher is set up after it exists on npm. Without
+      # NPM_TOKEN the publish below goes through OIDC
+      - name: npm token
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -n "$NPM_TOKEN" ]; then
+            echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" >> ~/.npmrc
+            echo "Publishing with NPM_TOKEN"
+          else
+            echo "Publishing through OIDC"
+          fi
+
+      # Publishes through pnpm, so `workspace:^` becomes a range; a version already on npm is skipped, and with none
+      # left it does nothing
+      - name: Publish
+        env:
+          # Also for a token publish, which id-token: write makes possible
+          NPM_CONFIG_PROVENANCE: "true"
+        run: pnpm changeset publish
+
+      # Also after a failed publish: the versions that did reach npm get their Release, and a re-run adds the rest
+      - name: Tags and GitHub Releases
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/release-github.sh
