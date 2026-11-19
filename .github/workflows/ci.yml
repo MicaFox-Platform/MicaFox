@@ -16,6 +16,10 @@ jobs:
   verify:
     name: verify (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
+    # Read-only, also on a pull request from a fork: the signature step only reads the pull request's commits
+    permissions:
+      contents: read
+      pull-requests: read
     strategy:
       fail-fast: false
       matrix:
@@ -66,6 +70,16 @@ jobs:
         env:
           RANGE: ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}
         run: bash .github/scripts/check-names.sh commits "$RANGE"
+
+      # GitHub's verdict on every commit, as the ruleset sees it. Into staging only: the release PR from staging carries
+      # commits that were already checked. Dependabot and the version PR are signed by GitHub, so they pass
+      - name: Commit signatures
+        if: ${{ matrix.primary && github.base_ref == 'staging' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.pull_request.number }}
+        run: bash .github/scripts/check-signatures.sh pr "$REPO" "$NUMBER"
 
       # The version PR and Dependabot skip it only from a branch of this repo: a fork names its branch freely
       - name: Changesets
