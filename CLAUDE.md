@@ -64,6 +64,8 @@ finish; fix what they report instead of arguing with it.
 - Packages import each other only by package name, never by relative path.
 - Protocol changes in `packages/protocol` are backward-compatible or bump the protocol version.
 - A public API change updates `docs/api/` in the same PR.
+- A change to what a public package ships adds a changeset in the same PR: `pnpm changeset`, or
+  `pnpm changeset --empty` when its users see no change (`docs/development.md#releasing`).
 
 ## Docs
 
