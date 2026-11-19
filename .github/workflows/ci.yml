@@ -11,6 +11,12 @@ on:
 permissions:
   contents: read
 
+# A new push to a pull request cancels the run of its previous commit, which no longer decides the merge. A rename
+# runs in a group of its own, so it never cancels the run of a push, whose docker job it would skip
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}-${{ github.event.action == 'edited' && 'rename' || 'code' }}
+  cancel-in-progress: true
+
 jobs:
   # One leg per supported Node line: the SDK talks to V8 through the inspector, which changes between versions
   verify:
@@ -96,13 +102,21 @@ jobs:
         if: ${{ matrix.primary && github.base_ref == 'main' }}
         run: bash .github/scripts/check-changesets.sh release
 
+      # Lint, formatting and types do not depend on the Node version: the primary leg checks them once
       - name: Linter
+        if: ${{ matrix.primary }}
         run: pnpm lint
 
       - name: Formatter
+        if: ${{ matrix.primary }}
         run: pnpm format
 
+      # Before the typecheck, as in `pnpm verify`: a package's typecheck is the same `tsc -b` and finds it up to date
+      - name: Build
+        run: pnpm build
+
       - name: Typecheck
+        if: ${{ matrix.primary }}
         run: pnpm typecheck
 
       # Coverage is reported once, from the primary leg
@@ -113,9 +127,6 @@ jobs:
       - name: Tests
         if: ${{ !matrix.primary }}
         run: pnpm test
-
-      - name: Build
-        run: pnpm build
 
       # Packs each package under packages/ as npm would receive it and lints the tarball, so it follows the build
       - name: Tests of the packed packages

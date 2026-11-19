@@ -27,6 +27,11 @@ echo '✓ commit names' >&2
 echo '✓ commit signatures' >&2
 
 cd "$root" || exit 1
+# A tree `pnpm verify` already passed on, unchanged since, needs no second run
+if bash .github/scripts/verify-cache.sh check; then
+  echo '✓ pnpm verify (already green on this tree)' >&2
+  exit 0
+fi
 if ! out=$(pnpm verify 2>&1); then
   {
     tail -n 30 <<<"$out"

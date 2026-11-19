@@ -27,7 +27,10 @@ done < <(sed 's/&&/\n/g' <<<"$verify")
 
 for step in "${steps[@]}"; do
   if out=$(pnpm --silent "$step" 2>&1); then
-    if [[ $step == test:coverage ]]; then
+    # verify:begin and verify:mark only keep the record of a green tree: nothing to report
+    if [[ $step == verify:* ]]; then
+      continue
+    elif [[ $step == test:coverage ]]; then
       echo "✓ $step: $(grep -E '^ +Tests ' <<<"$out" | xargs)"
       grep -E '^(Statements|Branches|Functions|Lines) +:' <<<"$out" | sed 's/^/  /'
     else

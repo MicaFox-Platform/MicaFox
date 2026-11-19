@@ -26,7 +26,7 @@ Dependencies point down this table only. Only examples depend on `tools/testkit`
 
 ## Commands
 
-- `pnpm verify` — lint, format check, typecheck, build, checks of the packed packages (`test:pack`), tests of the
+- `pnpm verify` — lint, format check, build, typecheck, checks of the packed packages (`test:pack`), tests of the
   built output, tests with coverage ≥ 80%. The gate; CI runs the same scripts.
 - `pnpm verify:brief` — the same checks with a short report; use it instead of `pnpm verify`.
 - `pnpm verify:fix` — auto-fix lint and formatting.
@@ -64,6 +64,8 @@ finish; fix what they report instead of arguing with it.
 - Packages import each other only by package name, never by relative path.
 - Protocol changes in `packages/protocol` are backward-compatible or bump the protocol version.
 - A public API change updates `docs/api/` in the same PR.
+- A change to what a public package ships adds a changeset in the same PR: `pnpm changeset`, or
+  `pnpm changeset --empty` when its users see no change (`docs/development.md#releasing`).
 
 ## Docs
 

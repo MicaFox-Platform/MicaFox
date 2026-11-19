@@ -16,17 +16,12 @@ changed=$({
 } | sort -u)
 [[ -z $changed ]] && exit 0
 
-cache=node_modules/.cache/micafox/verify-green
-key=$({
-  git rev-parse HEAD
-  git diff HEAD --binary
-  git ls-files --others --exclude-standard -z | xargs -0 shasum 2>/dev/null
-} | shasum -a 256 | cut -d' ' -f1)
-[[ -f $cache && $(cat "$cache") == "$key" ]] && exit 0
+# The record `pnpm verify` keeps of the last green tree, shared with the pre-push hook
+bash .github/scripts/verify-cache.sh check && exit 0
 
+# A green `verify:brief` records the tree itself; `format` alone does not, so a push still runs the full verify
 if grep -qvE '\.md$' <<<"$changed"; then script=verify:brief; else script=format; fi
 if out=$(pnpm --silent "$script" 2>&1); then
-  mkdir -p "$(dirname "$cache")" && echo "$key" >"$cache"
   exit 0
 fi
 {
