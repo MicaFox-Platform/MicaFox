@@ -1,4 +1,4 @@
-import { E2E_TEST_TIMEOUT_MS, useProcesses, waitForStatus } from "@micafox/testkit";
+import { E2E_TEST_TIMEOUT_MS, fetchUntilSnapshot, useProcesses, waitForStatus } from "@micafox/testkit";
 import { describe, expect, it } from "vitest";
 
 import { startApp, startHub, toAppUrl } from "./harness.js";
@@ -14,9 +14,9 @@ describe("redaction", { timeout: E2E_TEST_TIMEOUT_MS }, () => {
     const app = await startApp({ hubPort: hub.port, pricingApiKey: API_KEY });
     await waitForStatus(hub.run, "bp-quote", (status) => status.status === "active");
 
-    await fetch(toAppUrl(app.port, "/price"));
-    const [snapshot] = await hub.run.waitForMessages("snapshot");
-    const apiKey = snapshot?.variables.find((variable) => variable.name === "apiKey");
+    // The first snapshot whose pause listed the handler's scope, which holds apiKey
+    const snapshot = await fetchUntilSnapshot(toAppUrl(app.port, "/price"), hub.run);
+    const apiKey = snapshot.variables.find((variable) => variable.name === "apiKey");
     const leaks = [...hub.run.lines, ...app.run.lines].filter((line) => line.includes(API_KEY));
 
     expect({ apiKey, leaks }).toEqual({ apiKey: { name: "apiKey", value: { type: "redacted" } }, leaks: [] });

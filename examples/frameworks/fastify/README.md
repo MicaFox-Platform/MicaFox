@@ -73,6 +73,11 @@ a name on purpose: a breakpoint on `util.ts` alone gets status `error`, and one 
 
 `tests/` starts the kit's fake hub and the app as real processes under tsx and checks the debugger end to end: a
 breakpoint in `pricing.ts` and its snapshot, redaction, `pending` and `error` statuses, serving under load, a hub
-restart, a rejected token, startup options and shutdown, and a snapshot of every group of value types of
-`src/values.ts`: encodings, limits, truncation and redaction at any depth. They run in `pnpm verify`, or alone with
+restart, a rejected token, startup options and shutdown. They run in `pnpm verify`, or alone with
 `pnpm --filter @micafox/example-fastify test`.
+
+The routes of `src/values.ts` are for trying the encodings by hand. A snapshot's content is checked in the SDK's own
+tests on the real V8 with a stopped clock (`packages/sdk/src/debugger/capture/__tests__/`), not here: in a real
+process the 10 ms a pause may take is real time, which a loaded CI runner can spend before a value is read. The tests
+here check what a real process adds: the snapshot at its line with the handler's own variables, which a pause lists
+first, its statuses and that a secret is printed nowhere.

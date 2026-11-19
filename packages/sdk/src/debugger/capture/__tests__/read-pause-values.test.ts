@@ -28,7 +28,19 @@ describe("readPause values", () => {
       'const v = new Date("2024-05-06T07:08:09Z");',
       { type: "date", value: "2024-05-06T07:08:09.000Z" },
     ],
+    // V8 describes a Date with its toString() text, which has no milliseconds
+    [
+      "a date to the whole second",
+      'const v = new Date("2026-11-12T10:30:45.678Z");',
+      { type: "date", value: "2026-11-12T10:30:45.000Z" },
+    ],
     ["an invalid date", "const v = new Date(NaN);", { type: "unavailable", reason: "the date is invalid" }],
+    ["a RegExp without its pattern", "const v = /ab+c/gi;", { type: "object", className: "RegExp", properties: [] }],
+    [
+      "a Promise without its state",
+      "const v = new Promise(() => undefined);",
+      { type: "object", className: "Promise", properties: [] },
+    ],
     ["a function", "const v = function named() {};", { type: "function", name: "named" }],
     ["an arrow function named by its variable", "const v = (a) => a;", { type: "function", name: "v" }],
     ["an anonymous function", "const v = (() => () => 1)();", { type: "function", name: "" }],

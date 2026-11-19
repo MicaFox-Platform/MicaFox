@@ -1,4 +1,4 @@
-import { E2E_TEST_TIMEOUT_MS, useProcesses, waitForStatus } from "@micafox/testkit";
+import { E2E_TEST_TIMEOUT_MS, fetchInARow, fetchUntilSnapshot, useProcesses, waitForStatus } from "@micafox/testkit";
 import { describe, expect, it } from "vitest";
 
 import { PRICING_LINE, startApp, startHub, toAppUrl } from "./harness.js";
@@ -11,18 +11,20 @@ describe("breakpoints under tsx", { timeout: E2E_TEST_TIMEOUT_MS }, () => {
     const app = await startApp({ hubPort: hub.port });
     const active = await waitForStatus(hub.run, "bp-quote", (status) => status.status === "active");
 
-    const response = await fetch(toAppUrl(app.port, "/price?sku=sku-2&quantity=3"));
-    const [snapshot] = await hub.run.waitForMessages("snapshot");
-    const [top] = snapshot?.stack ?? [];
+    const url = toAppUrl(app.port, "/price?sku=sku-2&quantity=3");
+    const statuses = await fetchInARow(url, 1);
+    // The first snapshot whose pause listed the handler's scope: a loaded machine can spend the 10 ms before it
+    const snapshot = await fetchUntilSnapshot(url, hub.run);
+    const [top] = snapshot.stack;
 
     expect({
-      status: response.status,
-      modules: [active.module, snapshot?.module],
+      statuses,
+      modules: [active.module, snapshot.module],
       file: top?.file,
       line: top?.line,
-      variables: snapshot?.variables,
+      variables: snapshot.variables,
     }).toEqual({
-      status: 200,
+      statuses: [200],
       modules: ["debugger", "debugger"],
       file: expect.stringMatching(/\/examples\/frameworks\/fastify\/src\/pricing\.ts$/) as unknown,
       line: PRICING_LINE,

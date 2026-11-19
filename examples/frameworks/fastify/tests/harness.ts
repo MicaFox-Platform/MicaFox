@@ -48,8 +48,6 @@ export interface AppOptions {
   logLevel?: string;
   /** `PRICING_API_KEY`, the secret of `src/pricing.ts`. */
   pricingApiKey?: string;
-  /** `VALUES_SECRET`, the secret the `/values/secrets` route nests in its values. */
-  valuesSecret?: string;
 }
 
 const APP_VARIABLES: ReadonlyArray<[keyof AppOptions, string]> = [
@@ -60,7 +58,6 @@ const APP_VARIABLES: ReadonlyArray<[keyof AppOptions, string]> = [
   ["enabled", "MICAFOX_ENABLED"],
   ["logLevel", "MICAFOX_LOG_LEVEL"],
   ["pricingApiKey", "PRICING_API_KEY"],
-  ["valuesSecret", "VALUES_SECRET"],
 ];
 
 /** Starts the app; resolves once it serves HTTP. */
