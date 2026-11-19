@@ -17,17 +17,26 @@ The input is a path to a file in `docs/architecture/`, optionally followed by a 
 - **Path + focus** — the file is decided design; the focus says what to discuss or change. Goal: change only that
   and keep the rest of the file consistent with it.
 
-The input may also be, or include, a link to a card on the Trello board https://trello.com/b/hzrnwdVz/micafox. A
-card link alone takes the path and focus from the `/architect` command in the card's description. Read the card
-and its comments. Take it only if it is in **Planned**, or in **In Progress** with your own `Started by Claude`
-comment; anything else → stop and say why, and never move or edit it. The card's "Depends on" lists a card that is
-not in **Done** → name it and ask whether to go on, since design may run ahead of the code it depends on.
+The input may also be, or include, a link to a card on the Trello board https://trello.com/b/hzrnwdVz/micafox: a
+Research card, a seed or a full card whose design is open. Read the card and its comments: they are the topic and
+hold decisions already made. Take it only if it is in **Planned**, or in **In Progress** with your own
+`Started by Claude` comment; anything else → stop and say why, and never move or edit it. The card's "Depends on"
+lists a card that is not in **Done** → name it and ask whether to go on, since design may run ahead of the code it
+depends on. With a card, the file and focus come from the first of:
 
-No path, a path outside `docs/architecture/` or a missing file → stop and ask for one; to start a new component,
-the user copies the template first.
+1. a path given with the link;
+2. the `/architect` command in the card's description;
+3. your proposal: the doc in `docs/architecture/` of the component the card is about (its labels, Technical
+   context and linked docs), with the card's question as the focus. A component without a doc yet → a new path
+   per the `docs/architecture/` section of `.claude/rules/docs.md`, copied from `.claude/templates/architecture.md` in step 1 with the
+   card's ideas, questions and options under its sections, then handled as **Path only**. Confirm the file and
+   focus with AskUserQuestion before step 1.
+
+No path and no card, a path outside `docs/architecture/` or a missing file → stop and ask for one; to start a new
+component without a card, the user copies the template first.
 
 1. **Branch.** `git switch staging && git pull --ff-only`, then create `docs/<kebab-topic>` from it. An uncommitted
-   draft comes along with the switch. With a card, move it to **In Progress** and comment
+   draft comes along with the switch; a new doc from a card is copied from the template now. With a card, move it to **In Progress** and comment
    `Started by Claude · branch <name>`.
 2. **Ground it.** Read the file, `docs/vision.md`, the overviews (`docs/architecture/overview.md`,
    `docs/api/overview.md`), the docs it links or touches in `docs/architecture/` and `docs/api/`, and the ADRs whose

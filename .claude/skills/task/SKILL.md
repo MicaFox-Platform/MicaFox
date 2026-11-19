@@ -17,7 +17,7 @@ Board: Trello https://trello.com/b/hzrnwdVz/micafox. Card format: `.claude/templ
 - No link: take the top card of **Planned** without the Research label. None → stop.
 - Anything else (someone else's In Progress, In Review, Done, Backlog) → stop and say why. Never move or edit those.
 - The card's "Depends on" lists a card that is not in **Done** → stop and name it.
-- The card has the Research label → stop and suggest `/architect`; research ends in a decision, not a PR.
+- The card has the Research label → stop and suggest `/architect <card link>`; research ends in a decision, not a PR.
 - The card is not in the format of `.claude/templates/card.md` (a seed) → stop and suggest `/task-design <card link>`.
 
 ## 2. Clarify

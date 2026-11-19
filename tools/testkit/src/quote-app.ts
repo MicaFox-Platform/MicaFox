@@ -74,14 +74,27 @@ export const startQuoteApp = (app: QuoteApp, hubPort: number): Promise<Listening
 export const toQuoteUrl = (port: number, pathname = "/quote?sku=SKU-2&quantity=3"): string =>
   `http://127.0.0.1:${String(port)}${pathname}`;
 
+// A pause that reaches its 10 ms before it lists the handler's own scope leaves one variable in its place, named
+// after the scope. Once listed, the scope's primitive variables come whatever the time; later scopes may still be
+// cut, as the SDK's own module scope in a bundle always is
+const isCutBeforeVariables = (snapshot: Snapshot): boolean =>
+  snapshot.variables.some(({ name, value }) => name === "<local scope>" && value.type === "unavailable");
+
 /**
- * Sends GET requests to `url`, one at a time, until the fake hub has printed a snapshot, and resolves with it. Slow
- * pauses, such as the first of a freshly started process on a CI runner, use up the 20 ms a second the app may be
- * paused, so the next requests in that second capture nothing. A snapshot the 10 ms cut short still holds the
- * handler's own variables: the SDK reads them before its `request` and `response`.
+ * Sends GET requests to `url`, one at a time, until the fake hub has printed a snapshot that holds the handler's own
+ * variables, and resolves with it. Slow pauses, such as the first of a freshly started process on a CI runner, can
+ * reach the 10 ms of a pause before the local scope is read, and use up the 20 ms a second the app may be paused, so
+ * the next requests in that second capture nothing.
  */
 export const fetchUntilSnapshot = async (url: string, hub: ChildProcessRun): Promise<Snapshot> => {
-  const isSnapshot = (line: string): boolean => readType(line) === "snapshot";
+  const isSnapshot = (line: string): boolean => {
+    if (readType(line) !== "snapshot") {
+      return false;
+    }
+
+    // readType() has accepted the line as a snapshot
+    return !isCutBeforeVariables(JSON.parse(line) as Snapshot);
+  };
   const state = { isSettled: false };
   const found = hub.waitForLines(isSnapshot).finally(() => {
     state.isSettled = true;
