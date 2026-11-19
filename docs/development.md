@@ -53,8 +53,8 @@ pnpm test:build   → tests of the built output: packages loaded with import and
 pnpm test:pack    → pack each package under packages/ as npm would receive it and check the tarball: no src/ or
                     tests, README.md and LICENSE, exports and workspace ranges, publint and Are the Types Wrong;
                     run pnpm build first
-pnpm verify       → lint → format → typecheck → build → test:pack → test:build → test:coverage (≥ 80%), stops at the
-                    first failure
+pnpm verify       → lint → format → build → typecheck → test:pack → test:build → test:coverage (≥ 80%), stops at the
+                    first failure; a green run is recorded for its tree, see On your machine
 pnpm verify:brief → the same steps, one line per green step and the start of a failure (for AI agents)
 pnpm verify:fix   → auto-fix lint and formatting
 pnpm docker:up    → optional, needs Docker: build an image per example app and start them with the fake hub
@@ -120,7 +120,8 @@ public guides. The rules distilled from them, with the parts that apply to an em
 ESLint enforces every rule it can, including limits on file and function size, nesting, complexity and
 parameters: see the [configs preset](api/configs.md#micafoxconfigseslint). `pnpm lint` also runs
 `.github/scripts/check-structure.sh` for the folder rules ESLint cannot check: files per folder, tests outside
-`__tests__/` and empty folders.
+`__tests__/` and empty folders, and `.github/scripts/check-actions.sh`: every action a workflow uses is pinned by its
+commit SHA with the version in a comment (`owner/repo@<sha> # vX.Y.Z`), since a tag can be moved to other code.
 
 ## Making a change
 
@@ -219,11 +220,14 @@ git commit ──▶ commit-msg ──▶ git push ──▶ pre-push ──▶ 
 
 `pnpm install` points git at `.githooks/`:
 
-| Hook         | Runs on      | Checks                                                                             |
-| ------------ | ------------ | ---------------------------------------------------------------------------------- |
-| `commit-msg` | `git commit` | the subject follows [Naming](#naming), before the commit exists                    |
-| `pre-push`   | `git push`   | subjects, [signatures](#signing-commits) of new commits, then `pnpm verify` (~7 s) |
+| Hook         | Runs on      | Checks                                                                               |
+| ------------ | ------------ | ------------------------------------------------------------------------------------ |
+| `commit-msg` | `git commit` | the subject follows [Naming](#naming), before the commit exists                      |
+| `pre-push`   | `git push`   | subjects, [signatures](#signing-commits) of new commits, then `pnpm verify` (~1 min) |
 
+- A green `pnpm verify` records its tree in `node_modules/.cache/micafox/` (`.github/scripts/verify-cache.sh`), and
+  `pre-push` skips the run when the tree is the same: the Node version, HEAD, every change against it and the
+  untracked files. Any edit, commit or other Node version means a full run.
 - Merge commits and `fixup!`, `squash!`, `amend!` commits pass `commit-msg`; `pre-push` stops the ones left
   unsquashed: run `git rebase -i --autosquash <base>`.
 - `--no-verify` skips a hook once; CI still runs the same checks.
@@ -244,12 +248,16 @@ legs pass. Steps, in order:
 | Commit signatures | into `staging`: GitHub does not verify a commit, see [Signing commits](#signing-commits)              |
 | Changesets        | into `staging`: a public package's shipped files changed without a changeset, or a `major` one at 0.x |
 | No changeset left | into `main`: a changeset that names a package is left; merge the version PR first                     |
-| Linter … Tests    | `pnpm lint`, `pnpm format`, `pnpm typecheck` or `pnpm test` fails; coverage is checked once           |
-| Build             | `pnpm build` fails, `pnpm test:pack` fails on a tarball, or `pnpm test:build` on the build            |
+| Linter, Formatter | `pnpm lint` or `pnpm format` fails                                                                    |
+| Build … Tests     | `pnpm build`, `pnpm typecheck` or `pnpm test` fails; coverage is checked once                         |
+| Tests of the …    | `pnpm test:pack` fails on a tarball, or `pnpm test:build` on the build                                |
 
-Only the Node 22.13 leg runs the name steps, the signature step, the changeset steps and the coverage run
-(`pnpm test:coverage`). The signature step runs `.github/scripts/check-signatures.sh` with the default read-only
-token, also on pull requests from forks. The changeset steps run `.github/scripts/check-changesets.sh`; check a
+Only the Node 22.13 leg runs the name steps, the signature step, the changeset steps, the linter, the formatter, the
+typecheck and the coverage run (`pnpm test:coverage`): none of them depends on the Node version. A new push to a
+pull request cancels the CI and CodeQL runs of its previous commit; a rename does not cancel the run of a push.
+
+The signature step runs `.github/scripts/check-signatures.sh` with the default read-only token, also on pull requests
+from forks. The changeset steps run `.github/scripts/check-changesets.sh`; check a
 branch before you push with `bash .github/scripts/check-changesets.sh pr`, after `git add`: it sees no untracked
 file. The version PR and Dependabot skip the Changesets step.
 
@@ -259,7 +267,8 @@ networks behind; `docker-result` passes when all three pass. A rename skips both
 a required check yet.
 
 The `dependency-review` job fails when the pull request adds a dependency with a known vulnerability of high
-severity or worse. Dependabot pull requests skip the name steps.
+severity or worse. Dependabot pull requests skip the name steps. Dependabot opens one pull request a week into
+`staging` that updates the pinned actions ([dependabot.yml](../.github/dependabot.yml)).
 
 The `CodeQL` workflow scans the JavaScript/TypeScript code and the workflows on pull requests into `staging` and
 `main`, on pushes to both and weekly; GitHub's `CodeQL` check fails when the pull request adds an alert of high
@@ -287,7 +296,8 @@ Claude Code runs these hooks from [.claude/settings.json](../.claude/settings.js
 | `format-file.sh` | after each file edit      | runs Prettier and `eslint --fix` on the file, reports what is left       |
 | `stop-verify.sh` | before the agent finishes | requires a green `pnpm verify:brief` (`format` if only Markdown changed) |
 
-Agents are also denied force-pushes, `gh pr merge` and edits to `pnpm-lock.yaml`.
+Like `pre-push`, `stop-verify.sh` skips the run on a tree `pnpm verify` already passed on. Agents are also denied
+force-pushes, `gh pr merge` and edits to `pnpm-lock.yaml`.
 
 ## Releasing
 

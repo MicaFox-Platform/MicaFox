@@ -1,0 +1,14 @@
+# Keeps the actions, pinned by commit (.github/scripts/check-actions.sh), up to date: one pull request a week into
+# staging, where every change goes, with each SHA and its version comment updated together
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: staging
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: ci

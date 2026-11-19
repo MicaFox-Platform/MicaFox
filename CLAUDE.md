@@ -26,7 +26,7 @@ Dependencies point down this table only. Only examples depend on `tools/testkit`
 
 ## Commands
 
-- `pnpm verify` — lint, format check, typecheck, build, checks of the packed packages (`test:pack`), tests of the
+- `pnpm verify` — lint, format check, build, typecheck, checks of the packed packages (`test:pack`), tests of the
   built output, tests with coverage ≥ 80%. The gate; CI runs the same scripts.
 - `pnpm verify:brief` — the same checks with a short report; use it instead of `pnpm verify`.
 - `pnpm verify:fix` — auto-fix lint and formatting.
