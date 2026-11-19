@@ -1,0 +1,66 @@
+name: Version PR
+
+# Turns the changesets on staging into `chore(release): version packages`, a pull request from
+# changeset-release/staging into staging: docs/development.md#releasing
+on:
+  push:
+    branches:
+      - staging
+  # Re-runs it without a new push, for example after a run that failed to start. Run from staging: the environment
+  # below admits no other branch
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One run at a time: a newer push waits for the running one instead of cancelling it halfway through a push
+concurrency:
+  group: version-pr
+  cancel-in-progress: false
+
+jobs:
+  version-pr:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Holds the GitHub App's secrets; its deployment branch rule admits only staging
+    environment: release-pr
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # The changelog links each entry to the commit that added its changeset
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.2
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # A pull request opened with the workflow's own token would not trigger CI, and `ci` is required
+      - name: GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ secrets.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      # Without changesets it does nothing. It commits through the GitHub API, so the commits are signed and Verified;
+      # no publish script, so nothing is published
+      - name: Open or update the version PR
+        uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          version-script: pnpm version-packages
+          commit-message: "chore(release): version packages"
+          pr-title: "chore(release): version packages"

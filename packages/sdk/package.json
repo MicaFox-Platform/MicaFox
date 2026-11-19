@@ -17,7 +17,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "!dist/**/*.tsbuildinfo"
   ],
   "scripts": {
     "dev": "tsx --conditions=@micafox/source --watch src/index.ts",
@@ -33,11 +34,35 @@
     "node": ">=22"
   },
   "dependencies": {
-    "@micafox/protocol": "workspace:*",
+    "@micafox/protocol": "workspace:^",
     "ws": "^8.22.1"
   },
   "devDependencies": {
     "@micafox/configs": "workspace:*",
     "@types/ws": "^8.18.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MicaFox-Platform/MicaFox.git",
+    "directory": "packages/sdk"
+  },
+  "homepage": "https://github.com/MicaFox-Platform/MicaFox/tree/main/packages/sdk#readme",
+  "bugs": {
+    "url": "https://github.com/MicaFox-Platform/MicaFox/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "import": {
+          "types": "./dist/esm/index.d.ts",
+          "default": "./dist/esm/index.js"
+        },
+        "require": {
+          "types": "./dist/cjs/index.d.ts",
+          "default": "./dist/cjs/index.js"
+        }
+      }
+    }
   }
 }

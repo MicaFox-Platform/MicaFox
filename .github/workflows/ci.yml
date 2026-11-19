@@ -16,6 +16,10 @@ jobs:
   verify:
     name: verify (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
+    # Read-only, also on a pull request from a fork: the signature step only reads the pull request's commits
+    permissions:
+      contents: read
+      pull-requests: read
     strategy:
       fail-fast: false
       matrix:
@@ -67,6 +71,31 @@ jobs:
           RANGE: ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}
         run: bash .github/scripts/check-names.sh commits "$RANGE"
 
+      # GitHub's verdict on every commit, as the ruleset sees it. Into staging only: the release PR from staging carries
+      # commits that were already checked. Dependabot and the version PR are signed by GitHub, so they pass
+      - name: Commit signatures
+        if: ${{ matrix.primary && github.base_ref == 'staging' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.pull_request.number }}
+        run: bash .github/scripts/check-signatures.sh pr "$REPO" "$NUMBER"
+
+      # The version PR and Dependabot skip it only from a branch of this repo: a fork names its branch freely
+      - name: Changesets
+        if: >-
+          ${{ matrix.primary && github.base_ref == 'staging' && !(
+            github.event.pull_request.head.repo.full_name == github.repository &&
+            (github.head_ref == 'changeset-release/staging' || startsWith(github.head_ref, 'dependabot/'))
+          ) }}
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: bash .github/scripts/check-changesets.sh pr "$BASE"
+
+      - name: No changeset left
+        if: ${{ matrix.primary && github.base_ref == 'main' }}
+        run: bash .github/scripts/check-changesets.sh release
+
       - name: Linter
         run: pnpm lint
 
@@ -87,6 +116,10 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      # Packs each package under packages/ as npm would receive it and lints the tarball, so it follows the build
+      - name: Tests of the packed packages
+        run: pnpm test:pack
 
       # Loads `dist/` of each package through import and require() in child processes, so it follows the build
       - name: Tests of the built output
@@ -150,10 +183,11 @@ jobs:
           echo "containers: ${left:-none}; networks: ${networks:-none}"
           test -z "$left$networks"
 
-  # One name for the whole matrix, to add to the ruleset once `docker` is stable
+  # One name for the whole matrix, to add to the ruleset once `docker` is stable. Skipped with `docker` on a rename, so
+  # a skip shows as skipped, not failed
   docker-result:
     needs: docker
-    if: ${{ always() && github.base_ref == 'staging' }}
+    if: ${{ always() && github.base_ref == 'staging' && github.event.action != 'edited' }}
     runs-on: ubuntu-latest
     steps:
       - name: All base images passed

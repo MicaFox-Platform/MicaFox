@@ -4,8 +4,7 @@ Open-source runtime platform for Node.js, built from SDK modules that share one 
 module is a debugger: set non-breaking breakpoints in a running application and get snapshots of its state, without
 changing code or redeploying.
 
-> Early development. The design and API below are decided, but the packages are not implemented or published yet,
-> and the API may still change.
+> Early development: the API may still change before 1.0.
 
 ## How it works
 
@@ -98,6 +97,7 @@ Logger, buffers, batching, rate limits and the rest: [SDK API](docs/api/sdk/over
 - Node.js 22 or later, with `import` or `require()`. The main thread is debugged; worker threads are not.
 - TypeScript apps and bundles ship source maps, inline or as `.map` files next to the JavaScript.
 - Tested with Fastify, Express, NestJS and Next.js: [compatibility](docs/api/sdk/overview.md#compatibility).
+- Overhead, measured on the Fastify example: [numbers](docs/api/sdk/overview.md#overhead).
 - No other debugger attached to the process: while breakpoints are set, MicaFox resumes every pause it did not cause.
   With `--inspect`, MicaFox does not start.
 

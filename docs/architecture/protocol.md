@@ -78,9 +78,7 @@ users import `@micafox/protocol`. None of them imports another to get a protocol
 2. Each version's messages and data types live in their own module, `src/v<N>.ts`, with `version` fixed to `<N>`; a
    bump adds `src/v<N+1>.ts` and leaves the older modules as they are, so a hub can keep accepting old sessions.
    Compatible additions go into the current `src/v<N>.ts`.
-3. Until the first release of the packages on npm, version 1 changes in place; from that release on, it follows the
-   rules above.
-4. Either change updates `docs/api/protocol.md` in the same pull request.
+3. Either change updates `docs/api/protocol.md` in the same pull request.
 
 ## Decisions
 

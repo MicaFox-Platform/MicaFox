@@ -83,7 +83,6 @@ The protocol version this package describes. Every message carries it in `versio
 version 1 and fix `version` to `1`. Additions that old peers can ignore keep it: an optional field, a new module, a
 new message type, and a new value of an enumerated field whose reader fallback is documented, such as a
 [`BreakpointStatus`](#breakpointstatus) `status`. Renaming, removing or retyping anything a peer reads bumps it.
-Until the packages' first release on npm, version 1 still changes in place.
 
 A session uses the version of its `hello`: `welcome` and every later message in both directions carry it, and a
 message with another version is a protocol error. A hub accepts every version it still has types for and closes

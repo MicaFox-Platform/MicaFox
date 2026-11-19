@@ -1,7 +1,8 @@
 # @micafox/testkit
 
 The end-to-end test kit and the benchmark of the examples: it starts their apps and one fake hub as real child
-processes and waits on what each prints, and `pnpm bench` measures the SDK's overhead in the Fastify example. Private
+processes and waits on what each prints, and `pnpm bench` measures the SDK's overhead in the Fastify example. Its
+`test/` also checks the scripts of `.github/scripts/`. Private
 and never published; only the examples (`examples/*`, `examples/frameworks/*`) depend on it, and ESLint keeps it out
 of `packages/`. It is never built: it exports its TypeScript sources, which Vitest and tsx run as
 they are.
@@ -23,7 +24,12 @@ they are.
   run it by that path, `connection.ts` answers one app and prints what it sends, `modules.ts` picks the modules of its
   `welcome`, `breakpoints.ts` reads the breakpoints to set and counts their time left down.
 - `test/` — `env-examples.test.ts`: the `.env.example` files and `start` scripts of the examples; `docker.test.ts`:
-  their Dockerfile and `compose.yaml` against those files, and the hub's `HOST`.
+  their Dockerfile and `compose.yaml` against those files, and the hub's `HOST`; `changesets.test.ts`: the changeset
+  checks of `.github/scripts/check-changesets.sh`, in a throwaway git repository; `packs.test.ts`: the tarball checks
+  of `.github/scripts/check-packs.sh` (`pnpm test:pack`), in a throwaway workspace; `release-github.test.ts`: the tags
+  and GitHub Releases of `.github/scripts/release-github.sh`, in a throwaway repository with stubbed `npm` and `gh`;
+  `signatures.test.ts`: the commit signature checks of `.github/scripts/check-signatures.sh`, against a stubbed `gh`
+  and in a throwaway repository with SSH-signed commits.
 - `docker/` — the container tests of `pnpm test:docker`, run by `vitest.docker.config.ts` only, never by `pnpm test`:
   `compose.test.yaml` locks down every service of `examples/compose.yaml` (read-only root filesystem, a writable
   `/tmp`, 256 MB, SDK errors only) and reports it healthy once it serves; `stack.ts` starts, follows, stops and

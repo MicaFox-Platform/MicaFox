@@ -13,11 +13,14 @@ import {
 let test: BreakpointsUnderTest;
 
 beforeEach(() => {
+  // The harness charges the pause budget on Date.now(): a frozen clock keeps a pause slowed by a busy runner from spending it
+  vi.useFakeTimers({ toFake: ["Date"] });
   test = createBreakpoints();
 });
 
 afterEach(() => {
   test.dispose();
+  vi.useRealTimers();
 });
 
 const status = (breakpointId: string, state: BreakpointStatus["status"], message?: string): BreakpointStatus => ({

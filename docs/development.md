@@ -50,7 +50,11 @@ pnpm lint         → one ESLint run over the repo
 pnpm format       → one Prettier check over the repo
 pnpm test:build   → tests of the built output: packages loaded with import and require(), examples/formats
                     and examples/frameworks/*; run pnpm build first
-pnpm verify       → lint → format → typecheck → build → test:build → test:coverage (≥ 80%), stops at the first failure
+pnpm test:pack    → pack each package under packages/ as npm would receive it and check the tarball: no src/ or
+                    tests, README.md and LICENSE, exports and workspace ranges, publint and Are the Types Wrong;
+                    run pnpm build first
+pnpm verify       → lint → format → typecheck → build → test:pack → test:build → test:coverage (≥ 80%), stops at the
+                    first failure
 pnpm verify:brief → the same steps, one line per green step and the start of a failure (for AI agents)
 pnpm verify:fix   → auto-fix lint and formatting
 pnpm docker:up    → optional, needs Docker: build an image per example app and start them with the fake hub
@@ -74,7 +78,8 @@ stack afterwards, also after a failure. `NODE_IMAGE=node:22-alpine pnpm test:doc
 - Unit tests live in the `__tests__/` folder of the folder that holds their module, so folders list only code.
   Tests that are not about one module (doc examples, lint boundaries, end-to-end) live in `packages/<name>/test/`, or in
   `examples/<name>/tests/` and `examples/frameworks/<name>/tests/` for the whole system; the configs package keeps all
-  its tests there, and `tools/testkit/test/` the checks of the examples' `.env.example` files and Docker setup.
+  its tests there, and `tools/testkit/test/` the checks of the examples' `.env.example` files and Docker setup and
+  of the changeset checks of CI.
   Coverage of `packages/*/src` must stay ≥ 80% in lines, branches and functions; a line no meaningful test can
   reach is excluded in `vitest.config.ts` with the reason, never covered by a hollow test.
 - Test behavior through the public surface. Mock only at the boundaries: the WebSocket, time and `node:inspector`.
@@ -150,25 +155,56 @@ agents also follow [CLAUDE.md](../CLAUDE.md).
 - **PR title.** Becomes the merge commit's title. Rename a PR with `gh pr edit <number> --title "…"`; CI re-runs.
   Release PRs from `staging` into `main` check only the title.
 
-Use one of these types; release tooling maps them to the changelog and semver. A change that spans several types is
-split into commits, or takes the main type and a scope: `ci(infra): …`.
+Use one of these types; they name the kind of change in history, while versions and changelogs come from changesets:
+[Releasing](#releasing). A change that spans several types is split into commits, or takes the main type and a
+scope: `ci(infra): …`.
 
-| Type       | For                                            |
-| ---------- | ---------------------------------------------- |
-| `feat`     | new behavior for users of the packages (minor) |
-| `fix`      | bug fix for users of the packages (patch)      |
-| `perf`     | faster or lighter, same behavior               |
-| `refactor` | code change with the same behavior             |
-| `docs`     | documentation only                             |
-| `test`     | tests only                                     |
-| `build`    | build, dependencies, package and tool configs  |
-| `ci`       | CI workflows, hooks and their scripts          |
-| `chore`    | anything else that does not reach users        |
-| `style`    | formatting only                                |
-| `revert`   | reverts an earlier commit                      |
+| Type       | For                                           |
+| ---------- | --------------------------------------------- |
+| `feat`     | new behavior for users of the packages        |
+| `fix`      | bug fix for users of the packages             |
+| `perf`     | faster or lighter, same behavior              |
+| `refactor` | code change with the same behavior            |
+| `docs`     | documentation only                            |
+| `test`     | tests only                                    |
+| `build`    | build, dependencies, package and tool configs |
+| `ci`       | CI workflows, hooks and their scripts         |
+| `chore`    | anything else that does not reach users       |
+| `style`    | formatting only                               |
+| `revert`   | reverts an earlier commit                     |
 
 `.github/scripts/check-names.sh` is the source of these rules; CI and the git hooks run it, and it prints the rules
 with examples on every failure. Check a name by hand: `bash .github/scripts/check-names.sh commit "<subject>"`.
+
+## Signing commits
+
+The rulesets of `staging` and `main` require a verified signature on every commit, and pull requests merge with merge
+commits, so every commit of yours is checked as it is. [Checks](#checks) tell you early; this is how to pass them.
+
+1. **Sign with an SSH key.** Use an existing key or create one with `ssh-keygen -t ed25519`, then:
+
+   ```bash
+   git config --global gpg.format ssh
+   git config --global user.signingkey ~/.ssh/id_ed25519.pub
+   git config --global commit.gpgsign true
+   ```
+
+2. **Add the key to GitHub** at [github.com/settings/keys](https://github.com/settings/keys) as a _Signing key_; an
+   authentication key does not verify commits.
+3. **Commit with a verified email.** The email of `git config user.email` must be verified at
+   [github.com/settings/emails](https://github.com/settings/emails), or be your `<id>+<name>@users.noreply.github.com`
+   address. Otherwise GitHub shows a valid signature as unverified (`no_user`).
+
+A commit already pushed to your pull request is signed again with a rebase and a force-push to the PR branch; the
+commits get new hashes:
+
+```bash
+git fetch origin
+git rebase --exec 'git commit --amend --no-edit -S' origin/staging
+git push --force-with-lease
+```
+
+If the email was the problem, fix `user.email` first and add `--reset-author` to the `--amend`.
 
 ## Checks
 
@@ -183,10 +219,10 @@ git commit ──▶ commit-msg ──▶ git push ──▶ pre-push ──▶ 
 
 `pnpm install` points git at `.githooks/`:
 
-| Hook         | Runs on      | Checks                                                                              |
-| ------------ | ------------ | ----------------------------------------------------------------------------------- |
-| `commit-msg` | `git commit` | the subject follows [Naming](#naming), before the commit exists                     |
-| `pre-push`   | `git push`   | subjects of commits on no remote yet, then `pnpm verify` on the working tree (~7 s) |
+| Hook         | Runs on      | Checks                                                                             |
+| ------------ | ------------ | ---------------------------------------------------------------------------------- |
+| `commit-msg` | `git commit` | the subject follows [Naming](#naming), before the commit exists                    |
+| `pre-push`   | `git push`   | subjects, [signatures](#signing-commits) of new commits, then `pnpm verify` (~7 s) |
 
 - Merge commits and `fixup!`, `squash!`, `amend!` commits pass `commit-msg`; `pre-push` stops the ones left
   unsquashed: run `git rebase -i --autosquash <base>`.
@@ -200,19 +236,27 @@ CI runs on every pull request into `staging` or `main`, and again on each new co
 runs on Node 22.13 (the oldest 22.x the dev toolchain runs on) and Node 24; the `ci` job passes when both
 legs pass. Steps, in order:
 
-| Step            | Fails when                                                                                  |
-| --------------- | ------------------------------------------------------------------------------------------- |
-| Only staging    | a pull request into `main` comes from a branch other than `staging`                         |
-| PR title        | the title breaks [Naming](#naming); fix it with `gh pr edit <number> --title "…"`           |
-| Commit messages | a non-merge commit subject breaks [Naming](#naming); skipped for release PRs from `staging` |
-| Linter … Tests  | `pnpm lint`, `pnpm format`, `pnpm typecheck` or `pnpm test` fails; coverage is checked once |
-| Build           | `pnpm build` fails, or `pnpm test:build` fails on the built output                          |
+| Step              | Fails when                                                                                            |
+| ----------------- | ----------------------------------------------------------------------------------------------------- |
+| Only staging      | a pull request into `main` comes from a branch other than `staging`                                   |
+| PR title          | the title breaks [Naming](#naming); fix it with `gh pr edit <number> --title "…"`                     |
+| Commit messages   | a non-merge commit subject breaks [Naming](#naming); skipped for release PRs from `staging`           |
+| Commit signatures | into `staging`: GitHub does not verify a commit, see [Signing commits](#signing-commits)              |
+| Changesets        | into `staging`: a public package's shipped files changed without a changeset, or a `major` one at 0.x |
+| No changeset left | into `main`: a changeset that names a package is left; merge the version PR first                     |
+| Linter … Tests    | `pnpm lint`, `pnpm format`, `pnpm typecheck` or `pnpm test` fails; coverage is checked once           |
+| Build             | `pnpm build` fails, `pnpm test:pack` fails on a tarball, or `pnpm test:build` on the build            |
 
-Only the Node 22.13 leg runs the name steps and the coverage run (`pnpm test:coverage`).
+Only the Node 22.13 leg runs the name steps, the signature step, the changeset steps and the coverage run
+(`pnpm test:coverage`). The signature step runs `.github/scripts/check-signatures.sh` with the default read-only
+token, also on pull requests from forks. The changeset steps run `.github/scripts/check-changesets.sh`; check a
+branch before you push with `bash .github/scripts/check-changesets.sh pr`, after `git add`: it sees no untracked
+file. The version PR and Dependabot skip the Changesets step.
 
 On pull requests into `staging` the `docker` job runs `pnpm test:docker` once per base image (`node:22-slim`,
 `node:22-alpine`, `node:24-slim`), in parallel, within 10 minutes each, and fails when the run left containers or
-networks behind; `docker-result` passes when all three pass. It is not a required check yet.
+networks behind; `docker-result` passes when all three pass. A rename skips both, as it needs no rebuild. It is not
+a required check yet.
 
 The `dependency-review` job fails when the pull request adds a dependency with a known vulnerability of high
 severity or worse. Dependabot pull requests skip the name steps.
@@ -228,7 +272,7 @@ merges when:
 
 - `ci` and `dependency-review` are green;
 - a [code owner](../.github/CODEOWNERS) approved it after its last push, and every review thread is resolved;
-- every commit is [signed](https://docs.github.com/en/authentication/managing-commit-signature-verification).
+- every commit is [signed](#signing-commits) and verified by GitHub.
 
 Pull requests are merged with merge commits only, so every commit lands in history as it is. Pull requests from
 forks wait for a maintainer to approve their CI run.
@@ -244,3 +288,57 @@ Claude Code runs these hooks from [.claude/settings.json](../.claude/settings.js
 | `stop-verify.sh` | before the agent finishes | requires a green `pnpm verify:brief` (`format` if only Markdown changed) |
 
 Agents are also denied force-pushes, `gh pr merge` and edits to `pnpm-lock.yaml`.
+
+## Releasing
+
+`@micafox/sdk`, `@micafox/protocol` and `@micafox/configs` are published to npm with
+[Changesets](https://github.com/changesets/changesets), each with its own version and `CHANGELOG.md`. Why:
+[ADR 0021](adr/packages/0021-version-and-publish-the-packages-with-changesets.md). `pnpm test:pack` checks every
+package's tarball on each `pnpm verify`; the published `exports` come from `publishConfig.exports`, the repo's
+`exports` without the `@micafox/source` condition, so change both together.
+
+```text
+PR + changeset ──▶ staging ──▶ version PR into staging ──▶ release PR into main ──▶ npm, tags, GitHub Releases
+```
+
+1. **Describe the change.** A pull request that changes what a public package ships adds a changeset with
+   `pnpm changeset`: the packages, the bump and one line for their users. While a package is 0.x, a breaking change
+   is `minor`; CI rejects `major`. What ships is set by `changedFilePatterns` in `.changeset/config.json`: sources,
+   the configs' preset folders, `tsconfig*.json`, `package.json` and `README.md`, without tests. A change there that users do not see,
+   such as a script or a dev dependency in `package.json`, takes `pnpm changeset --empty`.
+2. **Version.** Each push to `staging` with changesets opens or updates `chore(release): version packages` from
+   `changeset-release/staging` into `staging`: it bumps the versions, writes the changelogs and deletes the changesets
+   it applied. A GitHub App opens it and signs its commits, so CI runs on it and a code owner approves it like any
+   other. Empty changesets alone open no version pull request. `pnpm version-packages` runs `changeset version` and
+   then `.github/scripts/sync-sdk-version.sh`, which keeps `SDK_VERSION` equal to the SDK's `package.json`. To run it
+   without a new push, such as after a run that failed to start, use Actions → Version PR → Run workflow on `staging`.
+
+   It needs a one-time setup by a repository admin: a GitHub App with Contents and Pull requests write, installed on
+   this repository and not in the ruleset's bypass list; an environment `release-pr` whose deployment branches are
+   `staging` only; and in it the secrets `RELEASE_APP_CLIENT_ID` and `RELEASE_APP_PRIVATE_KEY` of the App. The
+   repository admits only GitHub's own actions, those of verified creators and `pnpm/action-setup@*`, so add
+   `changesets/action@*` to the allowed actions under Settings → Actions → General; without it
+   `.github/workflows/version-pr.yml` ends in `startup_failure` before any step runs.
+
+3. **Release.** Merge the version pull request last, then open the release pull request from `staging` into `main`;
+   CI rejects it while a changeset is left. After the merge, the publish job waits for approval in the `npm`
+   environment, then publishes every version not yet on npm, with provenance, and adds a
+   `@micafox/<package>@<version>` tag and a GitHub Release with the version's changelog section for each. The
+   workflow is `.github/workflows/release.yml`; it runs on Node 24 with npm >= 11.5.1, and only its job has
+   `id-token: write` and `contents: write`. `.github/scripts/release-github.sh` adds the Releases.
+
+   It needs a one-time setup by a repository admin: an environment `npm` with a required reviewer and `main` as its
+   only deployment branch.
+
+4. **When it fails.** Re-run the publish job: it publishes what is missing and adds the missing tags and Releases. A
+   published version cannot be taken back: `npm deprecate` it and release a fix through `staging`.
+5. **A package's first publish.** npm configures a trusted publisher only for a package that exists, so the first
+   release of each package goes through a token and every later one through OIDC:
+   1. Create a granular npm token: name `micafox-first-publish`, expiration 7 days, read and write for the `@micafox`
+      scope only, "Bypass two-factor authentication" on, since CI cannot answer a one-time password. Add it as the
+      secret `NPM_TOKEN` of the `npm` environment.
+   2. Release as above. With `NPM_TOKEN` set the job publishes with it, still with provenance.
+   3. On npmjs.com, in the package's Settings, add a Trusted Publisher: GitHub Actions, organization
+      `MicaFox-Platform`, repository `MicaFox`, workflow `release.yml`, environment `npm`. Under Publishing access
+      choose "Require two-factor authentication and disallow tokens".
+   4. Delete `NPM_TOKEN` from the environment and revoke the token on npm. Without it the job publishes through OIDC.
