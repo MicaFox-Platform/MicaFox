@@ -1,6 +1,6 @@
 {
   "name": "@micafox/sdk",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "MicaFox SDK: the debugger and the default hub connector, run inside the host app",
   "type": "module",
   "exports": {
