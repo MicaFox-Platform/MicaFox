@@ -176,6 +176,36 @@ scope: `ci(infra): …`.
 `.github/scripts/check-names.sh` is the source of these rules; CI and the git hooks run it, and it prints the rules
 with examples on every failure. Check a name by hand: `bash .github/scripts/check-names.sh commit "<subject>"`.
 
+## Signing commits
+
+The rulesets of `staging` and `main` require a verified signature on every commit, and pull requests merge with merge
+commits, so every commit of yours is checked as it is. [Checks](#checks) tell you early; this is how to pass them.
+
+1. **Sign with an SSH key.** Use an existing key or create one with `ssh-keygen -t ed25519`, then:
+
+   ```bash
+   git config --global gpg.format ssh
+   git config --global user.signingkey ~/.ssh/id_ed25519.pub
+   git config --global commit.gpgsign true
+   ```
+
+2. **Add the key to GitHub** at [github.com/settings/keys](https://github.com/settings/keys) as a _Signing key_; an
+   authentication key does not verify commits.
+3. **Commit with a verified email.** The email of `git config user.email` must be verified at
+   [github.com/settings/emails](https://github.com/settings/emails), or be your `<id>+<name>@users.noreply.github.com`
+   address. Otherwise GitHub shows a valid signature as unverified (`no_user`).
+
+A commit already pushed to your pull request is signed again with a rebase and a force-push to the PR branch; the
+commits get new hashes:
+
+```bash
+git fetch origin
+git rebase --exec 'git commit --amend --no-edit -S' origin/staging
+git push --force-with-lease
+```
+
+If the email was the problem, fix `user.email` first and add `--reset-author` to the `--amend`.
+
 ## Checks
 
 Each rule is checked as early as possible, where it is cheapest to fix. Every check prints `✓`, or what is wrong
@@ -189,10 +219,10 @@ git commit ──▶ commit-msg ──▶ git push ──▶ pre-push ──▶ 
 
 `pnpm install` points git at `.githooks/`:
 
-| Hook         | Runs on      | Checks                                                                              |
-| ------------ | ------------ | ----------------------------------------------------------------------------------- |
-| `commit-msg` | `git commit` | the subject follows [Naming](#naming), before the commit exists                     |
-| `pre-push`   | `git push`   | subjects of commits on no remote yet, then `pnpm verify` on the working tree (~7 s) |
+| Hook         | Runs on      | Checks                                                                             |
+| ------------ | ------------ | ---------------------------------------------------------------------------------- |
+| `commit-msg` | `git commit` | the subject follows [Naming](#naming), before the commit exists                    |
+| `pre-push`   | `git push`   | subjects, [signatures](#signing-commits) of new commits, then `pnpm verify` (~7 s) |
 
 - Merge commits and `fixup!`, `squash!`, `amend!` commits pass `commit-msg`; `pre-push` stops the ones left
   unsquashed: run `git rebase -i --autosquash <base>`.
@@ -211,15 +241,17 @@ legs pass. Steps, in order:
 | Only staging      | a pull request into `main` comes from a branch other than `staging`                                   |
 | PR title          | the title breaks [Naming](#naming); fix it with `gh pr edit <number> --title "…"`                     |
 | Commit messages   | a non-merge commit subject breaks [Naming](#naming); skipped for release PRs from `staging`           |
+| Commit signatures | into `staging`: GitHub does not verify a commit, see [Signing commits](#signing-commits)              |
 | Changesets        | into `staging`: a public package's shipped files changed without a changeset, or a `major` one at 0.x |
 | No changeset left | into `main`: a changeset that names a package is left; merge the version PR first                     |
 | Linter … Tests    | `pnpm lint`, `pnpm format`, `pnpm typecheck` or `pnpm test` fails; coverage is checked once           |
 | Build             | `pnpm build` fails, `pnpm test:pack` fails on a tarball, or `pnpm test:build` on the build            |
 
-Only the Node 22.13 leg runs the name steps, the changeset steps and the coverage run (`pnpm test:coverage`). The
-changeset steps run `.github/scripts/check-changesets.sh`; check a branch before you push with
-`bash .github/scripts/check-changesets.sh pr`, after `git add`: it sees no untracked file. The version PR and
-Dependabot skip the Changesets step.
+Only the Node 22.13 leg runs the name steps, the signature step, the changeset steps and the coverage run
+(`pnpm test:coverage`). The signature step runs `.github/scripts/check-signatures.sh` with the default read-only
+token, also on pull requests from forks. The changeset steps run `.github/scripts/check-changesets.sh`; check a
+branch before you push with `bash .github/scripts/check-changesets.sh pr`, after `git add`: it sees no untracked
+file. The version PR and Dependabot skip the Changesets step.
 
 On pull requests into `staging` the `docker` job runs `pnpm test:docker` once per base image (`node:22-slim`,
 `node:22-alpine`, `node:24-slim`), in parallel, within 10 minutes each, and fails when the run left containers or
@@ -239,7 +271,7 @@ merges when:
 
 - `ci` and `dependency-review` are green;
 - a [code owner](../.github/CODEOWNERS) approved it after its last push, and every review thread is resolved;
-- every commit is [signed](https://docs.github.com/en/authentication/managing-commit-signature-verification).
+- every commit is [signed](#signing-commits) and verified by GitHub.
 
 Pull requests are merged with merge commits only, so every commit lands in history as it is. Pull requests from
 forks wait for a maintainer to approve their CI run.
