@@ -1,6 +1,6 @@
 {
   "name": "@micafox/configs",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Shared TypeScript, ESLint, Prettier and Vitest configs",
   "type": "module",
   "exports": {
