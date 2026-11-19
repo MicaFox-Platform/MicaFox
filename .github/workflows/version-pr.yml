@@ -6,6 +6,9 @@ on:
   push:
     branches:
       - staging
+  # Re-runs it without a new push, for example after a run that failed to start. Run from staging: the environment
+  # below admits no other branch
+  workflow_dispatch:
 
 permissions:
   contents: read

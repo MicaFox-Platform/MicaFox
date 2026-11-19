@@ -309,7 +309,8 @@ PR + changeset ──▶ staging ──▶ version PR into staging ──▶ rel
    `changeset-release/staging` into `staging`: it bumps the versions, writes the changelogs and deletes the changesets
    it applied. A GitHub App opens it and signs its commits, so CI runs on it and a code owner approves it like any
    other. Empty changesets alone open no version pull request. `pnpm version-packages` runs `changeset version` and
-   then `.github/scripts/sync-sdk-version.sh`, which keeps `SDK_VERSION` equal to the SDK's `package.json`.
+   then `.github/scripts/sync-sdk-version.sh`, which keeps `SDK_VERSION` equal to the SDK's `package.json`. To run it
+   without a new push, such as after a run that failed to start, use Actions → Version PR → Run workflow on `staging`.
 
    It needs a one-time setup by a repository admin: a GitHub App with Contents and Pull requests write, installed on
    this repository and not in the ruleset's bypass list; an environment `release-pr` whose deployment branches are
