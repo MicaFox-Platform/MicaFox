@@ -157,6 +157,58 @@ describe("readPause redaction", () => {
     expect(find(read.variables, "v")).toEqual({ type: "string", value: url, length: url.length });
   });
 
+  it("redacts the built-in names at every depth, in an array item and under a map key, and keeps no secret", () => {
+    const rules = resolveRedaction(undefined, {}, () => undefined);
+    const { read } = readRealPause(
+      'const s = "values-secret-7c3d92"; const login = { user: "ada", password: s };' +
+        "const settings = { account: { nested: { deeper: { cookie: s } } } };" +
+        "const accounts = [{ id: 1, token: s }]; const headers = new Map([['authorization', s]]);",
+      { limits: [{ maxDepth: 5 }], dependencies: { isSecret: (name) => rules.isSecret(name) } },
+    );
+
+    const plain = (properties: Array<{ name: string; value: Value }>): Value => ({
+      type: "object",
+      className: "Object",
+      properties,
+    });
+    expect({
+      login: find(read.variables, "login"),
+      settings: find(read.variables, "settings"),
+      accounts: find(read.variables, "accounts"),
+      headers: find(read.variables, "headers"),
+      json: JSON.stringify(read.variables.filter((variable) => variable.name !== "s")),
+    }).toEqual({
+      login: plain([
+        { name: "user", value: { type: "string", value: "ada", length: 3 } },
+        { name: "password", value: REDACTED },
+      ]),
+      settings: plain([
+        {
+          name: "account",
+          value: plain([
+            { name: "nested", value: plain([{ name: "deeper", value: plain([{ name: "cookie", value: REDACTED }]) }]) },
+          ]),
+        },
+      ]),
+      accounts: {
+        type: "array",
+        length: 1,
+        items: [
+          plain([
+            { name: "id", value: { type: "number", value: 1 } },
+            { name: "token", value: REDACTED },
+          ]),
+        ],
+      },
+      headers: {
+        type: "map",
+        size: 1,
+        entries: [{ key: { type: "string", value: "authorization", length: 13 }, value: REDACTED }],
+      },
+      json: expect.not.stringContaining("values-secret-7c3d92") as unknown,
+    });
+  });
+
   it("redacts the built-in names with the rules that run() resolves", () => {
     const rules = resolveRedaction(undefined, {}, () => undefined);
     const { read } = readVariables(

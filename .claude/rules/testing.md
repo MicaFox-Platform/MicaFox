@@ -63,6 +63,10 @@ A folder lists only the code it runs; its tests sit one level down, in its own `
   package's sources by relative path, since they live in it. The whole system: in `examples/<name>/tests/` or
   `examples/frameworks/<name>/tests/`, through the public API only, with the example's harness beside them; it starts
   the example's own `src/` and the fake hub as child processes through `@micafox/testkit`, imported by package name.
+- A real process runs on real time: never assert what a time limit can cut, such as a snapshot's values beyond the
+  handler's own variables, which a pause lists first. Check content in the SDK's tests on the real V8 with a stopped
+  clock (`packages/sdk/test/capture/real-pause.ts`). An end-to-end test waits for an event until its timeout, such as
+  `fetchUntilSnapshot()`; it never repeats an assertion a fixed number of times.
 - A run ends when the process exits by itself; a deadline after the last request only kills one that never does, and
   a run that fails earlier kills its process. No sleeps and no assertion on elapsed real time: order is shown by
   markers the fixture writes to the same output as the code under test.
