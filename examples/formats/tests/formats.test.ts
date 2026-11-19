@@ -1,4 +1,4 @@
-import { E2E_TEST_TIMEOUT_MS, fetchInARow, useProcesses } from "@micafox/testkit";
+import { E2E_TEST_TIMEOUT_MS, fetchInARow, fetchUntilSnapshot, useProcesses } from "@micafox/testkit";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -35,10 +35,11 @@ describe.each(SUPPORTED_APPS)("the $name app on the built SDK", { timeout: E2E_T
     await waitForStatus(hub.run, (status) => status.status === "active");
 
     const statuses = await fetchInARow(toQuoteUrl(server.port), REQUESTS);
-    const [snapshot] = await hub.run.waitForMessages("snapshot");
-    const [top] = snapshot?.stack ?? [];
+    // The first of those snapshots, unless a slow pause cut it before the handler's variables; else one more request
+    const snapshot = await fetchUntilSnapshot(toQuoteUrl(server.port), hub.run);
+    const [top] = snapshot.stack;
 
-    expect({ statuses, file: top?.file, line: top?.line, variables: snapshot?.variables }).toEqual({
+    expect({ statuses, file: top?.file, line: top?.line, variables: snapshot.variables }).toEqual({
       statuses: Array.from({ length: REQUESTS }, () => 200),
       // For the tsc apps and the bundle, the original .ts file and line from the .map beside the compiled file
       file: expect.stringMatching(new RegExp(`/${escapeRegExp(toRepositoryPath(app.quoteSource))}$`)) as unknown,
