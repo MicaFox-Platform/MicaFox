@@ -337,8 +337,14 @@ PR + changeset ──▶ staging ──▶ version PR into staging ──▶ rel
    1. Create a granular npm token: name `micafox-first-publish`, expiration 7 days, read and write for the `@micafox`
       scope only, "Bypass two-factor authentication" on, since CI cannot answer a one-time password. Add it as the
       secret `NPM_TOKEN` of the `npm` environment.
-   2. Release as above. With `NPM_TOKEN` set the job publishes with it, still with provenance.
+   2. Release as above. With `NPM_TOKEN` set the job publishes with it, still with provenance. npm first creates a
+      `0.0.0-stage` placeholder of a new package, and its page may show that placeholder for a few minutes.
    3. On npmjs.com, in the package's Settings, add a Trusted Publisher: GitHub Actions, organization
-      `MicaFox-Platform`, repository `MicaFox`, workflow `release.yml`, environment `npm`. Under Publishing access
-      choose "Require two-factor authentication and disallow tokens".
-   4. Delete `NPM_TOKEN` from the environment and revoke the token on npm. Without it the job publishes through OIDC.
+      `MicaFox-Platform`, repository `MicaFox`, workflow `release.yml`, environment `npm`, with "Allow npm publish"
+      on: without it OIDC allows only `npm stage publish`, which `changeset publish` does not use. Under Publishing
+      access choose "Require two-factor authentication and disallow bypass 2fa tokens".
+   4. Delete only the secret `NPM_TOKEN`, not the `npm` environment: without the environment the job's next run
+      creates it with no reviewer and no branch rule. Revoke the token on npm. Without it the job publishes through
+      OIDC.
+   5. Release once more within 48 hours, with a patch changeset if nothing else is pending: npm keeps a new Trusted
+      Publisher pending until it publishes once, and shows the deadline on the package's Settings page.
