@@ -255,7 +255,8 @@ file. The version PR and Dependabot skip the Changesets step.
 
 On pull requests into `staging` the `docker` job runs `pnpm test:docker` once per base image (`node:22-slim`,
 `node:22-alpine`, `node:24-slim`), in parallel, within 10 minutes each, and fails when the run left containers or
-networks behind; `docker-result` passes when all three pass. It is not a required check yet.
+networks behind; `docker-result` passes when all three pass. A rename skips both, as it needs no rebuild. It is not
+a required check yet.
 
 The `dependency-review` job fails when the pull request adds a dependency with a known vulnerability of high
 severity or worse. Dependabot pull requests skip the name steps.
