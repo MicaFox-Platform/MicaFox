@@ -313,7 +313,10 @@ PR + changeset ──▶ staging ──▶ version PR into staging ──▶ rel
 
    It needs a one-time setup by a repository admin: a GitHub App with Contents and Pull requests write, installed on
    this repository and not in the ruleset's bypass list; an environment `release-pr` whose deployment branches are
-   `staging` only; and in it the secrets `RELEASE_APP_CLIENT_ID` and `RELEASE_APP_PRIVATE_KEY` of the App.
+   `staging` only; and in it the secrets `RELEASE_APP_CLIENT_ID` and `RELEASE_APP_PRIVATE_KEY` of the App. The
+   repository admits only GitHub's own actions, those of verified creators and `pnpm/action-setup@*`, so add
+   `changesets/action@*` to the allowed actions under Settings → Actions → General; without it
+   `.github/workflows/version-pr.yml` ends in `startup_failure` before any step runs.
 
 3. **Release.** Merge the version pull request last, then open the release pull request from `staging` into `main`;
    CI rejects it while a changeset is left. After the merge, the publish job waits for approval in the `npm`
