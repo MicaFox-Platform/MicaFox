@@ -183,10 +183,11 @@ jobs:
           echo "containers: ${left:-none}; networks: ${networks:-none}"
           test -z "$left$networks"
 
-  # One name for the whole matrix, to add to the ruleset once `docker` is stable
+  # One name for the whole matrix, to add to the ruleset once `docker` is stable. Skipped with `docker` on a rename, so
+  # a skip shows as skipped, not failed
   docker-result:
     needs: docker
-    if: ${{ always() && github.base_ref == 'staging' }}
+    if: ${{ always() && github.base_ref == 'staging' && github.event.action != 'edited' }}
     runs-on: ubuntu-latest
     steps:
       - name: All base images passed
