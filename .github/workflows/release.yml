@@ -40,8 +40,9 @@ jobs:
         with:
           node-version: 24
 
+      # A third-party action in the job that can publish: pinned to a commit, since its owner can move a tag
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
         with:
           version: 10.26.2
 
@@ -80,6 +81,10 @@ jobs:
         env:
           # Also for a token publish, which id-token: write makes possible
           NPM_CONFIG_PROVENANCE: "true"
+          # `changeset publish` tags what it published with annotated tags, which need a committer; without one each
+          # `git tag` fails, changesets still reports the tags as created, and the next step falls back to asking npm
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
         run: pnpm changeset publish
 
       # Also after a failed publish: the versions that did reach npm get their Release, and a re-run adds the rest
