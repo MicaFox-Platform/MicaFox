@@ -260,10 +260,9 @@ Agents are also denied force-pushes, `gh pr merge` and edits to `pnpm-lock.yaml`
 
 `@micafox/sdk`, `@micafox/protocol` and `@micafox/configs` are published to npm with
 [Changesets](https://github.com/changesets/changesets), each with its own version and `CHANGELOG.md`. Why:
-[ADR 0021](adr/packages/0021-version-and-publish-the-packages-with-changesets.md). `@micafox/sdk` and
-`@micafox/protocol` stay `private` until their first release, so until then only changes to `@micafox/configs` need a
-changeset. `pnpm test:pack` checks every package's tarball on each `pnpm verify`; the published `exports` come from
-`publishConfig.exports`, the repo's `exports` without the `@micafox/source` condition, so change both together.
+[ADR 0021](adr/packages/0021-version-and-publish-the-packages-with-changesets.md). `pnpm test:pack` checks every
+package's tarball on each `pnpm verify`; the published `exports` come from `publishConfig.exports`, the repo's
+`exports` without the `@micafox/source` condition, so change both together.
 
 ```text
 PR + changeset ──▶ staging ──▶ version PR into staging ──▶ release PR into main ──▶ npm, tags, GitHub Releases
