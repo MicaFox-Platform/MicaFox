@@ -41,7 +41,7 @@ packages/hub-core/src/server/db/
 ├── scope.ts          forOrg, global and system: transactions and session settings
 ├── policies.ts       the RLS policy helpers migrations use
 ├── migrator/         the ordered migrator, its lock, the unknown-migration and RLS checks
-├── writer/           the write queue: batching, per-organization groups, limits
+├── writer/           the write queue: batching, upserts, per-organization groups, limits, rejected rows
 ├── pglite/           the PGlite dialect, the app role inside it, the seed
 └── migrations/       hub-core's own migrations: 0001-<name>.ts, ...
 ```
@@ -92,17 +92,21 @@ Why Kysely and per-package migrations:
 ### Writing in batches
 
 1. Features write high-rate rows, such as snapshots, through `writer.insert(table, orgId, row)`, never one
-   `INSERT` each.
+   `INSERT` each. Rows that only hold the latest value, such as a breakpoint's status on an instance, go through
+   `writer.upsert(table, orgId, row, key)`: a newer row with the same key replaces the queued one.
 2. The writer flushes every 50 ms or at 500 rows: one transaction that, for each organization's group, runs
-   `set_config('micafox.org_id', …, true)` and one multi-row `INSERT`.
+   `set_config('micafox.org_id', …, true)` and one multi-row `INSERT`, or `INSERT … ON CONFLICT … DO UPDATE`.
 3. The queue holds at most `MICAFOX_WRITE_QUEUE_MAX_BYTES` (10 MiB). While Postgres is down it retries with backoff,
    and rows that do not fit are dropped and counted.
-4. The pool has `MICAFOX_DATABASE_POOL_SIZE` connections (10); a larger machine raises it together with the limits.
+4. A flush that fails on its data, SQLSTATE class 22 or 23, is never retried whole: the writer splits it, writes
+   the good rows, and drops and counts the rows Postgres rejects, with a collapsed warning naming the table.
+5. The pool has `MICAFOX_DATABASE_POOL_SIZE` connections (10); a larger machine raises it together with the limits.
 
 ### Running on PGlite
 
 1. `MICAFOX_DATABASE_URL=pglite:memory` or `pglite:<folder>` runs the hub on PGlite inside its own process, for tests,
-   the test mode and trials; the hub logs that it is not for production.
+   the [test mode](server.md#running-in-test-mode) and trials; the hub logs that it is not for production. A new
+   folder starts from the same seed as `pglite:memory`.
 2. PGlite connects as a superuser, so the adapter creates the app role and runs as it with `SET ROLE`; the
    superuser check applies to that role.
 3. `pglite:memory` loads `pglite-seed.tar.gz`, a database already migrated at build time, then runs only what is

@@ -72,6 +72,26 @@ packages/hub-core/src/server/
 5. It starts the jobs, turns ready and logs `hub.started` with the version, the build (hub or basic hub), the
    features and the settings without secrets.
 
+### Running in test mode
+
+1. `MICAFOX_TEST_MODE=true` starts the hub for automated tests and the Docker test stacks, from the same image and
+   build. It refuses to start unless `MICAFOX_DATABASE_URL` is `pglite:memory` or `pglite:<folder>`, and logs a
+   warning that it accepts SDK connections without a key.
+2. On an empty database it seeds the organization `Test`, the owner `owner@micafox.test` with
+   `MICAFOX_TEST_PASSWORD`, the project `test` with its `production` environment, and that environment's project
+   key from `MICAFOX_TEST_PROJECT_KEY`. A password or key not given is generated. A folder that already holds the
+   seed is used as it is, so a test can restart the hub on it and find its breakpoints.
+3. `MICAFOX_PORT=0` takes a free port. Without `MICAFOX_PUBLIC_URL`, the public URL is `http://localhost:<port>`
+   once bound, so the origin check and cookies work on it.
+4. Turning ready logs `hub.started` with `url`, the SDK URL, the seeded ids, and the password and key when they were
+   generated. `tools/testkit` reads that line, logs in with `POST /api/v1/session` and drives the tests through the
+   public API, polling it until a status or snapshot appears.
+5. The [SDK endpoint](sdk-endpoint.md#connecting-an-sdk) lets a connection without a key into the seeded
+   environment, so apps in Docker reach the hub over plain `ws://` by its host name. Everything else, limits and
+   checks included, is the same as in production.
+6. It is ready within 2 s and stays under 256 MB of memory with the example apps' load. Why:
+   [ADR 0037](../../adr/hub/server/0037-start-a-seeded-test-mode-on-pglite.md).
+
 ### Serving a request
 
 1. Fastify gives the request an id, echoed in `x-request-id`, and sets the security headers: a CSP of
@@ -114,8 +134,9 @@ Paths, errors and pagination: [HTTP API](../../api/hub/http.md). Why:
    `pg_try_advisory_lock` for the job on a connection of its own and skips the run when another holds it.
 2. A run is limited to its interval, 10 minutes at most; the next one starts after it ends. Failures are logged and
    counted.
-3. Core jobs: delete expired sessions, invites and reset links every hour; write the last use of project keys every
-   minute; run each feature's retention policy every hour, per organization, in batches.
+3. Core jobs: delete expired sessions, invites and reset links every hour; write the last use of project keys and
+   the last seen time of online [instances](sdk-endpoint.md#keeping-instances) every minute; delete instances
+   offline for 7 days every hour; run each feature's retention policy every hour, per organization, in batches.
 
 ### Logging
 
@@ -128,8 +149,9 @@ Paths, errors and pagination: [HTTP API](../../api/hub/http.md). Why:
    except `/healthz`, `/readyz` and metrics.
 4. Security events, such as a login, a failed login, a key created or revoked, an invite or a role change, are
    `info` lines with an `event` field.
-5. Never logged: `Authorization`, `Cookie`, `Set-Cookie`, passwords, tokens and snapshot contents. The one secret the
-   log ever holds is the setup token, printed while no owner exists.
+5. Never logged: `Authorization`, `Cookie`, `Set-Cookie`, passwords, tokens and snapshot contents. The only secrets
+   the log ever holds are the setup token, printed while no owner exists, and the password and key that
+   [test mode](#running-in-test-mode) generates when none is given.
 
 ### Metrics
 
@@ -152,3 +174,4 @@ Paths, errors and pagination: [HTTP API](../../api/hub/http.md). Why:
 
 - [0025. Build the hub server on Fastify with TypeBox schemas](../../adr/hub/server/0025-build-the-hub-server-on-fastify-with-typebox-schemas.md)
 - [0031. Version the HTTP API in the path, errors as RFC 9457](../../adr/hub/server/0031-version-the-http-api-in-the-path-errors-as-rfc-9457.md)
+- [0037. Start a seeded test mode on PGlite](../../adr/hub/server/0037-start-a-seeded-test-mode-on-pglite.md)

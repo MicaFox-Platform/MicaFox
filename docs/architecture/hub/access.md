@@ -68,6 +68,8 @@ packages/hub-core/src/server/access/
    403 and counts toward the login rate limit.
 3. Setup creates the organization, the owner and a session, deletes the token, and `/api/v1/setup` answers 404 from
    then on. Nobody else can claim a fresh hub, because the token is only in its log.
+4. In [test mode](server.md#running-in-test-mode) the owner and a project are seeded instead, and no setup token
+   exists.
 
 ### Logging in
 
@@ -134,6 +136,7 @@ Snapshots hold app data, so the hub guards who reads them and who can claim the 
 | Guessing passwords                 | an account                                           | rate limits per IP and email, scrypt                                                    |
 | A leaked database                  | hashes and app data                                  | only hashes of secrets; disk encryption is the operator's                               |
 | SQL injection setting another org  | another organization's rows                          | Kysely parameters only; with a separate owner role, the app role cannot turn RLS off    |
+| Test mode on a reachable port      | keyless SDK connections, the generated password      | only on PGlite, so it never holds real data; a warning at start                         |
 
 ## Decisions
 

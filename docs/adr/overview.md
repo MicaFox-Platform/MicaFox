@@ -14,6 +14,7 @@ writing one: [`.claude/rules/adr.md`](../../.claude/rules/adr.md).
 - [0021. Version and publish the packages with Changesets](packages/0021-version-and-publish-the-packages-with-changesets.md)
 - [0022. Split the hub into packages by role](packages/0022-split-the-hub-into-packages-by-role.md)
 - [0035. Release the hub as an image and a chart](packages/0035-release-the-hub-as-an-image-and-a-chart.md)
+- [0038. Let the test kit start the built hub](packages/0038-let-the-test-kit-start-the-built-hub.md)
 
 ## Protocol
 
@@ -70,6 +71,13 @@ writing one: [`.claude/rules/adr.md`](../../.claude/rules/adr.md).
 
 - [0025. Build the hub server on Fastify with TypeBox schemas](hub/server/0025-build-the-hub-server-on-fastify-with-typebox-schemas.md)
 - [0031. Version the HTTP API in the path, errors as RFC 9457](hub/server/0031-version-the-http-api-in-the-path-errors-as-rfc-9457.md)
+- [0037. Start a seeded test mode on PGlite](hub/server/0037-start-a-seeded-test-mode-on-pglite.md)
+
+## Hub: SDK endpoint
+
+`hub/sdk-endpoint/` — The WebSocket the SDK connects to, its sessions and connected instances.
+
+- [0036. Keep connected instances in hub-core](hub/sdk-endpoint/0036-keep-connected-instances-in-hub-core.md)
 
 ## Hub: database
 

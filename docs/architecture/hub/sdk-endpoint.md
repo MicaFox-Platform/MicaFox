@@ -11,6 +11,7 @@ messages to the feature that serves it, and sends each instance the state its fe
 - Owns:
   - `wss://<hub>/sdk`: the key check before the upgrade, the `hello` → `welcome` handshake, limits, liveness;
   - the open sessions of a replica, by environment and instance;
+  - connected instances: the `instances` table, whether each is online, and their API;
   - routing module messages to features, and resending a feature's state to an environment;
   - closing sessions when a key is revoked, entitlements change or the hub stops.
 - Does not own: message types and wire rules: [protocol](../../api/protocol.md); what a module's messages mean, such
@@ -45,7 +46,8 @@ packages/hub-core/src/server/sdk-endpoint/
 ├── upgrade.ts       the key check and limits, and the HTTP answer before the upgrade
 ├── handshake.ts     the hello timer and checks, the welcome modules
 ├── sessions.ts      open sessions by environment, replacing and closing them
-├── routing.ts       frames and batches to features, by module, then type
+├── routing.ts       frames and batches to features, by module, then type; depth and string checks
+├── instances.ts     the instances table, online state, last seen and the instances API
 └── liveness.ts      the idle timer and the per-session rate limit
 ```
 
@@ -57,7 +59,9 @@ packages/hub-core/src/server/sdk-endpoint/
    `wss://<hub>/sdk`, shown in the UI next to a new key.
 2. The endpoint looks the key up by its SHA-256 hash ([access](access.md#managing-project-keys)) and caches the
    result, with the organization's entitlements, for 60 s. Before any upgrade it answers, with a problem body:
-   - 401 without a bearer token; 403 for an unknown or revoked key; the SDK then waits its longest delay;
+   - 401 without a bearer token, except in [test mode](server.md#running-in-test-mode), where a connection
+     without one joins the seeded environment; 403 for an unknown or revoked key; the SDK then waits its longest
+     delay;
    - 429 over `MICAFOX_SDK_MAX_CONNECTIONS` (1000 per replica) or `MICAFOX_SDK_MAX_CONNECTIONS_PER_KEY` (500);
    - 503 while the hub is not ready, or when Postgres is down and the key is not cached; the SDK backs off as usual.
 3. After the upgrade the endpoint waits 10 s for `hello`. Another first frame or an invalid `hello` closes with
@@ -67,21 +71,24 @@ packages/hub-core/src/server/sdk-endpoint/
 4. It answers `welcome` at once with the modules of `hello` that a registered feature serves, without extension
    modules the organization is not entitled to.
 5. It registers the session: instance, organization, project, environment, key and modules, with the rest of
-   `hello`. An open session with the same `instanceId` in the same environment is closed with 1001; an
-   `instanceId` from another environment never replaces one.
+   `hello`, and [keeps the instance](#keeping-instances). An open session with the same `instanceId` in the same
+   environment is closed with 1001; an `instanceId` from another environment never replaces one. An `instanceId`
+   longer than 64 characters makes the `hello` invalid.
 6. For each agreed module it sends what the feature's `state(session)` returns, such as the full breakpoint list.
    It notes the key's last use; a job writes it every minute.
 
 ### Routing a message
 
-1. Each frame must be UTF-8 JSON of a protocol message or a `batch`, in the session's version; otherwise the session
-   closes with `protocolError`. A batch is handled message by message, in order.
-2. A repeated `hello`, a message without `module` (with a collapsed warning), a module the session did not agree on
+1. Each frame must be UTF-8 JSON of a protocol message or a `batch`, in the session's version, nested at most 64
+   levels deep; otherwise the session closes with `protocolError`. A batch is handled message by message, in order.
+2. NUL characters and unpaired surrogates in strings and property names, which Postgres cannot store, are replaced
+   with U+FFFD and counted, so no message can stall the [write queue](database.md#writing-in-batches).
+3. A repeated `hello`, a message without `module` (with a collapsed warning), a module the session did not agree on
    and an unknown one are ignored. Every other message goes to its feature's `onMessage(session, message)`, which
    checks it against its own schema.
-3. A session may send `MICAFOX_SDK_MAX_MESSAGES_PER_SECOND` (1000) messages a second over 10 s; the rest are
+4. A session may send `MICAFOX_SDK_MAX_MESSAGES_PER_SECOND` (1000) messages a second over 10 s; the rest are
    dropped and counted, with a collapsed warning.
-4. When `onMessage` throws, the error is logged and counted and the session stays open.
+5. When `onMessage` throws, the error is logged and counted and the session stays open.
 
 ### Resending the state
 
@@ -91,6 +98,23 @@ packages/hub-core/src/server/sdk-endpoint/
 3. The state is always complete, never a diff
    ([ADR 0010](../../adr/protocol/0010-send-the-full-breakpoint-set-on-every-change.md)), so a resend that is lost
    or overtaken is healed by the next one or by the reconnect.
+
+### Keeping instances
+
+1. Each `hello` upserts its instance into `instances`, keyed by environment and `instanceId`: service, labels,
+   hostname, pid, SDK, runtime, modules, commit, protocol version, the key's prefix and the connect time. Fields are
+   cut to fit: service at 128 characters, hostname at 255, the first 32 labels with keys of at most 64 and values
+   of at most 256 characters, SDK and runtime names and versions at 64; each cut is counted with a collapsed warning,
+   and the session stays.
+2. An instance is online while this replica holds a session for it; nothing in the table says so, so a crash or a
+   lost database never leaves an instance online. A job writes `last_seen_at` of the online ones every minute, and a
+   closed session writes it once more.
+3. A new instance beyond 1000 in an environment deletes the oldest offline one; offline instances not seen for 7
+   days are deleted every hour.
+4. `GET /api/v1/environments/{environmentId}/instances` lists them with `online` and every `hello` field
+   ([HTTP API](../../api/hub/http.md#instances)); `instance.connected` and `instance.disconnected` events keep the
+   screens live. Features read instances through hub-core and keep their own per-instance data. Why:
+   [ADR 0036](../../adr/hub/sdk-endpoint/0036-keep-connected-instances-in-hub-core.md).
 
 ### Keeping a session alive
 
@@ -114,3 +138,5 @@ packages/hub-core/src/server/sdk-endpoint/
 - [0016. Use the hello's protocol version for the session](../../adr/protocol/0016-use-the-hellos-protocol-version-for-the-session.md)
 - [0017. Tag messages with their module and agree on modules](../../adr/protocol/0017-tag-messages-with-their-module-and-agree-on-modules.md)
 - [0030. Use opaque prefixed tokens stored as hashes](../../adr/hub/access/0030-use-opaque-prefixed-tokens-stored-as-hashes.md)
+- [0036. Keep connected instances in hub-core](../../adr/hub/sdk-endpoint/0036-keep-connected-instances-in-hub-core.md)
+- [0037. Start a seeded test mode on PGlite](../../adr/hub/server/0037-start-a-seeded-test-mode-on-pglite.md)

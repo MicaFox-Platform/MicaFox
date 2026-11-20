@@ -82,7 +82,15 @@ Names are unique within their parent; a taken one is 409 `conflict`.
 
 `GET /api/v1/orgs/{orgId}/entitlements` — `{ entitlements: string[] }`, the paid features the organization may use.
 
-Feature endpoints live under `/api/v1/<feature>/…` and are documented with each feature.
+### Instances
+
+`GET /api/v1/environments/{environmentId}/instances` — a page of the app instances that connected to the
+environment in the last 7 days, online first, then by last seen: `{ id, online, service, labels, hostname, pid,
+sdk: { name, version }, runtime: { name, version }, modules, commit, protocolVersion, keyPrefix, connectedAt,
+lastSeenAt }`. `id` is the SDK's `instanceId`; the other fields come from its last
+[`hello`](../protocol.md#hello), cut to the hub's limits. `?online=true` and `?service=` filter it.
+
+Feature endpoints live under `/api/v1/<feature>/…` and are documented with each feature: [debugger](debugger.md).
 
 ## Usage
 

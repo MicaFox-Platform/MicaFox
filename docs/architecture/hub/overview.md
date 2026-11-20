@@ -40,6 +40,8 @@ Postgres except the SDK sockets it holds.
   writes and PGlite for tests.
 - [Access](access.md) — organizations, users, the first run, sessions, project keys, roles, entitlements and the
   threat model.
+- [Debugger](debugger.md) — `@micafox/hub-debugger`: breakpoints, their statuses per instance, snapshots, their
+  screens and API, within limits that keep a hub and its database bounded.
 - [Web](web.md) — the single-page app: shell, routes and navigation that features extend, live updates and the
   shell's screens.
 - [UI](ui.md) — `@micafox/ui`: the retro design tokens and components every screen is built from.
@@ -84,8 +86,11 @@ Two builds come from the one app:
 - [Starting the hub](server.md#starting) and [stopping it](server.md#stopping)
 - [Building both builds](app.md#building)
 - [Creating the first owner](access.md#creating-the-first-owner) and [logging in](access.md#logging-in)
-- [Connecting an SDK](sdk-endpoint.md#connecting-an-sdk) and
-  [resending the state to an environment](sdk-endpoint.md#resending-the-state)
+- [Connecting an SDK](sdk-endpoint.md#connecting-an-sdk), [keeping its instance](sdk-endpoint.md#keeping-instances)
+  and [resending the state to an environment](sdk-endpoint.md#resending-the-state)
+- [Setting a breakpoint](debugger.md#setting-a-breakpoint), [taking in a snapshot](debugger.md#taking-in-a-snapshot)
+  and [from a fresh hub to the first snapshot](debugger.md#from-a-fresh-hub-to-the-first-snapshot)
+- [Running in test mode](server.md#running-in-test-mode) for automated tests
 - [Serving a request](server.md#serving-a-request) inside its organization:
   [scoped queries](database.md#scoping-a-query)
 - [Writing snapshots in batches](database.md#writing-in-batches)
@@ -113,6 +118,13 @@ Not in S2; each has the socket that adds it without a redesign.
 | An encryption keyring for secrets the hub reads back | later | a keyring with `kid`, added with the first encrypted field                               |
 | Logo and fox mascot                                  | S4    | assets and tokens in `@micafox/ui`                                                       |
 | Mobile layouts and languages other than English      | later | layout primitives in `@micafox/ui`; UI strings in one `strings.ts` per package           |
+| Breakpoint conditions                                | S6    | a compatible optional field of `Breakpoint` in protocol version 1; the create dialog     |
+| Logpoints                                            | S6    | a new SDK module and feature package over the same session and contract                  |
+| Source view through git connectors                   | later | `file` and `line` are repository paths, and `commit` comes with every instance           |
+| SDK settings from the hub, such as capture limits    | later | a compatible module message sent with `state(session)`, as breakpoints are               |
+| Central redaction policies                           | S7    | an `ee/` extension part of the debugger; the SDK's redaction stays on                    |
+| Hit limits counted in the SDK                        | later | an optional `maxHits` in `Breakpoint`; the hub's own count stays the guard               |
+| Instances' online state across replicas              | S4    | online asked of the replica that holds the socket, through the event bus                 |
 
 ## Decisions
 
@@ -124,4 +136,4 @@ Not in S2; each has the socket that adds it without a redesign.
 
 Decisions of one component: [app](app.md#decisions), [server](server.md#decisions),
 [SDK endpoint](sdk-endpoint.md#decisions), [database](database.md#decisions), [access](access.md#decisions),
-[web](web.md#decisions), [UI](ui.md#decisions).
+[debugger](debugger.md#decisions), [web](web.md#decisions), [UI](ui.md#decisions).

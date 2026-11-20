@@ -11,7 +11,9 @@ web app, and ships them as the official image, a Compose setup and a Helm chart.
   - the list of features in their migration order, and the `#ee` import with its empty stub;
   - the two builds: **hub** (default, with `ee/`) and **basic hub** (`EE=false`), and the check that the basic hub
     holds no file from `ee/`;
-  - the `micafox-hub` command, the Dockerfile, `deploy/compose.yaml` with Caddy, and the Helm chart;
+  - the `micafox-hub` command, also exported as `./cli` for `tools/testkit`
+    ([ADR 0038](../../adr/packages/0038-let-the-test-kit-start-the-built-hub.md)), the Dockerfile,
+    `deploy/compose.yaml` with Caddy, and the Helm chart;
   - the hub's version, changelog and release.
 - Does not own: what runs inside the process, which is [hub-core](overview.md#packages) and the
   [features](features.md); the image's settings, which are [configuration](../../api/hub/config.md).

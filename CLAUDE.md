@@ -22,7 +22,7 @@ pnpm monorepo, Node >= 22, TypeScript (strict, NodeNext), Vitest, ESLint, Pretti
 | `packages/hub-<feature>`      | one hub feature each, `hub-debugger` first                                  | protocol, hub-core, ui |
 | `ee/hub`                      | paid hub extension, proprietary licence, no external PRs                    | the above, features    |
 | `packages/hub`                | the hub app: basic hub and hub builds, image, Compose, Helm chart           | the above, `#ee`       |
-| `tools/testkit`               | private E2E kit and benchmark of the examples, tests of the release scripts | protocol               |
+| `tools/testkit`               | private E2E kit and benchmark of the examples, tests of the release scripts | protocol, hub          |
 | `examples/formats`            | apps that load the built SDK per module format                              | sdk, protocol, testkit |
 | `examples/frameworks/fastify` | demo app, full debugger E2E                                                 | sdk, protocol, testkit |
 | `examples/frameworks/<name>`  | `express`, `nestjs`, `nextjs` on built SDK                                  | sdk, testkit           |
