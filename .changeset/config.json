@@ -7,8 +7,8 @@
   "format": "prettier",
   "fixed": [],
   "linked": [],
-  "ignore": [],
-  "privatePackages": { "version": false, "tag": false },
+  "ignore": ["@micafox/ui", "@micafox/hub-*", "@micafox/testkit", "@micafox/example-*"],
+  "privatePackages": { "version": true, "tag": false },
   "updateInternalDependencies": "patch",
   "changedFilePatterns": [
     "src/**",

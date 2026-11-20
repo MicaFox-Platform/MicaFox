@@ -1,6 +1,7 @@
 // The release scripts in .github/scripts: the changeset checks CI runs on every pull request, and the SDK_VERSION sync
 // of `pnpm version-packages`. Each test builds a throwaway git repository with the real .changeset/config.json, a
-// public 0.x package, a public 1.x package and a private one, and runs the script in it as CI does.
+// public 0.x package, a public 1.x package, the private test kit and the hub's packages, named as in the repository so
+// that the config's `ignore` list applies, and runs the script in it as CI does.
 
 import { spawnSync, type SpawnSyncReturns } from "node:child_process";
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -53,6 +54,7 @@ interface Manifest {
   readonly version: string;
   readonly private?: boolean;
   readonly scripts?: Record<string, string>;
+  readonly dependencies?: Record<string, string>;
 }
 
 const packageJson = (manifest: Manifest): string => JSON.stringify(manifest);
@@ -78,8 +80,16 @@ const createRepo = (): void => {
   write("packages/young/src/index.ts", "export const a = 1;\n");
   write("packages/stable/package.json", packageJson({ name: "@fixture/stable", version: "1.2.0" }));
   write("packages/stable/src/index.ts", "export const b = 1;\n");
-  write("packages/hidden/package.json", packageJson({ name: "@fixture/hidden", version: "0.1.0", private: true }));
-  write("packages/hidden/src/index.ts", "export const c = 1;\n");
+  write("packages/testkit/package.json", packageJson({ name: "@micafox/testkit", version: "0.1.0", private: true }));
+  write("packages/testkit/src/index.ts", "export const c = 1;\n");
+  write("packages/ui/package.json", packageJson({ name: "@micafox/ui", version: "0.0.0", private: true }));
+  write("packages/ui/src/index.ts", "export {};\n");
+  const hubCore = { name: "@micafox/hub-core", version: "0.0.0", private: true };
+  write("packages/hub-core/package.json", packageJson({ ...hubCore, dependencies: { "@micafox/ui": "workspace:*" } }));
+  write("packages/hub-core/src/index.ts", "export {};\n");
+  const hub = { name: "@micafox/hub", version: "0.0.0", private: true };
+  write("packages/hub/package.json", packageJson({ ...hub, dependencies: { "@micafox/hub-core": "workspace:*" } }));
+  write("packages/hub/src/index.ts", "export {};\n");
   commit("chore: base");
   git("switch", "--quiet", "--create", "feat/change");
 };
@@ -97,7 +107,7 @@ describe("check-changesets.sh pr", { timeout: E2E_TEST_TIMEOUT_MS }, () => {
     const result = run("pr", "staging");
 
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain("✗ a public package changed since staging without a changeset");
+    expect(result.stderr).toContain("✗ a public package or the hub changed since staging without a changeset");
     expect(result.stderr).toContain("pnpm changeset --empty");
   });
 
@@ -156,7 +166,9 @@ describe("check-changesets.sh pr", { timeout: E2E_TEST_TIMEOUT_MS }, () => {
   it.each([
     ["a unit test of a public package", "packages/young/src/__tests__/index.test.ts"],
     ["a file outside what the package ships", "packages/young/test/e2e.test.ts"],
-    ["a private package", "packages/hidden/src/index.ts"],
+    ["a private package", "packages/testkit/src/index.ts"],
+    ["a test of a hub package", "packages/hub-core/test/boundaries.test.ts"],
+    ["a unit test of a hub package", "packages/ui/src/__tests__/index.test.ts"],
     ["a file outside the packages", "docs/notes.md"],
   ])("needs no changeset for %s", (_, file) => {
     write(file, "export const changed = true;\n");
@@ -204,6 +216,84 @@ describe("check-changesets.sh pr", { timeout: E2E_TEST_TIMEOUT_MS }, () => {
     commit("feat!: break stable");
 
     expect(run("pr", "staging").status).toBe(0);
+  });
+});
+
+describe("check-changesets.sh pr on the hub", { timeout: E2E_TEST_TIMEOUT_MS }, () => {
+  it.each([
+    ["the UI kit", "packages/ui/src/index.ts"],
+    ["hub-core", "packages/hub-core/src/index.ts"],
+    ["a file of the app that Changesets does not track", "packages/hub/Dockerfile"],
+    ["ee/", "ee/hub/src/server/index.ts"],
+  ])("fails when %s changed without a changeset for @micafox/hub, and names the file", (_, file) => {
+    write(file, "export const changed = true;\n");
+    commit("feat: change the hub");
+
+    const result = run("pr", "staging");
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("✗ the hub changed since staging without a changeset for @micafox/hub");
+    expect(result.stderr).toContain(`  ${file}`);
+  });
+
+  it("fails on an untracked file under ee/, which git diff does not see", () => {
+    write("ee/hub/src/server/index.ts", "export {};\n");
+
+    const result = run("pr", "staging");
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      "untracked files are not checked, git add them first:\n  ee/hub/src/server/index.ts",
+    );
+  });
+
+  it("fails when the app's own sources changed without a changeset", () => {
+    write("packages/hub/src/index.ts", "export const changed = true;\n");
+    commit("feat: change the app");
+
+    const result = run("pr", "staging");
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("✗ a public package or the hub changed since staging without a changeset");
+  });
+
+  it("passes when a changeset names @micafox/hub", () => {
+    write("packages/ui/src/index.ts", "export const changed = true;\n");
+    write(".changeset/hub-change.md", changeset({ "@micafox/hub": "minor" }));
+    commit("feat: change the UI kit");
+
+    expect(run("pr", "staging").status).toBe(0);
+  });
+
+  it("passes with an empty changeset when hub users see no change", () => {
+    write("packages/hub-core/src/index.ts", "export const changed = true;\n");
+    write(".changeset/no-release.md", EMPTY_CHANGESET);
+    commit("refactor: change hub-core");
+
+    expect(run("pr", "staging").status).toBe(0);
+  });
+
+  it("fails when the only changeset names another package", () => {
+    write("packages/hub-core/src/index.ts", "export const changed = true;\n");
+    write("packages/young/src/index.ts", "export const a = 2;\n");
+    write(".changeset/young-change.md", changeset({ "@fixture/young": "minor" }));
+    commit("feat: change hub-core and young");
+
+    const result = run("pr", "staging");
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("without a changeset for @micafox/hub");
+  });
+
+  it("fails as changeset status does when a changeset names the hub with one of its ignored packages", () => {
+    write("packages/hub-core/src/index.ts", "export const changed = true;\n");
+    write(".changeset/mixed.md", changeset({ "@micafox/hub": "minor", "@micafox/hub-core": "minor" }));
+    commit("feat: change hub-core");
+
+    const result = run("pr", "staging");
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("✗ changeset status failed: see above");
   });
 });
 

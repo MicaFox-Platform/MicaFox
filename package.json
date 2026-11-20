@@ -15,7 +15,7 @@
     "bench": "node --import tsx tools/testkit/bench/main.ts",
     "test:watch": "vitest --coverage",
     "test:coverage": "vitest run --coverage",
-    "lint": "eslint . && bash .github/scripts/check-structure.sh && bash .github/scripts/check-actions.sh",
+    "lint": "eslint . && bash .github/scripts/check-structure.sh && bash .github/scripts/check-actions.sh && bash .github/scripts/check-licences.sh",
     "lint:fix": "eslint . --fix",
     "format": "prettier . --check",
     "format:fix": "prettier . --write",

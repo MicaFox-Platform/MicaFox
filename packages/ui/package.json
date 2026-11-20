@@ -1,0 +1,27 @@
+{
+  "name": "@micafox/ui",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The hub's design tokens and React components",
+  "type": "module",
+  "exports": {
+    ".": {
+      "@micafox/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "rm -rf ./dist && tsc -b tsconfig.json",
+    "typecheck": "tsc -b tsconfig.json"
+  },
+  "keywords": [],
+  "author": "Artem Horovyi",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@micafox/configs": "workspace:*"
+  }
+}

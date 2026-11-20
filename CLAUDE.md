@@ -28,8 +28,8 @@ pnpm monorepo, Node >= 22, TypeScript (strict, NodeNext), Vitest, ESLint, Pretti
 | `examples/frameworks/<name>`  | `express`, `nestjs`, `nextjs` on built SDK                                  | sdk, testkit           |
 
 Dependencies point down this table only. Only examples depend on `tools/testkit`, which is never published. The hub
-rows (`ui` to `hub`) are designed in `docs/architecture/hub/` and not built yet; they are private, AGPL-3.0 except
-`ui` (MIT) and `ee/` (its own licence).
+rows (`ui` to `hub`) are designed in `docs/architecture/hub/` and exist as empty scaffolds, except `ee/hub`, which is
+not created yet; they are private, AGPL-3.0 except `ui` (MIT) and `ee/` (its own licence).
 
 ## Commands
 

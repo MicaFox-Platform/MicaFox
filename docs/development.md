@@ -32,10 +32,19 @@ typecheck resolve: packages read each other's sources directly, so development n
 
 ### The hub
 
-The hub packages are designed in [architecture/hub](architecture/hub/overview.md) and arrive with the hub's tasks.
-They are private and ES modules only; `ui` is MIT, `ee/` has its own licence and takes no outside pull requests, and
-the rest is AGPL-3.0, where an outside pull request needs a signed CLA. Nothing imports `ee/` except `packages/hub`
-through `#ee`.
+The hub packages are designed in [architecture/hub](architecture/hub/overview.md); `ui`, `hub-core`, `hub-debugger`
+and `hub` exist as empty packages that the hub's tasks fill, and `ee/hub` comes with them. They are private and ES
+modules only; `ui` is MIT, `ee/` has its own licence and takes no outside pull requests, and the rest is
+AGPL-3.0-only, where an outside pull request needs a signed CLA. Nothing imports `ee/` except `packages/hub` through
+`#ee`; until `ee/hub` exists, `#ee` and `#ee/web` resolve to the basic hub's stubs in both builds.
+
+- ESLint holds the hub's dependency rule: each package imports only the packages above it in
+  [the table](architecture/hub/overview.md#packages), a feature never imports another feature, and `./web` and
+  `./schema` import no server code and no Node built-in.
+- `pnpm lint` runs `.github/scripts/check-licences.sh`: the third-party dependencies of the AGPL packages and `ee/`
+  take only permissive licences, LGPL and MPL-2.0, never GPL, AGPL, SSPL or an unknown one, and those of `ui` only
+  permissive ones
+  ([ADR 0022](adr/packages/0022-split-the-hub-into-packages-by-role.md)).
 
 - `pnpm dev` runs the hub on PGlite in `.micafox/dev-db/`, with no Docker: the web app with hot reload and the
   server in watch mode. Set `MICAFOX_DATABASE_URL` to use a Postgres you run, such as the one of
@@ -44,7 +53,9 @@ through `#ee`.
   `ee/`; CI also runs the database tests on Postgres 15 and 18.
 - `pnpm test:e2e` runs the browser tests with Playwright against both builds; like `pnpm test:docker` it is not part
   of `pnpm verify`.
-- A change under `packages/hub*/`, `packages/ui/` or `ee/` that hub users see takes a changeset for `@micafox/hub`.
+- A change under `packages/hub*/`, `packages/ui/` or `ee/` takes a changeset for `@micafox/hub`, or
+  `pnpm changeset --empty` when hub users see no change; changes to tests do not. Changesets versions `@micafox/hub`
+  alone among the private packages: `.changeset/config.json` ignores the others.
 
 ## Setup
 
@@ -261,17 +272,17 @@ CI runs on every pull request into `staging` or `main`, and again on each new co
 runs on Node 22.13 (the oldest 22.x the dev toolchain runs on) and Node 24; the `ci` job passes when both
 legs pass. Steps, in order:
 
-| Step              | Fails when                                                                                            |
-| ----------------- | ----------------------------------------------------------------------------------------------------- |
-| Only staging      | a pull request into `main` comes from a branch other than `staging`                                   |
-| PR title          | the title breaks [Naming](#naming); fix it with `gh pr edit <number> --title "…"`                     |
-| Commit messages   | a non-merge commit subject breaks [Naming](#naming); skipped for release PRs from `staging`           |
-| Commit signatures | into `staging`: GitHub does not verify a commit, see [Signing commits](#signing-commits)              |
-| Changesets        | into `staging`: a public package's shipped files changed without a changeset, or a `major` one at 0.x |
-| No changeset left | into `main`: a changeset that names a package is left; merge the version PR first                     |
-| Linter, Formatter | `pnpm lint` or `pnpm format` fails                                                                    |
-| Build … Tests     | `pnpm build`, `pnpm typecheck` or `pnpm test` fails; coverage is checked once                         |
-| Tests of the …    | `pnpm test:pack` fails on a tarball, or `pnpm test:build` on the build                                |
+| Step              | Fails when                                                                                                                                                               |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Only staging      | a pull request into `main` comes from a branch other than `staging`                                                                                                      |
+| PR title          | the title breaks [Naming](#naming); fix it with `gh pr edit <number> --title "…"`                                                                                        |
+| Commit messages   | a non-merge commit subject breaks [Naming](#naming); skipped for release PRs from `staging`                                                                              |
+| Commit signatures | into `staging`: GitHub does not verify a commit, see [Signing commits](#signing-commits)                                                                                 |
+| Changesets        | into `staging`: a public package's shipped files changed without a changeset, or a `major` one at 0.x; a hub file changed without one for `@micafox/hub` or an empty one |
+| No changeset left | into `main`: a changeset that names a package is left; merge the version PR first                                                                                        |
+| Linter, Formatter | `pnpm lint` or `pnpm format` fails                                                                                                                                       |
+| Build … Tests     | `pnpm build`, `pnpm typecheck` or `pnpm test` fails; coverage is checked once                                                                                            |
+| Tests of the …    | `pnpm test:pack` fails on a tarball, or `pnpm test:build` on the build                                                                                                   |
 
 Only the Node 22.13 leg runs the name steps, the signature step, the changeset steps, the linter, the formatter, the
 typecheck and the coverage run (`pnpm test:coverage`): none of them depends on the Node version. A new push to a
@@ -324,8 +335,11 @@ force-pushes, `gh pr merge` and edits to `pnpm-lock.yaml`.
 
 `@micafox/sdk`, `@micafox/protocol` and `@micafox/configs` are published to npm with
 [Changesets](https://github.com/changesets/changesets), each with its own version and `CHANGELOG.md`. Why:
-[ADR 0021](adr/packages/0021-version-and-publish-the-packages-with-changesets.md). `pnpm test:pack` checks every
-package's tarball on each `pnpm verify`; the published `exports` come from `publishConfig.exports`, the repo's
+[ADR 0021](adr/packages/0021-version-and-publish-the-packages-with-changesets.md). The private `@micafox/hub` is
+versioned the same way, with its own `CHANGELOG.md`, but never published to npm or tagged; a release of a package it
+depends on, such as `@micafox/protocol`, bumps it too
+([ADR 0035](adr/packages/0035-release-the-hub-as-an-image-and-a-chart.md)). `pnpm test:pack` checks every
+public package's tarball on each `pnpm verify`; the published `exports` come from `publishConfig.exports`, the repo's
 `exports` without the `@micafox/source` condition, so change both together.
 
 ```text
@@ -336,7 +350,8 @@ PR + changeset ──▶ staging ──▶ version PR into staging ──▶ rel
    `pnpm changeset`: the packages, the bump and one line for their users. While a package is 0.x, a breaking change
    is `minor`; CI rejects `major`. What ships is set by `changedFilePatterns` in `.changeset/config.json`: sources,
    the configs' preset folders, `tsconfig*.json`, `package.json` and `README.md`, without tests. A change there that users do not see,
-   such as a script or a dev dependency in `package.json`, takes `pnpm changeset --empty`.
+   such as a script or a dev dependency in `package.json`, takes `pnpm changeset --empty`. Any change to a file of
+   the hub other than a test takes a changeset for `@micafox/hub` or an empty one: [The hub](#the-hub).
 2. **Version.** Each push to `staging` with changesets opens or updates `chore(release): version packages` from
    `changeset-release/staging` into `staging`: it bumps the versions, writes the changelogs and deletes the changesets
    it applied. A GitHub App opens it and signs its commits, so CI runs on it and a code owner approves it like any
