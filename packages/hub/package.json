@@ -1,0 +1,43 @@
+{
+  "name": "@micafox/hub",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The MicaFox hub app: the hub and basic hub builds, the image, Compose setup and Helm chart",
+  "type": "module",
+  "imports": {
+    "#ee": {
+      "micafox-open-core": "./src/ee-stub.ts",
+      "default": "./src/ee-stub.ts"
+    },
+    "#ee/web": {
+      "micafox-open-core": "./src/web/ee-stub.ts",
+      "default": "./src/web/ee-stub.ts"
+    }
+  },
+  "exports": {
+    ".": {
+      "@micafox/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "rm -rf ./dist && tsc -b tsconfig.json",
+    "typecheck": "tsc -b tsconfig.json"
+  },
+  "keywords": [],
+  "author": "Artem Horovyi",
+  "license": "AGPL-3.0-only",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@micafox/hub-core": "workspace:*",
+    "@micafox/hub-debugger": "workspace:*",
+    "@micafox/protocol": "workspace:*",
+    "@micafox/ui": "workspace:*"
+  },
+  "devDependencies": {
+    "@micafox/configs": "workspace:*"
+  }
+}

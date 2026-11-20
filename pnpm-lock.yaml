@@ -192,6 +192,54 @@ importers:
         specifier: ^4.1.11
         version: 4.1.11(@types/node@26.6.5)(@vitest/coverage-v8@4.1.11)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
+  packages/hub:
+    dependencies:
+      '@micafox/hub-core':
+        specifier: workspace:*
+        version: link:../hub-core
+      '@micafox/hub-debugger':
+        specifier: workspace:*
+        version: link:../hub-debugger
+      '@micafox/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@micafox/ui':
+        specifier: workspace:*
+        version: link:../ui
+    devDependencies:
+      '@micafox/configs':
+        specifier: workspace:*
+        version: link:../configs
+
+  packages/hub-core:
+    dependencies:
+      '@micafox/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@micafox/ui':
+        specifier: workspace:*
+        version: link:../ui
+    devDependencies:
+      '@micafox/configs':
+        specifier: workspace:*
+        version: link:../configs
+
+  packages/hub-debugger:
+    dependencies:
+      '@micafox/hub-core':
+        specifier: workspace:*
+        version: link:../hub-core
+      '@micafox/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@micafox/ui':
+        specifier: workspace:*
+        version: link:../ui
+    devDependencies:
+      '@micafox/configs':
+        specifier: workspace:*
+        version: link:../configs
+
   packages/protocol:
     devDependencies:
       '@micafox/configs':
@@ -213,6 +261,12 @@ importers:
       '@types/ws':
         specifier: ^8.18.2
         version: 8.18.2
+
+  packages/ui:
+    devDependencies:
+      '@micafox/configs':
+        specifier: workspace:*
+        version: link:../configs
 
   tools/testkit:
     dependencies:

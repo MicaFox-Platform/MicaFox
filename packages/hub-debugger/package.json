@@ -1,0 +1,42 @@
+{
+  "name": "@micafox/hub-debugger",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The hub's debugger feature: breakpoints, snapshots, their screens and API",
+  "type": "module",
+  "exports": {
+    ".": {
+      "@micafox/source": "./src/server/index.ts",
+      "types": "./dist/server/index.d.ts",
+      "default": "./dist/server/index.js"
+    },
+    "./web": {
+      "@micafox/source": "./src/web/index.ts",
+      "types": "./dist/web/index.d.ts",
+      "default": "./dist/web/index.js"
+    },
+    "./schema": {
+      "@micafox/source": "./src/schema/index.ts",
+      "types": "./dist/schema/index.d.ts",
+      "default": "./dist/schema/index.js"
+    }
+  },
+  "scripts": {
+    "build": "rm -rf ./dist && tsc -b tsconfig.json",
+    "typecheck": "tsc -b tsconfig.json"
+  },
+  "keywords": [],
+  "author": "Artem Horovyi",
+  "license": "AGPL-3.0-only",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@micafox/hub-core": "workspace:*",
+    "@micafox/protocol": "workspace:*",
+    "@micafox/ui": "workspace:*"
+  },
+  "devDependencies": {
+    "@micafox/configs": "workspace:*"
+  }
+}

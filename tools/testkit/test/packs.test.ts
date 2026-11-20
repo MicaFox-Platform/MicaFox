@@ -96,6 +96,16 @@ describe("check-packs.sh", { timeout: PACK_TEST_TIMEOUT_MS }, () => {
     expect(result.status).toBe(0);
   });
 
+  it("skips a private package, which is never published", () => {
+    write("packages/hub/package.json", JSON.stringify({ name: "@fixture/hub", version: "0.0.0", private: true }));
+    write("packages/hub/src/index.ts", "export {};\n");
+
+    const result = run();
+
+    expect(result.stderr).toBe("");
+    expect(result.status).toBe(0);
+  });
+
   it("fails when the tarball ships the sources", () => {
     writePackage("core", manifest("@fixture/core", { files: ["dist", "src"] }));
 

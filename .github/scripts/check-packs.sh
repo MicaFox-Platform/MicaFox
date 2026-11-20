@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Packs every package under packages/ as npm would receive it and checks the tarball: what it ships, its packed
+# Packs every public package under packages/ as npm would receive it and checks the tarball: what it ships, its packed
 # package.json, then publint and Are the Types Wrong. Run by `pnpm test:pack` after `pnpm build`. Every failure says
 # what is wrong and how to fix it.
 set -uo pipefail
@@ -24,6 +24,8 @@ versions=$(jq -s 'map({ (.name): .version }) | add' packages/*/package.json)
 for dir in packages/*/; do
   dir=${dir%/}
   name=$(jq -r '.name' "$dir/package.json")
+  # A private package is never published, such as the hub's (docs/architecture/hub/overview.md#packages)
+  jq -e '.private == true' "$dir/package.json" >/dev/null && continue
   out="$tmp/${dir##*/}"
   mkdir -p "$out"
 
