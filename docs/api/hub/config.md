@@ -16,7 +16,7 @@ Kubernetes secret: `MICAFOX_DATABASE_URL_FILE=/run/secrets/db`.
 | `MICAFOX_DATABASE_URL` (`_FILE`)           | required              | `postgres://…` for the app role, or `pglite:memory` / `pglite:<folder>` for tests and trials  |
 | `MICAFOX_MIGRATION_DATABASE_URL` (`_FILE`) | the database URL      | the owner role that runs migrations                                                           |
 | `MICAFOX_DATABASE_POOL_SIZE`               | `10`                  | connections in the pool                                                                       |
-| `MICAFOX_HOST`, `MICAFOX_PORT`             | `0.0.0.0`, `8080`     | where the hub listens                                                                         |
+| `MICAFOX_HOST`, `MICAFOX_PORT`             | `0.0.0.0`, `8080`     | where the hub listens; port `0` takes a free one                                              |
 | `MICAFOX_TRUST_PROXY`                      | `false`               | which proxies' `X-Forwarded-*` to believe: `true`, a hop count, or IPs and CIDRs              |
 | `MICAFOX_LOG_LEVEL`                        | `info`                | `debug`, `info`, `warn` or `error`                                                            |
 | `MICAFOX_LOG_FORMAT`                       | `json`                | `json`, or `pretty` for development                                                           |
@@ -28,10 +28,29 @@ Kubernetes secret: `MICAFOX_DATABASE_URL_FILE=/run/secrets/db`.
 | `MICAFOX_SDK_MAX_CONNECTIONS_PER_KEY`      | `500`                 | SDK connections per project key                                                               |
 | `MICAFOX_SDK_MAX_MESSAGES_PER_SECOND`      | `1000`                | messages a second per SDK connection, over 10 s                                               |
 | `MICAFOX_WRITE_QUEUE_MAX_BYTES`            | `10485760`            | rows waiting to be written; more are dropped and counted                                      |
-| `MICAFOX_RETENTION_<NAME>_DAYS`            | set by each feature   | how long a feature keeps its data, such as `MICAFOX_RETENTION_SNAPSHOTS_DAYS`                 |
+| `MICAFOX_RETENTION_<NAME>_DAYS`            | set by each feature   | how long a feature keeps its data, such as `MICAFOX_RETENTION_SNAPSHOTS_DAYS` (30)            |
+| `MICAFOX_DEBUGGER_SNAPSHOTS_PER_SECOND`    | `100`                 | snapshots the hub takes in per environment a second, over 10 s; more are dropped and counted  |
+| `MICAFOX_DEBUGGER_MAX_SNAPSHOTS`           | `100000`              | snapshots kept per environment; the oldest are deleted every minute                           |
+| `MICAFOX_TEST_MODE`                        | `false`               | `true` starts [test mode](#test-mode); only with a `pglite:` database                         |
+| `MICAFOX_TEST_PROJECT_KEY` (`_FILE`)       | generated, logged     | the seeded environment's project key in test mode, `mfx_pk_` and 43 characters                |
+| `MICAFOX_TEST_PASSWORD` (`_FILE`)          | generated, logged     | the seeded owner's password in test mode, 12 to 256 characters                                |
 
 The hub refuses to start when `MICAFOX_PUBLIC_URL` is HTTP on another host, when its database role is a superuser
 or has `BYPASSRLS`, or when the database was migrated by a newer hub.
+
+### Test mode
+
+For automated tests and test stacks, never for real data. With `MICAFOX_TEST_MODE=true` and a `pglite:` database the
+hub seeds, on an empty database, the organization `Test`, the owner `owner@micafox.test`, the project `test` with
+its `production` environment, and a project key for it. SDK connections without a key join that environment too,
+so apps in Docker can use plain `ws://`. Without `MICAFOX_PUBLIC_URL` the public URL is `http://localhost:<port>`.
+When ready, the hub logs one `hub.started` line with `url`, `sdkUrl`, `orgId`, `projectId`, `environmentId`, and the
+password and key when it generated them. It starts within 2 s.
+
+```sh
+MICAFOX_TEST_MODE=true MICAFOX_DATABASE_URL=pglite:memory MICAFOX_PORT=0 \
+  MICAFOX_TEST_PROJECT_KEY=mfx_pk_0000000000000000000000000000000000000000000 micafox-hub start
+```
 
 ### Commands
 

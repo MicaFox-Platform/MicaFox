@@ -67,7 +67,10 @@ tests run after the build. `examples/frameworks/express`, `nestjs` and `nextjs` 
 NestJS app built by the Nest CLI and a Next.js app whose route handlers `next build` bundles, served by `next start`;
 their tests run after the build too. All the examples start their processes and
 one fake hub through `tools/testkit` (`@micafox/testkit`), a private, never-published kit that only examples depend on,
-which also holds `pnpm bench`, the benchmark of the SDK's overhead: [README](../../tools/testkit/README.md).
+which also holds `pnpm bench`, the benchmark of the SDK's overhead: [README](../../tools/testkit/README.md). Once
+the hub is built, the kit starts it in [test mode](hub/server.md#running-in-test-mode) from `@micafox/hub` in place of
+the fake hub ([ADR 0038](../adr/packages/0038-let-the-test-kit-start-the-built-hub.md)); `pnpm bench` keeps the fake
+hub, and `pnpm bench:hub` measures the hub with simulated instances.
 
 The protocol and the SDK ship as ES modules and CommonJS, so apps load them with `import` or `require()`; the hub
 packages are ES modules only.

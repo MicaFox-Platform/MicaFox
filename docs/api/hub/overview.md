@@ -55,7 +55,8 @@ settings yourself.
 ## Exports
 
 - [HTTP API](http.md) — `/api/v1`: conventions, errors, pagination and the endpoints of the hub's core.
-- [Configuration](config.md) — every setting, the `micafox-hub` commands, health and metrics.
+- [Debugger](debugger.md) — `/api/v1/debugger`: breakpoints, their statuses per instance, and snapshots.
+- [Configuration](config.md) — every setting, test mode, the `micafox-hub` commands, health and metrics.
 
 The SDK connects to `wss://<hub>/sdk` with a project key: [SDK usage](../sdk/overview.md#usage) and
 [the handshake](../protocol.md#hello).
@@ -74,6 +75,9 @@ MICAFOX_TOKEN=mfx_pk_...
 MICAFOX_SERVICE=checkout
 ```
 
-4. Invite your team from the organization's settings: each invite is a link you send them yourself.
+4. The app appears under the environment's connected apps. On the debugger screen, set a breakpoint on a file and
+   line of your repository; each instance reports it `active`, or the reason it cannot be set, and every hit
+   appears as a snapshot within 2 s.
+5. Invite your team from the organization's settings: each invite is a link you send them yourself.
 
 Architecture: [hub overview](../../architecture/hub/overview.md).

@@ -21,7 +21,7 @@ table only, and packages import each other by package name, never by relative pa
 | `packages/hub-<feature>`      | one hub feature each, such as `hub-debugger`                              | protocol, hub-core, ui |
 | `ee/hub`                      | the hub's paid extension, under `ee/LICENSE`                              | the above, features    |
 | `packages/hub`                | the hub app: both builds, the image, Compose files and the Helm chart     | the above, `#ee`       |
-| `tools/testkit`               | private kit of the examples' E2E tests and benchmark: runner, fake hub    | protocol               |
+| `tools/testkit`               | private kit of the examples' E2E tests and benchmark: runner, fake hub    | protocol, hub          |
 | `examples/formats`            | one app per module format, run on the built SDK                           | sdk, protocol, testkit |
 | `examples/frameworks/fastify` | Fastify demo app to try the SDK by hand, with the full debugger E2E suite | sdk, protocol, testkit |
 | `examples/frameworks/<name>`  | `express`, `nestjs` and `nextjs`: one app each, run on the built SDK      | sdk, testkit           |
