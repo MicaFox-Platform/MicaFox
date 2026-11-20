@@ -25,8 +25,13 @@ over one WebSocket; every module message names its module, and the handshake agr
 carries. The [debugger](sdk/debugger.md) is the SDK's only module: it sets breakpoints through the V8
 inspector and captures snapshots of variables without stopping the app. The [logger](sdk/logger.md) writes the SDK's
 own problems to the app's logger or `console`. The hub decides which breakpoints exist and receives the snapshots;
-it is not part of this repository yet, and any server that speaks the [protocol](protocol.md) can act as one. Every
-peer builds against the protocol.
+any server that speaks the [protocol](protocol.md) can act as one, and every peer builds against the protocol.
+
+The [hub](hub/overview.md) is one process: it serves the web app, the HTTP API under `/api/v1` and the SDK
+endpoint `/sdk`, keeps its state in Postgres, isolates organizations with row-level security, and gains features,
+such as the debugger's screens and storage, through one feature contract. Its open core is AGPL-3.0; paid features
+live in `ee/` under their own licence and reach the official image through one `#ee` import, while CI builds the
+open "basic hub" without them.
 
 What the host app can rely on:
 
@@ -49,6 +54,10 @@ The exact limits: [SDK API](../api/sdk/overview.md#installation).
   and `ws`: [architecture](sdk/overview.md), [API](../api/sdk/overview.md).
 - `@micafox/configs` — shared TypeScript, ESLint, Prettier and Vitest presets; dev-time only, never in the
   host app: [architecture](configs.md), [API](../api/configs.md).
+- The hub — private packages, never on npm, shipped as the image `ghcr.io/micafox-platform/hub`:
+  `@micafox/ui` (MIT), `@micafox/hub-core`, `@micafox/hub-debugger` and the app `@micafox/hub` (AGPL-3.0), and
+  `@micafox/hub-ee` in `ee/hub` (proprietary): [architecture](hub/overview.md#packages),
+  [API](../api/hub/overview.md).
 
 `examples/frameworks/fastify` is a demo app to try the SDK by hand: a Fastify server debugged by `micafox` under tsx,
 with the kit's fake hub setting a sample breakpoint, and its end-to-end tests run both as real processes.
@@ -60,7 +69,8 @@ their tests run after the build too. All the examples start their processes and
 one fake hub through `tools/testkit` (`@micafox/testkit`), a private, never-published kit that only examples depend on,
 which also holds `pnpm bench`, the benchmark of the SDK's overhead: [README](../../tools/testkit/README.md).
 
-The protocol and the SDK ship as ES modules and CommonJS, so apps load them with `import` or `require()`.
+The protocol and the SDK ship as ES modules and CommonJS, so apps load them with `import` or `require()`; the hub
+packages are ES modules only.
 
 ## Key flows
 
@@ -84,6 +94,11 @@ One debugging session, end to end:
    created, sending buffered snapshots.
 
 Throughout, every part [writes its problems](sdk/logger.md#writing-a-line) through the logger.
+
+On the hub's side: [connecting an SDK](hub/sdk-endpoint.md#connecting-an-sdk),
+[resending the state](hub/sdk-endpoint.md#resending-the-state), [serving a request](hub/server.md#serving-a-request)
+and [pushing a live update](hub/web.md#pushing-a-live-update); all of the hub's flows:
+[hub overview](hub/overview.md#key-flows).
 
 Changing the contract between peers: [changing the protocol](protocol.md#changing-the-protocol).
 

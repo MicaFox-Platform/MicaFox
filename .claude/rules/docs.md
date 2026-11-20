@@ -36,7 +36,10 @@ made from `.claude/templates/architecture.md` is input for `/architect` only and
 Decisions. Layout is the decided folder tree of the component; a change that adds, moves or removes a folder or a
 source file updates it in the same PR. A package that
 is one component gets `<package>.md`; a package with several large components gets a folder `<package>/` with one
-`<component>.md` per component (`sdk/connector.md`, `sdk/debugger.md`).
+`<component>.md` per component (`sdk/connector.md`, `sdk/debugger.md`). A product made of several packages gets one
+folder too: `hub/` holds the hub's packages, its `overview.md` lists them in Packages, and adds a Deferred section
+after Key flows: what is left for a later stage, with the stage and the socket that makes it possible. Its API docs
+live in `docs/api/hub/` and its ADRs in `docs/adr/hub/<component>/`.
 
 ## `docs/api/`
 

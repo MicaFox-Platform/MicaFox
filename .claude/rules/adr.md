@@ -22,6 +22,7 @@ is on `staging`: supersede it.
 
 - File `docs/adr/<component>/NNNN-kebab-title.md`, in the folder of the component the choice belongs to, named like
   its architecture doc: `protocol/`, `sdk/connector/`, `sdk/debugger/`, `sdk/logger/`; `sdk/` for the SDK as a whole,
+  `hub/app/`, `hub/server/`, `hub/database/`, `hub/access/`, `hub/web/`, `hub/ui/` for the hub's components,
   `packages/` for package boundaries and publishing. A new component gets a new folder. The number is the next free
   one across all folders, no gaps. Copy `.claude/templates/adr.md` and keep its sections in order: Status, Context,
   Decision, Alternatives, Consequences.

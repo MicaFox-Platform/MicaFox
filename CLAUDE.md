@@ -17,12 +17,19 @@ pnpm monorepo, Node >= 22, TypeScript (strict, NodeNext), Vitest, ESLint, Pretti
 | `packages/configs`            | shared tsconfig / eslint / prettier / vitest                                | -                      |
 | `packages/protocol`           | messages, protocol version, `Connector`                                     | -                      |
 | `packages/sdk`                | debugger and default connector, in host app                                 | protocol               |
+| `packages/ui`                 | the hub's design tokens and React components (MIT)                          | -                      |
+| `packages/hub-core`           | hub server and web shell: feature contract, DB, access, SDK endpoint        | protocol, ui           |
+| `packages/hub-<feature>`      | one hub feature each, `hub-debugger` first                                  | protocol, hub-core, ui |
+| `ee/hub`                      | paid hub extension, proprietary licence, no external PRs                    | the above, features    |
+| `packages/hub`                | the hub app: basic hub and hub builds, image, Compose, Helm chart           | the above, `#ee`       |
 | `tools/testkit`               | private E2E kit and benchmark of the examples, tests of the release scripts | protocol               |
 | `examples/formats`            | apps that load the built SDK per module format                              | sdk, protocol, testkit |
 | `examples/frameworks/fastify` | demo app, full debugger E2E                                                 | sdk, protocol, testkit |
 | `examples/frameworks/<name>`  | `express`, `nestjs`, `nextjs` on built SDK                                  | sdk, testkit           |
 
-Dependencies point down this table only. Only examples depend on `tools/testkit`, which is never published.
+Dependencies point down this table only. Only examples depend on `tools/testkit`, which is never published. The hub
+rows (`ui` to `hub`) are designed in `docs/architecture/hub/` and not built yet; they are private, AGPL-3.0 except
+`ui` (MIT) and `ee/` (its own licence).
 
 ## Commands
 
@@ -62,6 +69,7 @@ finish; fix what they report instead of arguing with it.
 
 - The SDK must never crash, throw into, or block the host app.
 - Packages import each other only by package name, never by relative path.
+- Nothing imports `ee/` except `packages/hub`, through `#ee`; the basic hub build (`EE=false`) must hold no file of it.
 - Protocol changes in `packages/protocol` are backward-compatible or bump the protocol version.
 - A public API change updates `docs/api/` in the same PR.
 - A change to what a public package ships adds a changeset in the same PR: `pnpm changeset`, or
