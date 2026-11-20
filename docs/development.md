@@ -16,6 +16,11 @@ table only, and packages import each other by package name, never by relative pa
 | `packages/configs`            | shared tsconfig, ESLint, Prettier and Vitest presets                      | -                      |
 | `packages/protocol`           | messages, `PROTOCOL_VERSION` and the `Connector` type                     | -                      |
 | `packages/sdk`                | `src/debugger/` and `src/connector/`, run inside the host app             | protocol               |
+| `packages/ui`                 | the hub's design tokens, fonts, icons and React components                | -                      |
+| `packages/hub-core`           | the hub's server, web shell, database, access and SDK endpoint            | protocol, ui           |
+| `packages/hub-<feature>`      | one hub feature each, such as `hub-debugger`                              | protocol, hub-core, ui |
+| `ee/hub`                      | the hub's paid extension, under `ee/LICENSE`                              | the above, features    |
+| `packages/hub`                | the hub app: both builds, the image, Compose files and the Helm chart     | the above, `#ee`       |
 | `tools/testkit`               | private kit of the examples' E2E tests and benchmark: runner, fake hub    | protocol               |
 | `examples/formats`            | one app per module format, run on the built SDK                           | sdk, protocol, testkit |
 | `examples/frameworks/fastify` | Fastify demo app to try the SDK by hand, with the full debugger E2E suite | sdk, protocol, testkit |
@@ -24,6 +29,22 @@ table only, and packages import each other by package name, never by relative pa
 A package exports its `src/index.ts` under the `@micafox/source` condition, which `pnpm dev`, tests and
 typecheck resolve: packages read each other's sources directly, so development needs no build step.
 `tools/testkit` is never built: it exports its sources only.
+
+### The hub
+
+The hub packages are designed in [architecture/hub](architecture/hub/overview.md) and arrive with the hub's tasks.
+They are private and ES modules only; `ui` is MIT, `ee/` has its own licence and takes no outside pull requests, and
+the rest is AGPL-3.0, where an outside pull request needs a signed CLA. Nothing imports `ee/` except `packages/hub`
+through `#ee`.
+
+- `pnpm dev` runs the hub on PGlite in `.micafox/dev-db/`, with no Docker: the web app with hot reload and the
+  server in watch mode. Set `MICAFOX_DATABASE_URL` to use a Postgres you run, such as the one of
+  `packages/hub/deploy/compose.yaml`.
+- `pnpm verify` runs the hub's tests on PGlite and checks that the basic hub build (`EE=false`) holds no file from
+  `ee/`; CI also runs the database tests on Postgres 15 and 18.
+- `pnpm test:e2e` runs the browser tests with Playwright against both builds; like `pnpm test:docker` it is not part
+  of `pnpm verify`.
+- A change under `packages/hub*/`, `packages/ui/` or `ee/` that hub users see takes a changeset for `@micafox/hub`.
 
 ## Setup
 

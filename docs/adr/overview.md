@@ -12,6 +12,8 @@ writing one: [`.claude/rules/adr.md`](../../.claude/rules/adr.md).
 - [0001. Keep the protocol in its own package](packages/0001-keep-the-protocol-in-its-own-package.md)
 - [0013. Publish the packages as ES modules and CommonJS](packages/0013-publish-the-packages-as-es-modules-and-commonjs.md)
 - [0021. Version and publish the packages with Changesets](packages/0021-version-and-publish-the-packages-with-changesets.md)
+- [0022. Split the hub into packages by role](packages/0022-split-the-hub-into-packages-by-role.md)
+- [0035. Release the hub as an image and a chart](packages/0035-release-the-hub-as-an-image-and-a-chart.md)
 
 ## Protocol
 
@@ -55,6 +57,48 @@ writing one: [`.claude/rules/adr.md`](../../.claude/rules/adr.md).
 
 - [0014. Pass SDK logs as a full message and a context](sdk/logger/0014-pass-sdk-logs-as-a-full-message-and-a-context.md)
 - [0015. Filter SDK logs by level before the app's logger](sdk/logger/0015-filter-sdk-logs-by-level-before-the-apps-logger.md)
+
+## Hub: app
+
+`hub/app/` — The hub application, its builds and the open core.
+
+- [0023. Build the open core and ee/ from one app with #ee](hub/app/0023-build-the-open-core-and-ee-from-one-app-with-ee.md)
+
+## Hub: server
+
+`hub/server/` — The hub's HTTP server and its API conventions.
+
+- [0025. Build the hub server on Fastify with TypeBox schemas](hub/server/0025-build-the-hub-server-on-fastify-with-typebox-schemas.md)
+- [0031. Version the HTTP API in the path, errors as RFC 9457](hub/server/0031-version-the-http-api-in-the-path-errors-as-rfc-9457.md)
+
+## Hub: database
+
+`hub/database/` — Storage, migrations and isolation of organizations.
+
+- [0026. Query Postgres with Kysely and migrate per package](hub/database/0026-query-postgres-with-kysely-and-migrate-per-package.md)
+- [0027. Run hub tests and the test mode on PGlite](hub/database/0027-run-hub-tests-and-the-test-mode-on-pglite.md)
+- [0028. Isolate organizations with row-level security](hub/database/0028-isolate-organizations-with-row-level-security.md)
+
+## Hub: access
+
+`hub/access/` — Users, sessions, tokens and entitlements.
+
+- [0024. Gate paid features by entitlements on the server](hub/access/0024-gate-paid-features-by-entitlements-on-the-server.md)
+- [0029. Keep UI sessions in Postgres behind a cookie](hub/access/0029-keep-ui-sessions-in-postgres-behind-a-cookie.md)
+- [0030. Use opaque prefixed tokens stored as hashes](hub/access/0030-use-opaque-prefixed-tokens-stored-as-hashes.md)
+
+## Hub: web
+
+`hub/web/` — The web app in the browser.
+
+- [0032. Push live updates to the UI over server-sent events](hub/web/0032-push-live-updates-to-the-ui-over-server-sent-events.md)
+- [0033. Build the web app with React, Vite and TanStack](hub/web/0033-build-the-web-app-with-react-vite-and-tanstack.md)
+
+## Hub: UI
+
+`hub/ui/` — The UI kit and its look.
+
+- [0034. Style the UI with CSS Modules, tokens and React Aria](hub/ui/0034-style-the-ui-with-css-modules-tokens-and-react-aria.md)
 
 ## Superseded
 

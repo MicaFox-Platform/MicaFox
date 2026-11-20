@@ -1,0 +1,63 @@
+# Hub configuration
+
+## Installation
+
+The hub reads its settings from the environment when it starts. It checks all of them first; on any problem it
+prints every one and exits with code 1. Settings marked `_FILE` can instead be read from a file, such as a Docker or
+Kubernetes secret: `MICAFOX_DATABASE_URL_FILE=/run/secrets/db`.
+
+## Exports
+
+### Settings
+
+| Setting                                    | Default               | Meaning                                                                                       |
+| ------------------------------------------ | --------------------- | --------------------------------------------------------------------------------------------- |
+| `MICAFOX_PUBLIC_URL`                       | required              | the URL users open: `https://…`, or `http://` on `localhost`, `127.0.0.1` or `[::1]`; no path |
+| `MICAFOX_DATABASE_URL` (`_FILE`)           | required              | `postgres://…` for the app role, or `pglite:memory` / `pglite:<folder>` for tests and trials  |
+| `MICAFOX_MIGRATION_DATABASE_URL` (`_FILE`) | the database URL      | the owner role that runs migrations                                                           |
+| `MICAFOX_DATABASE_POOL_SIZE`               | `10`                  | connections in the pool                                                                       |
+| `MICAFOX_HOST`, `MICAFOX_PORT`             | `0.0.0.0`, `8080`     | where the hub listens                                                                         |
+| `MICAFOX_TRUST_PROXY`                      | `false`               | which proxies' `X-Forwarded-*` to believe: `true`, a hop count, or IPs and CIDRs              |
+| `MICAFOX_LOG_LEVEL`                        | `info`                | `debug`, `info`, `warn` or `error`                                                            |
+| `MICAFOX_LOG_FORMAT`                       | `json`                | `json`, or `pretty` for development                                                           |
+| `MICAFOX_METRICS_PORT`                     | off                   | a port for Prometheus metrics, apart from the API                                             |
+| `MICAFOX_SETUP_TOKEN` (`_FILE`)            | a random one, logged  | the setup token for the first owner, for automation                                           |
+| `MICAFOX_SOURCE_URL`                       | this version's source | where the UI's Source link points; set it when you run a modified hub                         |
+| `MICAFOX_SDK_MAX_FRAME_BYTES`              | `1048576`             | largest frame from the SDK; raise it with the SDK's `buffer.maxBytes`                         |
+| `MICAFOX_SDK_MAX_CONNECTIONS`              | `1000`                | SDK connections per hub                                                                       |
+| `MICAFOX_SDK_MAX_CONNECTIONS_PER_KEY`      | `500`                 | SDK connections per project key                                                               |
+| `MICAFOX_SDK_MAX_MESSAGES_PER_SECOND`      | `1000`                | messages a second per SDK connection, over 10 s                                               |
+| `MICAFOX_WRITE_QUEUE_MAX_BYTES`            | `10485760`            | rows waiting to be written; more are dropped and counted                                      |
+| `MICAFOX_RETENTION_<NAME>_DAYS`            | set by each feature   | how long a feature keeps its data, such as `MICAFOX_RETENTION_SNAPSHOTS_DAYS`                 |
+
+The hub refuses to start when `MICAFOX_PUBLIC_URL` is HTTP on another host, when its database role is a superuser
+or has `BYPASSRLS`, or when the database was migrated by a newer hub.
+
+### Commands
+
+Run them inside the hub's container: `docker compose exec hub micafox-hub <command>` or
+`kubectl exec deploy/hub -- micafox-hub <command>`.
+
+- `micafox-hub start` — the image's default: migrate, then serve.
+- `micafox-hub migrate` — run the missing migrations and exit.
+- `micafox-hub reset-password <email>` — print a one-time link, valid for an hour, to set a new password.
+- `micafox-hub version` — print the version and the build.
+
+### Health and metrics
+
+- `GET /healthz` — 200 while the process runs, also during migrations.
+- `GET /readyz` — 200 when the database answers, migrations are done and the hub is not stopping; 503 otherwise.
+- `GET /metrics` on `MICAFOX_METRICS_PORT` — Prometheus metrics of the process, HTTP, SDK connections, the database
+  and jobs, without organization or user labels.
+
+Logs are JSON lines on stdout; collect them with your platform. `SIGTERM` stops the hub within 30 s.
+
+## Usage
+
+```sh
+MICAFOX_PUBLIC_URL=https://hub.example.com
+MICAFOX_DATABASE_URL_FILE=/run/secrets/db_app_url
+MICAFOX_MIGRATION_DATABASE_URL_FILE=/run/secrets/db_owner_url
+MICAFOX_TRUST_PROXY=1
+MICAFOX_METRICS_PORT=9464
+```

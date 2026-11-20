@@ -9,6 +9,7 @@ The SDK is a set of modules that share one connector to the hub. The debugger is
 | `@micafox/sdk`      | debug a Node.js app: the debugger and its hub connector  | [SDK](sdk/overview.md)  |
 | `@micafox/protocol` | write a custom connector or hub: messages and interfaces | [protocol](protocol.md) |
 | `@micafox/configs`  | share TypeScript, ESLint, Prettier and Vitest presets    | [configs](configs.md)   |
+| Hub image           | run the hub: self-hosted with Compose or Helm            | [hub](hub/overview.md)  |
 
 How the packages fit together: [architecture overview](../architecture/overview.md).
 
@@ -18,6 +19,8 @@ How the packages fit together: [architecture overview](../architecture/overview.
   and call `micafox.run()` at startup: [SDK usage](sdk/overview.md#usage).
 - **Use another transport** — implement [`Connector`](protocol.md#connector) and pass it to the SDK as
   [`connector`](sdk/debugger.md#debuggeroptions).
+- **Run a hub** — start the image `ghcr.io/micafox-platform/hub` with Compose or Helm, create the owner, a project
+  and a project key, and point the SDK at `wss://<hub>/sdk`: [hub](hub/overview.md#usage).
 - **Write a hub** — check the project key, answer [`hello`](protocol.md#hello) with a
   [`welcome`](protocol.md#welcome) that lists the modules you accept, send
   [`breakpoints`](protocol.md#breakpoints), and receive [`batch`](protocol.md#batch), [`snapshot`](protocol.md#snapshot)
