@@ -1,5 +1,5 @@
 // The licence checks of .github/scripts/check-licences.sh (`pnpm lint`), against a stand-in for `pnpm licenses list`
-// in a throwaway repository that holds the hub's packages as in this one.
+// in a throwaway repository that holds the packages of packages/, hub/ and ee/ as in this one.
 
 import { spawnSync, type SpawnSyncReturns } from "node:child_process";
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -21,7 +21,13 @@ if [[ -e $STATE/broken && $(cat "$STATE/broken") == "$name" ]]; then echo "ERR_P
 answer="$STATE/$name.json"
 if [[ -e $answer ]]; then cat "$answer"; else echo "No licenses in packages found"; fi
 `;
-const PACKAGES = ["ui", "hub-core", "hub-debugger", "hub"];
+// Folder and package name, as in this repository
+const PACKAGES: Array<{ dir: string; name: string; license: string }> = [
+  { dir: "packages/ui", name: "ui", license: "MIT" },
+  { dir: "hub/core", name: "hub-core", license: "AGPL-3.0-only" },
+  { dir: "hub/debugger", name: "hub-debugger", license: "AGPL-3.0-only" },
+  { dir: "hub/app", name: "hub", license: "AGPL-3.0-only" },
+];
 
 let repo: string;
 let state: string;
@@ -32,6 +38,11 @@ const setDependencies = (packageDir: string, licenses: Record<string, string>): 
     Object.entries(licenses).map(([name, license]) => [license, [{ name, versions: ["1.0.0"], license }]]),
   );
   writeFileSync(path.join(state, `${packageDir}.json`), JSON.stringify(byLicense));
+};
+
+const writePackage = (dir: string, manifest: { name: string; license?: string | undefined }): void => {
+  mkdirSync(path.join(repo, dir), { recursive: true });
+  writeFileSync(path.join(repo, dir, "package.json"), JSON.stringify(manifest));
 };
 
 const run = (): SpawnSyncReturns<string> =>
@@ -53,9 +64,8 @@ beforeEach(() => {
   repo = mkdtempSync(path.join(tmpdir(), "micafox-licences-"));
   state = mkdtempSync(path.join(tmpdir(), "micafox-licences-state-"));
   spawnSync("git", ["init", "--quiet"], { cwd: repo });
-  for (const dir of PACKAGES) {
-    mkdirSync(path.join(repo, "packages", dir), { recursive: true });
-    writeFileSync(path.join(repo, "packages", dir, "package.json"), JSON.stringify({ name: `@micafox/${dir}` }));
+  for (const { dir, name, license } of PACKAGES) {
+    writePackage(dir, { name: `@micafox/${name}`, license });
   }
   mkdirSync(path.join(state, "bin"));
   writeFileSync(path.join(state, "bin", "pnpm"), PNPM_STUB);
@@ -91,11 +101,7 @@ describe("check-licences.sh", () => {
   });
 
   it("checks a feature package added later without a change to the script", () => {
-    mkdirSync(path.join(repo, "packages", "hub-logpoints"));
-    writeFileSync(
-      path.join(repo, "packages/hub-logpoints/package.json"),
-      JSON.stringify({ name: "@micafox/hub-logpoints" }),
-    );
+    writePackage("hub/logpoints", { name: "@micafox/hub-logpoints", license: "AGPL-3.0-only" });
     setDependencies("hub-logpoints", { "copyleft-lib": "GPL-2.0-or-later" });
 
     const result = run();
@@ -149,8 +155,7 @@ describe("check-licences.sh", () => {
   });
 
   it("checks the packages of ee/, which ship in the hub's image", () => {
-    mkdirSync(path.join(repo, "ee", "hub"), { recursive: true });
-    writeFileSync(path.join(repo, "ee/hub/package.json"), JSON.stringify({ name: "@micafox/hub-ee" }));
+    writePackage("ee/hub", { name: "@micafox/hub-ee", license: "SEE LICENSE IN LICENSE" });
     setDependencies("hub-ee", { "copyleft-lib": "AGPL-3.0-only" });
 
     const result = run();
@@ -175,5 +180,25 @@ describe("check-licences.sh", () => {
 
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("✗ @micafox/hub: pnpm licenses list printed no JSON object");
+  });
+
+  it.each([
+    ["packages/sdk", "AGPL-3.0-only", "everything under packages/ is MIT"],
+    ["hub/logpoints", "MIT", "everything under hub/ is AGPL-3.0-only"],
+    ["hub/logpoints", undefined, "everything under hub/ is AGPL-3.0-only"],
+    ["ee/hub", "AGPL-3.0-only", "ee/ is under its own terms"],
+  ])("fails when %s declares %s, which its folder does not allow", (dir, license, message) => {
+    writePackage(dir, { name: `@micafox/${dir.replace("/", "-")}`, license });
+
+    const result = run();
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(`✗ ${dir}/package.json: license is "${license ?? ""}": ${message}`);
+  });
+
+  it.each(["SEE LICENSE IN LICENSE", "UNLICENSED"])("passes ee/ under its own terms: %s", (license) => {
+    writePackage("ee/hub", { name: "@micafox/hub-ee", license });
+
+    expect(run().status).toBe(0);
   });
 });

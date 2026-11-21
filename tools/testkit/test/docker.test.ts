@@ -1,5 +1,5 @@
 // The Docker setup of the examples, checked without Docker against the files it must agree with: compose.yaml against
-// the Dockerfile's targets, the ports of examples/README.md and the .env.example files, the Dockerfile's commands
+// the Dockerfile's targets, the ports of sandbox/README.md and the .env.example files, the Dockerfile's commands
 // against the apps' start scripts and its paths against the hub's breakpoints. docker/ builds and runs the images.
 
 import { spawnSync } from "node:child_process";
@@ -24,9 +24,9 @@ const readText = (file: string): string => readFileSync(path.join(ROOT, file), "
 const readScripts = (directory: string): Record<string, string> =>
   (JSON.parse(readText(`${directory}/package.json`)) as { scripts?: Record<string, string> }).scripts ?? {};
 
-const dockerfile = readText("examples/Dockerfile");
+const dockerfile = readText("sandbox/Dockerfile");
 const testCompose = readText("tools/testkit/docker/compose.test.yaml");
-const compose = readText("examples/compose.yaml");
+const compose = readText("sandbox/compose.yaml");
 const hubEnvironment = parseEnv(readText("tools/testkit/.env.example"));
 const hubPort = Number(hubEnvironment.PORT);
 
@@ -64,7 +64,7 @@ const findRuntime = (name: string): string => {
 };
 const appPorts = services.map((service) => Number(service.published)).filter((port) => port !== hubPort);
 
-describe("examples/compose.yaml", () => {
+describe("sandbox/compose.yaml", () => {
   it("builds one service from each app's target of the Dockerfile", () => {
     expect(services.map((service) => service.target).sort()).toEqual(appStages.map(([name]) => name).sort());
   });
@@ -74,20 +74,20 @@ describe("examples/compose.yaml", () => {
     expect(compose.match(/^ {6}- "/gm)).toHaveLength(services.length);
   });
 
-  it("publishes the hub's port and the port of every app in examples/README.md", () => {
-    const readme = readText("examples/README.md");
+  it("publishes the hub's port and the port of every app in sandbox/README.md", () => {
+    const readme = readText("sandbox/README.md");
 
     expect(services.map((service) => Number(service.published))).toContain(hubPort);
     expect(appPorts.filter((port) => !readme.includes(`| \`${String(port)}\` |`))).toEqual([]);
   });
 
   it("publishes the port each app's .env.example or formats start script sets", () => {
-    const formatsDefaults = Object.entries(readScripts("examples/formats")).flatMap(([name, script]) => {
+    const formatsDefaults = Object.entries(readScripts("sandbox/formats")).flatMap(([name, script]) => {
       const match = /PORT=\$\{PORT:-(\d+)\}/.exec(script);
       return FORMATS_START.test(name) && match?.[1] !== undefined ? [Number(match[1])] : [];
     });
     const frameworkPorts = ["fastify", "express", "nestjs", "nextjs"].map((name) =>
-      Number(parseEnv(readText(`examples/frameworks/${name}/.env.example`)).PORT),
+      Number(parseEnv(readText(`sandbox/frameworks/${name}/.env.example`)).PORT),
     );
 
     expect([...frameworkPorts, ...formatsDefaults].sort()).toEqual([...appPorts].sort());
@@ -114,7 +114,7 @@ describe("the container tests of tools/testkit/docker/", () => {
   });
 });
 
-describe("examples/Dockerfile", () => {
+describe("sandbox/Dockerfile", () => {
   it("runs every app as the non-root node user", () => {
     expect(new Set(appStages.map(([name]) => findRuntime(name)))).toEqual(new Set(["runtime"]));
     expect(dockerfile).toMatch(/^FROM \S+ AS runtime\n(?:(?!FROM).*\n)*?USER node$/m);
@@ -126,13 +126,13 @@ describe("examples/Dockerfile", () => {
   });
 
   it.each([
-    ["express", "examples/frameworks/express", "start"],
-    ["nestjs", "examples/frameworks/nestjs", "start"],
-    ["formats-cjs", "examples/formats", "start:cjs"],
-    ["formats-esm", "examples/formats", "start:esm"],
-    ["formats-tsc-cjs", "examples/formats", "start:tsc-cjs"],
-    ["formats-tsc-esm", "examples/formats", "start:tsc-esm"],
-    ["formats-bundled", "examples/formats", "start:bundled"],
+    ["express", "sandbox/frameworks/express", "start"],
+    ["nestjs", "sandbox/frameworks/nestjs", "start"],
+    ["formats-cjs", "sandbox/formats", "start:cjs"],
+    ["formats-esm", "sandbox/formats", "start:esm"],
+    ["formats-tsc-cjs", "sandbox/formats", "start:tsc-cjs"],
+    ["formats-tsc-esm", "sandbox/formats", "start:tsc-esm"],
+    ["formats-bundled", "sandbox/formats", "start:bundled"],
   ])("starts %s with the file the %s script of %s runs", (stage, directory, script) => {
     const entry = readScripts(directory)[script]?.split(" ").at(-1);
 

@@ -37,20 +37,25 @@ const restrictImports = (component, allowed) => {
   ];
 };
 
-const TESTKIT_BAN = { name: "@micafox/testkit", message: "Only examples use @micafox/testkit (CLAUDE.md#packages)." };
+// The dependency matrix these rules enforce, folder by folder: docs/architecture/overview.md#packages
+const MATRIX = "docs/architecture/overview.md#packages";
 
-// Nothing imports ee/ but packages/hub, and only through #ee and #ee/web: ADR 0023
+// Product code (packages/, hub/, ee/) never imports tools/ or sandbox/: only the sandbox apps use the test kit
+const TESTKIT_BAN = { name: "@micafox/testkit", message: `Only the sandbox/ apps use @micafox/testkit (${MATRIX}).` };
+const SANDBOX_BAN = { regex: "^@micafox/example-", message: `Product code never imports sandbox/ (${MATRIX}).` };
+
+// Nothing imports ee/ but hub/app, and only through #ee and #ee/web: ADR 0023
 const EE_BAN = [
   {
     regex: String.raw`^@micafox/hub-ee(/|$)|(^|/)ee(/|$)`,
-    message: "Only packages/hub imports ee/, and only as #ee or #ee/web (ADR 0023).",
+    message: "Only hub/app imports ee/, and only as #ee or #ee/web (ADR 0023).",
   },
 ];
-const EE_ALIAS_BAN = { regex: "^#ee(/|$)", message: "Only packages/hub/src imports #ee and #ee/web (ADR 0023)." };
+const EE_ALIAS_BAN = { regex: "^#ee(/|$)", message: "Only hub/app/src imports #ee and #ee/web (ADR 0023)." };
 
-// A hub package's sources import only the @micafox packages above it in docs/architecture/hub/overview.md#packages,
-// any of their entries; @typescript-eslint/no-restricted-imports, so it stacks with the rules on `no-restricted-imports`
-const restrictHubDependencies = ({ files, ignores = [], allowed, message, allowEe = false }) => ({
+// A package's sources import only the @micafox packages its row of the matrix allows, any of their entries;
+// @typescript-eslint/no-restricted-imports, so it stacks with the rules on `no-restricted-imports`
+const restrictDependencies = ({ files, ignores = [], allowed, message, allowEe = false }) => ({
   files,
   ignores,
   rules: {
@@ -60,7 +65,8 @@ const restrictHubDependencies = ({ files, ignores = [], allowed, message, allowE
         patterns: [
           ...EE_BAN,
           ...(allowEe ? [] : [EE_ALIAS_BAN]),
-          { regex: `^@micafox/(?!(${allowed.join("|")})(/|$))`, message },
+          SANDBOX_BAN,
+          { regex: `^@micafox/(?!(${allowed.join("|")})(/|$))`, message: `${message} (${MATRIX})` },
         ],
       },
     ],
@@ -101,8 +107,8 @@ const restrictBrowserImports = (files, patterns) => ({
   },
 });
 
-// The hub app is run, never imported: only the test kit starts it, through its ./cli entry (ADR 0038). The hub
-// packages' own rows already reject it; this covers everything else
+// The hub app is run, never imported: only the test kit starts it, through its ./cli entry (ADR 0038). The rows
+// below already reject it; this covers everything else
 const APP_BAN = {
   regex: "^@micafox/hub(/|$)",
   message: "Nothing imports the hub app but tools/testkit, through @micafox/hub/cli (ADR 0038).",
@@ -122,33 +128,83 @@ const hubRules = [
       "@typescript-eslint/no-restricted-imports": ["error", { patterns: [...EE_BAN, EE_ALIAS_BAN, TESTKIT_APP_BAN] }],
     },
   },
-  restrictHubDependencies({
+  // Whole folders, tests and configs included; the rows of their sources below replace these with their own lists
+  {
+    files: ["packages/**"],
+    rules: {
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            ...EE_BAN,
+            EE_ALIAS_BAN,
+            SANDBOX_BAN,
+            { regex: "^@micafox/hub(-|/|$)", message: `packages/ never imports hub/ (${MATRIX}).` },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ["hub/**", "ee/**"],
+    rules: {
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            ...EE_BAN,
+            EE_ALIAS_BAN,
+            APP_BAN,
+            SANDBOX_BAN,
+            { regex: "^@micafox/sdk(/|$)", message: `The hub never imports the SDK (${MATRIX}).` },
+          ],
+        },
+      ],
+    },
+  },
+  // packages/: MIT building blocks, which never import hub/, ee/, tools/ or sandbox/
+  restrictDependencies({
+    files: ["packages/protocol/src/**"],
+    allowed: ["protocol"],
+    message: "@micafox/protocol imports no other @micafox package",
+  }),
+  restrictDependencies({
+    files: ["packages/sdk/src/**"],
+    allowed: ["protocol", "sdk"],
+    message: "@micafox/sdk imports only @micafox/protocol",
+  }),
+  restrictDependencies({
     files: ["packages/ui/src/**"],
     allowed: [],
-    message: "@micafox/ui imports no @micafox package (docs/architecture/hub/overview.md#packages).",
+    message: "@micafox/ui imports no @micafox package",
   }),
-  restrictHubDependencies({
-    files: ["packages/hub-core/src/**"],
+  // hub/: the open hub takes only protocol and ui from packages/, never the SDK
+  restrictDependencies({
+    files: ["hub/core/src/**"],
     allowed: ["protocol", "ui"],
-    message: "hub-core imports only @micafox/protocol and @micafox/ui (docs/architecture/hub/overview.md#packages).",
+    message: "hub-core imports only @micafox/protocol and @micafox/ui",
   }),
-  restrictHubDependencies({
-    files: ["packages/hub-*/src/**"],
-    ignores: ["packages/hub-core/**"],
+  restrictDependencies({
+    files: ["hub/*/src/**"],
+    ignores: ["hub/core/**", "hub/app/**"],
     allowed: ["protocol", "hub-core", "ui"],
-    message:
-      "A hub feature imports only @micafox/protocol, hub-core and ui, never another feature " +
-      "(docs/architecture/hub/overview.md#packages).",
+    message: "A hub feature imports only @micafox/protocol, hub-core and ui, never another feature",
   }),
-  restrictHubDependencies({
-    files: ["packages/hub/src/**"],
+  restrictDependencies({
+    files: ["hub/app/src/**"],
     allowed: ["protocol", "ui", "hub-core", "hub-[a-z0-9-]+"],
-    message: "The hub app imports the hub packages and the protocol (docs/architecture/hub/overview.md#packages).",
+    message: "hub/app imports the protocol, ui and the hub packages, and ee/ only through #ee",
     allowEe: true,
   }),
-  restrictBrowserImports(["packages/hub-*/src/web/**"], SERVER_CODE),
-  restrictBrowserImports(["packages/hub-*/src/schema/**"], [...SERVER_CODE, ...WEB_CODE]),
-  restrictBrowserImports(["packages/hub/src/web/**"], [...SERVER_CODE, ...APP_SERVER_CODE]),
+  // ee/: the paid extension builds on the open hub like a feature does, and never imports hub/app
+  restrictDependencies({
+    files: ["ee/*/src/**"],
+    allowed: ["protocol", "ui", "hub-core", "hub-[a-z0-9-]+"],
+    message: "ee/ imports only @micafox/protocol, ui, hub-core and the hub features, never hub/app",
+  }),
+  restrictBrowserImports(["hub/*/src/web/**", "ee/*/src/web/**"], SERVER_CODE),
+  restrictBrowserImports(["hub/*/src/schema/**", "ee/*/src/schema/**"], [...SERVER_CODE, ...WEB_CODE]),
+  restrictBrowserImports(["hub/app/src/web/**"], [...SERVER_CODE, ...APP_SERVER_CODE]),
 ];
 
 export default [
@@ -163,8 +219,8 @@ export default [
     },
   },
   {
-    // The test kit drives the examples' end-to-end tests; the packages never depend on it
-    files: ["packages/**/*.ts", "packages/**/*.tsx"],
+    // The test kit drives the sandbox apps' end-to-end tests; product code never depends on it
+    files: ["{packages,hub,ee}/**/*.ts", "{packages,hub,ee}/**/*.tsx"],
     rules: { "no-restricted-imports": ["error", { paths: [TESTKIT_BAN] }] },
   },
   ...hubRules,

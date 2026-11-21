@@ -11,9 +11,12 @@ run, logging in, invites, password resets, project keys and entitlements, with t
   - the model organization → project → environment, users, memberships and roles, and `can()`;
   - the setup token, sessions and their cookie, the origin check, login rate limits;
   - invites, reset links and project keys;
-  - `entitlements(orgId)` and its sources.
+  - `entitlements(orgId)`, the gate over the sources the extension registers.
 - Does not own: isolating rows by organization: [database](database.md#scoping-a-query); the actions a feature
   defines, which it checks through `can()`.
+- Split: `hub/core` holds login, sessions, invites, password resets, project keys, the base roles and the
+  entitlement gate. `ee/hub` adds the paid parts behind it: billing and Cloud sign-up, the licence-key entitlement
+  source, SSO and SCIM, fine-grained roles and the audit log.
 - Constraints:
   - Passwords, session ids, keys and links are stored only as hashes; S2 encrypts nothing and needs no secret but
     the database's.
@@ -48,14 +51,14 @@ run, logging in, invites, password resets, project keys and entitlements, with t
 ## Layout
 
 ```text
-packages/hub-core/src/server/access/
+hub/core/src/server/access/
 ├── index.ts          the access plugin and can()
 ├── tenancy/          organizations, projects, environments, memberships
 ├── setup/            the setup token and the first owner
 ├── sessions/         login, logout, the cookie, the origin check, rate limits, scrypt
 ├── invites/          invites and reset links
 ├── keys/             project keys: create, list, revoke, look up, last use
-└── entitlements/     entitlements(orgId) and its sources
+└── entitlements/     the gate entitlements(orgId), over the sources ee/hub registers
 ```
 
 ## Key flows

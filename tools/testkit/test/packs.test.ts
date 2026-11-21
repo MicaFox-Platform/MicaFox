@@ -97,8 +97,8 @@ describe("check-packs.sh", { timeout: PACK_TEST_TIMEOUT_MS }, () => {
   });
 
   it("skips a private package, which is never published", () => {
-    write("packages/hub/package.json", JSON.stringify({ name: "@fixture/hub", version: "0.0.0", private: true }));
-    write("packages/hub/src/index.ts", "export {};\n");
+    write("packages/ui/package.json", JSON.stringify({ name: "@fixture/ui", version: "0.0.0", private: true }));
+    write("packages/ui/src/index.ts", "export {};\n");
 
     const result = run();
 

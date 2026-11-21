@@ -93,16 +93,16 @@ always on. Why the server decides:
 ## Layout
 
 ```text
-packages/hub-core/src/server/feature/
+hub/core/src/server/feature/
 ├── index.ts          defineFeature, defineExtension and their types
 ├── registry.ts       checks the features at start and orders their parts
 └── gate.ts           the entitlement gate for extension parts
-packages/hub-core/src/web/feature/
+hub/core/src/web/feature/
 ├── index.ts          defineWebFeature, defineWebExtension and their types
 └── compose.ts        builds the navigation, the route tree and the slots from the features
-packages/hub-core/src/schema/
+hub/core/src/schema/
 └── index.ts          TypeBox schemas the core's server and web share: the ./schema entry
-packages/hub-<feature>/src/
+hub/<feature>/src/
 ├── server/index.ts   the feature's server part
 ├── web/index.ts      the feature's web part
 ├── schema/index.ts   TypeBox schemas both parts use
@@ -130,8 +130,9 @@ ee/
 
 ### Adding a feature
 
-1. Create `packages/hub-<name>` with the layout above and the AGPL licence, depending on hub-core, ui and protocol.
-2. Add it to `packages/hub/src/features.ts` and `src/web/features.ts`; its place in the list is its place in the
+1. Create `hub/<name>` (`@micafox/hub-<name>`) with the layout above and the AGPL licence, depending on hub-core,
+   ui and protocol.
+2. Add it to `hub/app/src/features.ts` and `src/web/features.ts`; its place in the list is its place in the
    migration order.
 3. Its tables carry `org_id` under row-level security, or the start fails: [database](database.md#migrating).
 

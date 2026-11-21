@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 
 const ROOT = path.join(import.meta.dirname, "..", "..", "..");
 const BREAKPOINT_MARKER = "// breakpoint here";
-// `PORT=${PORT:-3101} node ...`: the default port of a `start:<app>` script of examples/formats
+// `PORT=${PORT:-3101} node ...`: the default port of a `start:<app>` script of sandbox/formats
 const SCRIPT_PORT = /PORT=\$\{PORT:-(\d+)\}/;
 
 const readText = (file: string): string => readFileSync(path.join(ROOT, file), "utf8");
@@ -17,8 +17,8 @@ const readEnvFile = (file: string): Record<string, string | undefined> => parseE
 const readScripts = (directory: string): Record<string, string> =>
   (JSON.parse(readText(`${directory}/package.json`)) as { scripts?: Record<string, string> }).scripts ?? {};
 
-const FRAMEWORKS = readdirSync(path.join(ROOT, "examples", "frameworks")).map((name) => `examples/frameworks/${name}`);
-const APP_PACKAGES = ["examples/formats", ...FRAMEWORKS].filter((directory) =>
+const FRAMEWORKS = readdirSync(path.join(ROOT, "sandbox", "frameworks")).map((name) => `sandbox/frameworks/${name}`);
+const APP_PACKAGES = ["sandbox/formats", ...FRAMEWORKS].filter((directory) =>
   existsSync(path.join(ROOT, directory, "package.json")),
 );
 const HUB_PACKAGE = "tools/testkit";
@@ -48,7 +48,7 @@ const readAppPorts = (directory: string): number[] => {
 
 const appPorts = APP_PACKAGES.flatMap(readAppPorts);
 
-// The source folder of each app: one per framework package, one per `start:<app>` script of examples/formats
+// The source folder of each app: one per framework package, one per `start:<app>` script of sandbox/formats
 const APP_SOURCES = APP_PACKAGES.flatMap((directory) => {
   const apps = Object.keys(readScripts(directory)).flatMap((name) => {
     const [script, app] = name.split(":");
@@ -82,8 +82,8 @@ describe("the ports of the examples", () => {
     ]);
   });
 
-  it("are listed in examples/README.md", () => {
-    const readme = readText("examples/README.md");
+  it("are listed in sandbox/README.md", () => {
+    const readme = readText("sandbox/README.md");
 
     // A row of the table of apps, not any mention of the number
     expect(appPorts.filter((port) => !readme.includes(`| \`${String(port)}\` |`))).toEqual([]);
@@ -131,7 +131,7 @@ describe("the .gitignore", () => {
   };
 
   it.each([".env", ".env.local", ".env.production"])("ignores %s of an example", (name) => {
-    expect(isIgnored(`examples/frameworks/fastify/${name}`)).toBe(true);
+    expect(isIgnored(`sandbox/frameworks/fastify/${name}`)).toBe(true);
   });
 
   it.each([...APP_PACKAGES, HUB_PACKAGE])("keeps the .env.example of %s", (directory) => {

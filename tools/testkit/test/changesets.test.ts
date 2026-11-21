@@ -72,7 +72,7 @@ const createRepo = (): void => {
   repo = mkdtempSync(path.join(tmpdir(), "micafox-changesets-"));
   git("init", "--quiet", "--initial-branch", "staging");
   write("package.json", packageJson({ name: "fixture", version: "0.0.0", private: true }));
-  write("pnpm-workspace.yaml", "packages:\n  - packages/*\n");
+  write("pnpm-workspace.yaml", "packages:\n  - packages/*\n  - hub/*\n");
   mkdirSync(path.join(repo, ".changeset"));
   copyFileSync(path.join(ROOT, ".changeset", "config.json"), path.join(repo, ".changeset", "config.json"));
   copyFileSync(path.join(ROOT, ".changeset", "README.md"), path.join(repo, ".changeset", "README.md"));
@@ -85,11 +85,11 @@ const createRepo = (): void => {
   write("packages/ui/package.json", packageJson({ name: "@micafox/ui", version: "0.0.0", private: true }));
   write("packages/ui/src/index.ts", "export {};\n");
   const hubCore = { name: "@micafox/hub-core", version: "0.0.0", private: true };
-  write("packages/hub-core/package.json", packageJson({ ...hubCore, dependencies: { "@micafox/ui": "workspace:*" } }));
-  write("packages/hub-core/src/index.ts", "export {};\n");
+  write("hub/core/package.json", packageJson({ ...hubCore, dependencies: { "@micafox/ui": "workspace:*" } }));
+  write("hub/core/src/index.ts", "export {};\n");
   const hub = { name: "@micafox/hub", version: "0.0.0", private: true };
-  write("packages/hub/package.json", packageJson({ ...hub, dependencies: { "@micafox/hub-core": "workspace:*" } }));
-  write("packages/hub/src/index.ts", "export {};\n");
+  write("hub/app/package.json", packageJson({ ...hub, dependencies: { "@micafox/hub-core": "workspace:*" } }));
+  write("hub/app/src/index.ts", "export {};\n");
   commit("chore: base");
   git("switch", "--quiet", "--create", "feat/change");
 };
@@ -167,7 +167,8 @@ describe("check-changesets.sh pr", { timeout: E2E_TEST_TIMEOUT_MS }, () => {
     ["a unit test of a public package", "packages/young/src/__tests__/index.test.ts"],
     ["a file outside what the package ships", "packages/young/test/e2e.test.ts"],
     ["a private package", "packages/testkit/src/index.ts"],
-    ["a test of a hub package", "packages/hub-core/test/boundaries.test.ts"],
+    ["a test of a hub package", "hub/core/test/boundaries.test.ts"],
+    ["a test of the paid extension", "ee/hub/test/boundaries.test.ts"],
     ["a unit test of a hub package", "packages/ui/src/__tests__/index.test.ts"],
     ["a file outside the packages", "docs/notes.md"],
   ])("needs no changeset for %s", (_, file) => {
@@ -222,8 +223,9 @@ describe("check-changesets.sh pr", { timeout: E2E_TEST_TIMEOUT_MS }, () => {
 describe("check-changesets.sh pr on the hub", { timeout: E2E_TEST_TIMEOUT_MS }, () => {
   it.each([
     ["the UI kit", "packages/ui/src/index.ts"],
-    ["hub-core", "packages/hub-core/src/index.ts"],
-    ["a file of the app that Changesets does not track", "packages/hub/Dockerfile"],
+    ["hub-core", "hub/core/src/index.ts"],
+    ["a file of the app that Changesets does not track", "hub/app/Dockerfile"],
+    ["a feature added later", "hub/logpoints/src/index.ts"],
     ["ee/", "ee/hub/src/server/index.ts"],
   ])("fails when %s changed without a changeset for @micafox/hub, and names the file", (_, file) => {
     write(file, "export const changed = true;\n");
@@ -248,7 +250,7 @@ describe("check-changesets.sh pr on the hub", { timeout: E2E_TEST_TIMEOUT_MS }, 
   });
 
   it("fails when the app's own sources changed without a changeset", () => {
-    write("packages/hub/src/index.ts", "export const changed = true;\n");
+    write("hub/app/src/index.ts", "export const changed = true;\n");
     commit("feat: change the app");
 
     const result = run("pr", "staging");
@@ -266,7 +268,7 @@ describe("check-changesets.sh pr on the hub", { timeout: E2E_TEST_TIMEOUT_MS }, 
   });
 
   it("passes with an empty changeset when hub users see no change", () => {
-    write("packages/hub-core/src/index.ts", "export const changed = true;\n");
+    write("hub/core/src/index.ts", "export const changed = true;\n");
     write(".changeset/no-release.md", EMPTY_CHANGESET);
     commit("refactor: change hub-core");
 
@@ -274,7 +276,7 @@ describe("check-changesets.sh pr on the hub", { timeout: E2E_TEST_TIMEOUT_MS }, 
   });
 
   it("fails when the only changeset names another package", () => {
-    write("packages/hub-core/src/index.ts", "export const changed = true;\n");
+    write("hub/core/src/index.ts", "export const changed = true;\n");
     write("packages/young/src/index.ts", "export const a = 2;\n");
     write(".changeset/young-change.md", changeset({ "@fixture/young": "minor" }));
     commit("feat: change hub-core and young");
@@ -286,7 +288,7 @@ describe("check-changesets.sh pr on the hub", { timeout: E2E_TEST_TIMEOUT_MS }, 
   });
 
   it("fails as changeset status does when a changeset names the hub with one of its ignored packages", () => {
-    write("packages/hub-core/src/index.ts", "export const changed = true;\n");
+    write("hub/core/src/index.ts", "export const changed = true;\n");
     write(".changeset/mixed.md", changeset({ "@micafox/hub": "minor", "@micafox/hub-core": "minor" }));
     commit("feat: change hub-core");
 

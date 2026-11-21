@@ -9,11 +9,11 @@ const IMPORT_RULES = new Set([
   "import-x/no-nodejs-modules",
 ]);
 
-// Lints one import as if it were in `entry` of packages/hub-core/src, with the repository's real ESLint config.
+// Lints one import as if it were in `entry` of hub/core/src, with the repository's real ESLint config.
 // Typed linting parses only files that exist, hence the entries; a parse error would hide every rule, so it throws.
 const findRestrictedImports = async (entry: string, specifier: string): Promise<string[]> => {
   const eslint = new ESLint({ cwd: ROOT });
-  const filePath = path.join(ROOT, "packages/hub-core/src", entry);
+  const filePath = path.join(ROOT, "hub/core/src", entry);
   const [result] = await eslint.lintText(`import "${specifier}";\n`, { filePath });
   const fatal = result?.messages.find((message) => message.fatal);
   if (fatal) {
@@ -32,7 +32,7 @@ describe("hub-core imports", { timeout: 60_000 }, () => {
     ["@micafox/hub", "hub-core imports only @micafox/protocol and @micafox/ui"],
     ["@micafox/sdk", "hub-core imports only @micafox/protocol and @micafox/ui"],
     ["@micafox/hub-ee", "ADR 0023"],
-    ["#ee", "Only packages/hub/src imports #ee"],
+    ["#ee", "Only hub/app/src imports #ee"],
     ["../../../../ee/hub/src/server/index.js", "ADR 0023"],
   ])("rejects %s", async (specifier, message) => {
     const messages = await findRestrictedImports("server/index.ts", specifier);
@@ -104,9 +104,9 @@ describe("hub-core schema imports", { timeout: 60_000 }, () => {
 describe("hub-core .tsx web code", () => {
   const findNodeBan = async (file: string): Promise<unknown> => {
     // ESLint types the resolved config as `any`; a flat config always holds `rules`
-    const config = (await new ESLint({ cwd: ROOT }).calculateConfigForFile(
-      path.join("packages/hub-core/src/web", file),
-    )) as { rules: Record<string, unknown> };
+    const config = (await new ESLint({ cwd: ROOT }).calculateConfigForFile(path.join("hub/core/src/web", file))) as {
+      rules: Record<string, unknown>;
+    };
     return config.rules["import-x/no-nodejs-modules"];
   };
 

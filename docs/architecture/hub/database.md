@@ -36,7 +36,7 @@ tests and the test mode.
 ## Layout
 
 ```text
-packages/hub-core/src/server/db/
+hub/core/src/server/db/
 ├── index.ts          the pool and the three handles
 ├── scope.ts          forOrg, global and system: transactions and session settings
 ├── policies.ts       the RLS policy helpers migrations use

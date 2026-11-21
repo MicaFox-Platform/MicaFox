@@ -2,13 +2,10 @@
   "extends": "@micafox/configs/tsconfig/workspace-react.json",
   "references": [
     {
-      "path": "../protocol"
+      "path": "../../packages/protocol"
     },
     {
-      "path": "../ui"
-    },
-    {
-      "path": "../hub-core"
+      "path": "../../packages/ui"
     }
   ]
 }

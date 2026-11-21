@@ -45,7 +45,7 @@ const canRun = (args: readonly string[]): boolean =>
   spawnSync("docker", args, { stdio: "ignore", timeout: DEFAULT_TIMEOUT_MS }).status === 0;
 
 /**
- * What keeps the benchmark from using Docker: no `docker` on PATH, no daemon, or no buildx, which examples/Dockerfile
+ * What keeps the benchmark from using Docker: no `docker` on PATH, no daemon, or no buildx, which sandbox/Dockerfile
  * needs for its cache mounts. Undefined when Docker is ready.
  */
 export const findDockerProblem = (): string | undefined => {
@@ -63,16 +63,12 @@ export const findDockerProblem = (): string | undefined => {
   return undefined;
 };
 
-/** Builds `target` of examples/Dockerfile as `tag`, with the build log on the terminal. */
+/** Builds `target` of sandbox/Dockerfile as `tag`, with the build log on the terminal. */
 export const buildImage = (target: string, tag: string): void => {
-  const result = spawnSync(
-    "docker",
-    ["build", "--file", "examples/Dockerfile", "--target", target, "--tag", tag, "."],
-    {
-      cwd: ROOT,
-      stdio: "inherit",
-    },
-  );
+  const result = spawnSync("docker", ["build", "--file", "sandbox/Dockerfile", "--target", target, "--tag", tag, "."], {
+    cwd: ROOT,
+    stdio: "inherit",
+  });
   if (result.status !== 0) {
     throw new Error(`docker build of ${target} failed`);
   }

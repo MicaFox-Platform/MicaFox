@@ -25,8 +25,8 @@
     "verify:brief": "bash .claude/scripts/verify-brief.sh",
     "verify:fix": "pnpm lint:fix && pnpm format:fix",
     "version-packages": "changeset version && bash .github/scripts/sync-sdk-version.sh && pnpm format:fix",
-    "docker:up": "docker compose -f examples/compose.yaml up --build",
-    "docker:down": "docker compose -f examples/compose.yaml down",
+    "docker:up": "docker compose -f sandbox/compose.yaml up --build",
+    "docker:down": "docker compose -f sandbox/compose.yaml down",
     "prepare": "git config core.hooksPath .githooks || true"
   },
   "keywords": [],

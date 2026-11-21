@@ -26,7 +26,7 @@ describe("breakpoints under tsx", { timeout: E2E_TEST_TIMEOUT_MS }, () => {
     }).toEqual({
       statuses: [200],
       modules: ["debugger", "debugger"],
-      file: expect.stringMatching(/\/examples\/frameworks\/fastify\/src\/pricing\.ts$/) as unknown,
+      file: expect.stringMatching(/\/sandbox\/frameworks\/fastify\/src\/pricing\.ts$/) as unknown,
       line: PRICING_LINE,
       variables: expect.arrayContaining([
         { name: "sku", value: { type: "string", value: "SKU-2", length: 5 } },

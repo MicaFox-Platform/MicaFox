@@ -10,11 +10,11 @@ const IMPORT_RULES = new Set([
 ]);
 const FEATURE_MESSAGE = "A hub feature imports only @micafox/protocol, hub-core and ui, never another feature";
 
-// Lints one import as if it were in `entry` of packages/hub-debugger/src, with the repository's real ESLint config.
+// Lints one import as if it were in `entry` of hub/debugger/src, with the repository's real ESLint config.
 // Typed linting parses only files that exist, hence the entries; a parse error would hide every rule, so it throws.
 const findRestrictedImports = async (entry: string, specifier: string): Promise<string[]> => {
   const eslint = new ESLint({ cwd: ROOT });
-  const filePath = path.join(ROOT, "packages/hub-debugger/src", entry);
+  const filePath = path.join(ROOT, "hub/debugger/src", entry);
   const [result] = await eslint.lintText(`import "${specifier}";\n`, { filePath });
   const fatal = result?.messages.find((message) => message.fatal);
   if (fatal) {

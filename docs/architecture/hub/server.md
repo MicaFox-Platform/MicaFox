@@ -43,7 +43,7 @@ events between parts, runs background jobs, and starts and stops the whole hub s
 ## Layout
 
 ```text
-packages/hub-core/src/server/
+hub/core/src/server/
 ├── index.ts          createHub() and the server entry's exports
 ├── app/              the Fastify app, plugin order, request context, error handler, the web app's files
 ├── config/           the settings' schema, *_FILE values, the start-up report of problems

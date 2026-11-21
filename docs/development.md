@@ -7,24 +7,13 @@ debugging session flows through them, and which [decisions](adr/overview.md) are
 
 ## Repository
 
-A pnpm monorepo in TypeScript (strict, NodeNext) with Vitest, ESLint and Prettier. Dependencies point down the
-table only, and packages import each other by package name, never by relative path. Only examples depend on
-`tools/testkit`, which is private and never published; ESLint keeps it out of `packages/`.
-
-| Package                       | Holds                                                                     | May depend on          |
-| ----------------------------- | ------------------------------------------------------------------------- | ---------------------- |
-| `packages/configs`            | shared tsconfig, ESLint, Prettier and Vitest presets                      | -                      |
-| `packages/protocol`           | messages, `PROTOCOL_VERSION` and the `Connector` type                     | -                      |
-| `packages/sdk`                | `src/debugger/` and `src/connector/`, run inside the host app             | protocol               |
-| `packages/ui`                 | the hub's design tokens, fonts, icons and React components                | -                      |
-| `packages/hub-core`           | the hub's server, web shell, database, access and SDK endpoint            | protocol, ui           |
-| `packages/hub-<feature>`      | one hub feature each, such as `hub-debugger`                              | protocol, hub-core, ui |
-| `ee/hub`                      | the hub's paid extension, under `ee/LICENSE`                              | the above, features    |
-| `packages/hub`                | the hub app: both builds, the image, Compose files and the Helm chart     | the above, `#ee`       |
-| `tools/testkit`               | private kit of the examples' E2E tests and benchmark: runner, fake hub    | protocol, hub          |
-| `examples/formats`            | one app per module format, run on the built SDK                           | sdk, protocol, testkit |
-| `examples/frameworks/fastify` | Fastify demo app to try the SDK by hand, with the full debugger E2E suite | sdk, protocol, testkit |
-| `examples/frameworks/<name>`  | `express`, `nestjs` and `nextjs`: one app each, run on the built SDK      | sdk, testkit           |
+A pnpm monorepo in TypeScript (strict, NodeNext) with Vitest, ESLint and Prettier. The top folder tells a package's
+licence and how it ships: `packages/` holds the MIT building blocks (`configs`, `protocol`, `sdk`, `ui`), `hub/` the
+AGPL-3.0-only open hub (`core`, one folder per feature, `app`), `ee/` the proprietary paid extension, `sandbox/` the
+apps that exercise the SDK (`formats`, `frameworks/<name>`) and `tools/testkit` the private kit of their end-to-end
+tests. What each package may import: [the dependency matrix](architecture/overview.md#packages), which ESLint
+enforces. Packages import each other by package name, never by relative path, and names do not follow folders:
+`hub/core` is `@micafox/hub-core`, `sandbox/formats` is `@micafox/example-formats`.
 
 A package exports its `src/index.ts` under the `@micafox/source` condition, which `pnpm dev`, tests and
 typecheck resolve: packages read each other's sources directly, so development needs no build step.
@@ -32,29 +21,31 @@ typecheck resolve: packages read each other's sources directly, so development n
 
 ### The hub
 
-The hub packages are designed in [architecture/hub](architecture/hub/overview.md); `ui`, `hub-core`, `hub-debugger`
-and `hub` exist as empty packages that the hub's tasks fill, and `ee/hub` comes with them. They are private and ES
-modules only; `ui` is MIT, `ee/` has its own licence and takes no outside pull requests, and the rest is
-AGPL-3.0-only, where an outside pull request needs a signed CLA. Nothing imports `ee/` except `packages/hub` through
+The hub packages are designed in [architecture/hub](architecture/hub/overview.md); `packages/ui`, `hub/core`,
+`hub/debugger` and `hub/app` exist as empty packages that the hub's tasks fill, and `ee/hub` comes with them. They
+are private and ES modules only; `ui` is MIT, `ee/` has its own licence and takes no outside pull requests, and the rest is
+AGPL-3.0-only, where an outside pull request needs a signed CLA. Nothing imports `ee/` except `hub/app` through
 `#ee`; until `ee/hub` exists, `#ee` and `#ee/web` resolve to the basic hub's stubs in both builds.
 
-- ESLint holds the hub's dependency rule: each package imports only the packages above it in
-  [the table](architecture/hub/overview.md#packages), a feature never imports another feature, `./web` and
+- ESLint holds the dependency rule by folder: each package imports only what its row of
+  [the matrix](architecture/overview.md#packages) allows, a feature never imports another feature, `./web` and
   `./schema` import no server code and no Node built-in, and nothing imports the hub app but `tools/testkit`,
   through `@micafox/hub/cli` ([ADR 0038](adr/packages/0038-let-the-test-kit-start-the-built-hub.md)).
-- `pnpm lint` runs `.github/scripts/check-licences.sh`: the third-party dependencies of the AGPL packages and `ee/`
+- `pnpm lint` runs `.github/scripts/check-licences.sh`: every package declares the licence of its folder (MIT in
+  `packages/`, AGPL-3.0-only in `hub/`, its own terms in `ee/`), and the third-party dependencies of `hub/` and `ee/`
   take only permissive licences, LGPL and MPL-2.0, never GPL, AGPL, SSPL or an unknown one, and those of `ui` only
   permissive ones
-  ([ADR 0022](adr/packages/0022-split-the-hub-into-packages-by-role.md)).
+  ([ADR 0022](adr/packages/0022-split-the-hub-into-packages-by-role.md),
+  [ADR 0039](adr/packages/0039-group-the-workspace-by-licence-and-delivery.md)).
 
 - `pnpm dev` runs the hub on PGlite in `.micafox/dev-db/`, with no Docker: the web app with hot reload and the
   server in watch mode. Set `MICAFOX_DATABASE_URL` to use a Postgres you run, such as the one of
-  `packages/hub/deploy/compose.yaml`.
+  `hub/app/deploy/compose.yaml`.
 - `pnpm verify` runs the hub's tests on PGlite and checks that the basic hub build (`EE=false`) holds no file from
   `ee/`; CI also runs the database tests on Postgres 15 and 18.
 - `pnpm test:e2e` runs the browser tests with Playwright against both builds; like `pnpm test:docker` it is not part
   of `pnpm verify`.
-- A change under `packages/hub*/`, `packages/ui/` or `ee/` takes a changeset for `@micafox/hub`, or
+- A change under `hub/`, `packages/ui/` or `ee/` takes a changeset for `@micafox/hub`, or
   `pnpm changeset --empty` when hub users see no change; changes to tests do not. Changesets versions `@micafox/hub`
   alone among the private packages: `.changeset/config.json` ignores the others.
 
@@ -81,8 +72,8 @@ pnpm typecheck    → typecheck every package, then the root files and tests
 pnpm test         → one Vitest run over all packages; pnpm test <paths> runs only those test files
 pnpm lint         → one ESLint run over the repo
 pnpm format       → one Prettier check over the repo
-pnpm test:build   → tests of the built output: packages loaded with import and require(), examples/formats
-                    and examples/frameworks/*; run pnpm build first
+pnpm test:build   → tests of the built output: packages loaded with import and require(), sandbox/formats
+                    and sandbox/frameworks/*; run pnpm build first
 pnpm test:pack    → pack each package under packages/ as npm would receive it and check the tarball: no src/ or
                     tests, README.md and LICENSE, exports and workspace ranges, publint and Are the Types Wrong;
                     run pnpm build first
@@ -97,7 +88,7 @@ pnpm bench        → optional, needs Docker: the SDK's overhead in the Fastify 
 ```
 
 One package: `pnpm --filter @micafox/sdk test`, `pnpm --filter @micafox/example-fastify start`; to run an example by
-hand with the fake hub, or in Docker containers, see [the examples](../examples/README.md#docker). Docker is optional:
+hand with the fake hub, or in Docker containers, see [the examples](../sandbox/README.md#docker). Docker is optional:
 `pnpm verify` does not use it. CI runs the same scripts on every pull request, and `pnpm test:docker` in a job of its
 own: see [Checks](#checks).
 
@@ -109,22 +100,23 @@ stack afterwards, also after a failure. `NODE_IMAGE=node:22-alpine pnpm test:doc
 ## Testing
 
 - Unit tests live in the `__tests__/` folder of the folder that holds their module, so folders list only code.
-  Tests that are not about one module (doc examples, lint boundaries, end-to-end) live in `packages/<name>/test/`, or in
-  `examples/<name>/tests/` and `examples/frameworks/<name>/tests/` for the whole system; the configs package keeps all
+  Tests that are not about one module (doc examples, lint boundaries, end-to-end) live in the package's `test/`, such
+  as `packages/<name>/test/` or `hub/<name>/test/`, or in `sandbox/<name>/tests/` and
+  `sandbox/frameworks/<name>/tests/` for the whole system; the configs package keeps all
   its tests there, and `tools/testkit/test/` the checks of the examples' `.env.example` files and Docker setup and
   of the changeset checks of CI.
-  Coverage of `packages/*/src` must stay ≥ 80% in lines, branches and functions; a line no meaningful test can
-  reach is excluded in `vitest.config.ts` with the reason, never covered by a hollow test.
+  Coverage of `packages/*/src`, `hub/*/src` and `ee/*/src` must stay ≥ 80% in lines, branches and functions; a line
+  no meaningful test can reach is excluded in `vitest.config.ts` with the reason, never covered by a hollow test.
 - Test behavior through the public surface. Mock only at the boundaries: the WebSocket, time and `node:inspector`.
 - SDK code also tests its failure paths: it must prove it does not throw into or block the host app.
 - Public types whose shape is the contract get type tests in `*.test-d.ts` with `expectTypeOf` and `assertType`.
   Vitest does not run them; `pnpm typecheck` compiles them and fails on a broken assertion.
 - End-to-end tests run a component in a real Node process. A package keeps its own in
   `packages/<name>/test/e2e/<component>/`: a small fixture app started as a child process, and one test file per
-  behavior of the component. Tests of the whole system, through the public API only, live in `examples/<name>/tests/`
-  or `examples/frameworks/<name>/tests/` and start the example's app and the fake hub of
+  behavior of the component. Tests of the whole system, through the public API only, live in `sandbox/<name>/tests/`
+  or `sandbox/frameworks/<name>/tests/` and start the example's app and the fake hub of
   [`tools/testkit`](../tools/testkit/README.md) as child processes.
-  Those that need the built packages, as in `examples/formats` and `examples/frameworks/*`, run in
+  Those that need the built packages, as in `sandbox/formats` and `sandbox/frameworks/*`, run in
   `pnpm test:build`.
 
 Full rules: [testing](../.claude/rules/testing.md).

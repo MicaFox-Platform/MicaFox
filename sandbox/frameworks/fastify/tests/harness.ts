@@ -24,7 +24,7 @@ const APP_LISTENING = /"msg":"Server listening at http:\/\/127\.0\.0\.1:(\d+)"/;
 export const PRICING_LINE = findMarkerLine(PRICING_FILE, PRICING_MARKER);
 
 // One breakpoint on the return of quote(), the line the kit's `.env.example` sets one on for `start:hub`
-const QUOTE_BREAKPOINT = { id: "bp-quote", file: "examples/frameworks/fastify/src/pricing.ts", line: PRICING_LINE };
+const QUOTE_BREAKPOINT = { id: "bp-quote", file: "sandbox/frameworks/fastify/src/pricing.ts", line: PRICING_LINE };
 
 /** Starts the fake hub with a breakpoint on the return of `quote()` unless `breakpoints` is set. */
 export const startHub = (options: HubOptions = {}): Promise<ListeningRun> =>

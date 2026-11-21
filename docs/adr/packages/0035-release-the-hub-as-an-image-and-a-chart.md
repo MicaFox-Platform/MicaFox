@@ -15,7 +15,7 @@ and a release pull request into `main`
 ## Decision
 
 We version the hub as the private package `@micafox/hub` with Changesets, requiring a changeset for it on any change
-under `packages/hub*/`, `packages/ui/` or `ee/`, and the release workflow pushes its image and Helm chart of that
+under `hub/`, `packages/ui/` or `ee/`, and the release workflow pushes its image and Helm chart of that
 version to GHCR with provenance when the release pull request merges.
 
 ## Alternatives

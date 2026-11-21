@@ -1,4 +1,4 @@
-# What `pnpm test:docker` adds to examples/compose.yaml: every container runs as in a locked-down production deployment,
+# What `pnpm test:docker` adds to sandbox/compose.yaml: every container runs as in a locked-down production deployment,
 # with a read-only root filesystem, a writable /tmp only and a 256 MB memory limit. A healthcheck reports a container
 # healthy once its server accepts connections, so `docker compose up --wait` returns when every app serves. The apps
 # log only the SDK's errors, so any `[micafox]` line they print is one.

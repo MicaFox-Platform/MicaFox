@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Checks the licences of the third-party production dependencies of the hub's packages (ADR 0022): no GPL, AGPL or
-# SSPL in the AGPL packages and ee/, and only permissive licences in the MIT @micafox/ui. Both are lists of what
-# passes, so a licence spelled in no SPDX form, or none, fails until a person reads it. Run by `pnpm lint` after
-# `pnpm install`. Every failure says what is wrong and how to fix it.
+# Checks licences by folder, since the top folder tells a package's licence (ADR 0039): the `license` field of every
+# package under packages/ (MIT), hub/ (AGPL-3.0-only) and ee/ (its own terms), and the third-party production
+# dependencies of what ships in the hub's image (ADR 0022): no GPL, AGPL or SSPL in hub/ and ee/, and only permissive
+# licences in the MIT @micafox/ui. Both are lists of what passes, so a licence spelled in no SPDX form, or none, fails
+# until a person reads it. Run by `pnpm lint` after `pnpm install`. Every failure says what is wrong and how to fix it.
 set -uo pipefail
 
 status=0
@@ -59,11 +60,31 @@ $out"
 
 cd "$(git rev-parse --show-toplevel)" || exit 1
 
-check @micafox/ui ui
-# Every feature is a packages/hub-<feature> and the extension lives in ee/, so a new one is checked without a change
-# here; pnpm lists no dependency of a workspace dependency, hence each package on its own
+# The `license` a package declares matches its folder; ee/ is proprietary, so never an open-source licence
+declared() {
+  local manifest=$1 folder=${1%%/*} license
+  license=$(jq -r '.license // ""' "$manifest")
+  case $folder in
+    packages) [[ $license == MIT ]] && return ;;
+    hub) [[ $license == AGPL-3.0-only ]] && return ;;
+    ee) [[ $license == UNLICENSED || $license == "SEE LICENSE IN "* ]] && return ;;
+  esac
+  case $folder in
+    packages) fail "$manifest: license is \"$license\": everything under packages/ is MIT (ADR 0039); set \"license\": \"MIT\" or move the package" ;;
+    hub) fail "$manifest: license is \"$license\": everything under hub/ is AGPL-3.0-only (ADR 0039); set \"license\": \"AGPL-3.0-only\" or move the package" ;;
+    ee) fail "$manifest: license is \"$license\": ee/ is under its own terms (ADR 0039); set \"license\": \"SEE LICENSE IN <file>\" or \"UNLICENSED\"" ;;
+  esac
+}
+
 shopt -s nullglob
-for manifest in packages/hub*/package.json ee/*/package.json; do
+for manifest in packages/*/package.json hub/*/package.json ee/*/package.json; do
+  declared "$manifest"
+done
+
+check @micafox/ui ui
+# Every feature is a hub/<feature> and the extension lives in ee/, so a new one is checked without a change here;
+# pnpm lists no dependency of a workspace dependency, hence each package on its own
+for manifest in hub/*/package.json ee/*/package.json; do
   check "$(jq -r '.name' "$manifest")" hub
 done
 

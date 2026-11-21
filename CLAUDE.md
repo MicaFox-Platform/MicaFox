@@ -12,24 +12,26 @@ the long-term shape of the code, and you push back on anything that breaks the r
 
 pnpm monorepo, Node >= 22, TypeScript (strict, NodeNext), Vitest, ESLint, Prettier.
 
-| Package                       | Role                                                                        | May depend on          |
-| ----------------------------- | --------------------------------------------------------------------------- | ---------------------- |
-| `packages/configs`            | shared tsconfig / eslint / prettier / vitest                                | -                      |
-| `packages/protocol`           | messages, protocol version, `Connector`                                     | -                      |
-| `packages/sdk`                | debugger and default connector, in host app                                 | protocol               |
-| `packages/ui`                 | the hub's design tokens and React components (MIT)                          | -                      |
-| `packages/hub-core`           | hub server and web shell: feature contract, DB, access, SDK endpoint        | protocol, ui           |
-| `packages/hub-<feature>`      | one hub feature each, `hub-debugger` first                                  | protocol, hub-core, ui |
-| `ee/hub`                      | paid hub extension, proprietary licence, no external PRs                    | the above, features    |
-| `packages/hub`                | the hub app: basic hub and hub builds, image, Compose, Helm chart           | the above, `#ee`       |
-| `tools/testkit`               | private E2E kit and benchmark of the examples, tests of the release scripts | protocol, hub          |
-| `examples/formats`            | apps that load the built SDK per module format                              | sdk, protocol, testkit |
-| `examples/frameworks/fastify` | demo app, full debugger E2E                                                 | sdk, protocol, testkit |
-| `examples/frameworks/<name>`  | `express`, `nestjs`, `nextjs` on built SDK                                  | sdk, testkit           |
+The top folder tells the licence and how the code ships: `packages/` MIT building blocks, `hub/` the AGPL-3.0-only
+open hub, `ee/` the proprietary paid extension, `sandbox/` apps that exercise the SDK, `tools/` the private test kit.
 
-Dependencies point down this table only. Only examples depend on `tools/testkit`, which is never published. The hub
-rows (`ui` to `hub`) are designed in `docs/architecture/hub/` and exist as empty scaffolds, except `ee/hub`, which is
-not created yet; they are private, AGPL-3.0-only except `ui` (MIT) and `ee/` (its own licence).
+| Folder                      | Role                                                                       |
+| --------------------------- | -------------------------------------------------------------------------- |
+| `packages/configs`          | shared tsconfig / eslint / prettier / vitest                               |
+| `packages/protocol`         | messages, protocol version, `Connector`                                    |
+| `packages/sdk`              | debugger and default connector, in host app                                |
+| `packages/ui`               | the hub's design tokens and React components (MIT)                         |
+| `hub/core`                  | hub server and web shell: feature contract, DB, access, SDK endpoint       |
+| `hub/<feature>`             | one hub feature each, `hub/debugger` first                                 |
+| `hub/app`                   | the hub app: feature list, `#ee`, CLI, both builds, image, Compose, Helm   |
+| `ee/hub`                    | paid hub extension, proprietary licence, no external PRs; not created yet  |
+| `tools/testkit`             | private E2E kit and benchmark of the sandbox apps, tests of the CI scripts |
+| `sandbox/formats`           | apps that load the built SDK per module format                             |
+| `sandbox/frameworks/<name>` | `fastify` demo with full debugger E2E; `express`, `nestjs`, `nextjs`       |
+
+What each package may import, and its licence: the one matrix in `docs/architecture/overview.md#packages`, enforced
+by ESLint by folder. Package names do not follow folders (`hub/core` is `@micafox/hub-core`). The hub rows exist as
+empty scaffolds designed in `docs/architecture/hub/`; they are private.
 
 ## Commands
 
@@ -69,7 +71,7 @@ finish; fix what they report instead of arguing with it.
 
 - The SDK must never crash, throw into, or block the host app.
 - Packages import each other only by package name, never by relative path.
-- Nothing imports `ee/` except `packages/hub`, through `#ee`; the basic hub build (`EE=false`) must hold no file of it.
+- Nothing imports `ee/` except `hub/app`, through `#ee`; the basic hub build (`EE=false`) must hold no file of it.
 - Protocol changes in `packages/protocol` are backward-compatible or bump the protocol version.
 - A public API change updates `docs/api/` in the same PR.
 - A change to what a public package ships adds a changeset in the same PR: `pnpm changeset`, or

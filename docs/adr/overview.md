@@ -7,7 +7,7 @@ writing one: [`.claude/rules/adr.md`](../../.claude/rules/adr.md).
 
 ## Packages
 
-`packages/` — Package boundaries and how they are published.
+`packages/` — Package boundaries, the workspace layout and how packages are published.
 
 - [0001. Keep the protocol in its own package](packages/0001-keep-the-protocol-in-its-own-package.md)
 - [0013. Publish the packages as ES modules and CommonJS](packages/0013-publish-the-packages-as-es-modules-and-commonjs.md)
@@ -15,6 +15,7 @@ writing one: [`.claude/rules/adr.md`](../../.claude/rules/adr.md).
 - [0022. Split the hub into packages by role](packages/0022-split-the-hub-into-packages-by-role.md)
 - [0035. Release the hub as an image and a chart](packages/0035-release-the-hub-as-an-image-and-a-chart.md)
 - [0038. Let the test kit start the built hub](packages/0038-let-the-test-kit-start-the-built-hub.md)
+- [0039. Group the workspace by licence and delivery](packages/0039-group-the-workspace-by-licence-and-delivery.md)
 
 ## Protocol
 

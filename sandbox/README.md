@@ -11,7 +11,7 @@ From the repository root, after `pnpm install` and `pnpm build`. The scripts rea
 
 ```sh
 cp tools/testkit/.env.example tools/testkit/.env
-cp examples/frameworks/fastify/.env.example examples/frameworks/fastify/.env
+cp sandbox/frameworks/fastify/.env.example sandbox/frameworks/fastify/.env
 pnpm --filter @micafox/testkit start:hub       # terminal 1: the hub, on port 8787
 pnpm --filter @micafox/example-fastify start   # terminal 2: the app
 curl 'http://127.0.0.1:3000/price?sku=SKU-2&quantity=3'
@@ -64,7 +64,7 @@ run.
 
 ```sh
 NODE_IMAGE=node:22-alpine pnpm docker:up
-docker build -f examples/Dockerfile --target express -t micafox-example-express .
+docker build -f sandbox/Dockerfile --target express -t micafox-example-express .
 ```
 
 Inside a container every app runs its built output, Fastify included, and listens on every interface: the images

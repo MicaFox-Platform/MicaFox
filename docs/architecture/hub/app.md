@@ -28,7 +28,7 @@ web app, and ships them as the official image, a Compose setup and a Helm chart.
 ```text
 Build time
 ┌───────────────────────┐ import "#ee", "#ee/web"  ┌───────────────────────────────────────────┐
-│ packages/hub/src      │─────────────────────────▶│ default: @micafox/hub-ee (ee/hub)         │
+│ hub/app/src           │─────────────────────────▶│ default: @micafox/hub-ee (ee/hub)         │
 │ features.ts, web/     │                          │ EE=false: src/ee-stub.ts, web/ee-stub.ts  │
 └───────────┬───────────┘                          └───────────────────────────────────────────┘
             │ esbuild (server), Vite (web)
@@ -46,7 +46,7 @@ Run time (Compose)
 ## Layout
 
 ```text
-packages/hub/
+hub/app/
 ├── src/
 │   ├── index.ts            the server entry: createHub() with the features and the extension
 │   ├── features.ts         the server features in migration order, and the #ee import
@@ -129,7 +129,7 @@ Why one app with `#ee`: [ADR 0023](../../adr/hub/app/0023-build-the-open-core-an
 ### Releasing
 
 1. A pull request that changes what hub users see adds a changeset for `@micafox/hub`, whatever hub package it
-   touches; CI requires one for changes under `packages/hub*/`, `packages/ui/` and `ee/`.
+   touches; CI requires one for changes under `hub/`, `packages/ui/` and `ee/`.
 2. The version pull request bumps `@micafox/hub` and writes its `CHANGELOG.md`; the release pull request into
    `main` tags `@micafox/hub@<version>`.
 3. The release workflow builds the hub image and pushes `ghcr.io/micafox-platform/hub:<version>`,
