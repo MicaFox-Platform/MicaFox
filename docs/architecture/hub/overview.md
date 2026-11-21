@@ -57,13 +57,13 @@ What a team running a hub can rely on:
 
 ## Packages
 
-| Package                 | Folder                  | Holds                                                  | Licence     | Depends on                       |
-| ----------------------- | ----------------------- | ------------------------------------------------------ | ----------- | -------------------------------- |
-| `@micafox/ui`           | `packages/ui`           | design tokens, fonts, icons, React components          | MIT         | -                                |
-| `@micafox/hub-core`     | `packages/hub-core`     | the feature contract, server, web shell, DB, access    | AGPL-3.0    | protocol, ui                     |
-| `@micafox/hub-debugger` | `packages/hub-debugger` | the debugger feature                                   | AGPL-3.0    | protocol, hub-core, ui           |
-| `@micafox/hub-ee`       | `ee/hub`                | the extension with paid features; empty in S2          | `ee/` terms | protocol, hub-core, features, ui |
-| `@micafox/hub`          | `packages/hub`          | the app: both builds, image, Compose setup, Helm chart | AGPL-3.0    | all of the above, ee via `#ee`   |
+| Package                 | Folder                  | Holds                                                  | Licence       | Depends on                       |
+| ----------------------- | ----------------------- | ------------------------------------------------------ | ------------- | -------------------------------- |
+| `@micafox/ui`           | `packages/ui`           | design tokens, fonts, icons, React components          | MIT           | -                                |
+| `@micafox/hub-core`     | `packages/hub-core`     | the feature contract, server, web shell, DB, access    | AGPL-3.0-only | protocol, ui                     |
+| `@micafox/hub-debugger` | `packages/hub-debugger` | the debugger feature                                   | AGPL-3.0-only | protocol, hub-core, ui           |
+| `@micafox/hub-ee`       | `ee/hub`                | the extension with paid features; empty in S2          | `ee/` terms   | protocol, hub-core, features, ui |
+| `@micafox/hub`          | `packages/hub`          | the app: both builds, image, Compose setup, Helm chart | AGPL-3.0-only | all of the above, ee via `#ee`   |
 
 Every hub package is private: none is published to npm. Dependencies point down the table only, and no package
 imports `ee/` except `packages/hub` through `#ee`, which ESLint enforces. Each package carries its own `LICENSE`;

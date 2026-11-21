@@ -29,9 +29,9 @@ any server that speaks the [protocol](protocol.md) can act as one, and every pee
 
 The [hub](hub/overview.md) is one process: it serves the web app, the HTTP API under `/api/v1` and the SDK
 endpoint `/sdk`, keeps its state in Postgres, isolates organizations with row-level security, and gains features,
-such as the debugger's screens and storage, through one feature contract. Its open core is AGPL-3.0; paid features
-live in `ee/` under their own licence and reach the official image through one `#ee` import, while CI builds the
-open "basic hub" without them.
+such as the debugger's screens and storage, through one feature contract. Its open core is AGPL-3.0-only; paid
+features live in `ee/` under their own licence and reach the official image through one `#ee` import, while CI builds
+the open "basic hub" without them.
 
 What the host app can rely on:
 
@@ -55,7 +55,7 @@ The exact limits: [SDK API](../api/sdk/overview.md#installation).
 - `@micafox/configs` — shared TypeScript, ESLint, Prettier and Vitest presets; dev-time only, never in the
   host app: [architecture](configs.md), [API](../api/configs.md).
 - The hub — private packages, never on npm, shipped as the image `ghcr.io/micafox-platform/hub`:
-  `@micafox/ui` (MIT), `@micafox/hub-core`, `@micafox/hub-debugger` and the app `@micafox/hub` (AGPL-3.0), and
+  `@micafox/ui` (MIT), `@micafox/hub-core`, `@micafox/hub-debugger` and the app `@micafox/hub` (AGPL-3.0-only), and
   `@micafox/hub-ee` in `ee/hub` (proprietary): [architecture](hub/overview.md#packages),
   [API](../api/hub/overview.md).
 

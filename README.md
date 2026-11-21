@@ -23,8 +23,8 @@ changing code or redeploying.
 4. When that line runs, the SDK records the call stack and variables and resumes your code at once.
 5. The snapshot goes to the hub, where you read it.
 
-The hub is not part of this repository yet; any server that speaks the [protocol](docs/api/protocol.md) can act as
-one.
+The hub is being built in this repository and is not released yet; until it is, any server that speaks the
+[protocol](docs/api/protocol.md) can act as one.
 
 What your app can rely on:
 

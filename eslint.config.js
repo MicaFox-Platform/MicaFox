@@ -101,8 +101,27 @@ const restrictBrowserImports = (files, patterns) => ({
   },
 });
 
+// The hub app is run, never imported: only the test kit starts it, through its ./cli entry (ADR 0038). The hub
+// packages' own rows already reject it; this covers everything else
+const APP_BAN = {
+  regex: "^@micafox/hub(/|$)",
+  message: "Nothing imports the hub app but tools/testkit, through @micafox/hub/cli (ADR 0038).",
+};
+const TESTKIT_APP_BAN = {
+  regex: "^@micafox/hub(?!/cli$)(/|$)",
+  message: "The test kit starts the hub only through @micafox/hub/cli (ADR 0038).",
+};
+
 const hubRules = [
-  { rules: { "@typescript-eslint/no-restricted-imports": ["error", { patterns: [...EE_BAN, EE_ALIAS_BAN] }] } },
+  {
+    rules: { "@typescript-eslint/no-restricted-imports": ["error", { patterns: [...EE_BAN, EE_ALIAS_BAN, APP_BAN] }] },
+  },
+  {
+    files: ["tools/testkit/**"],
+    rules: {
+      "@typescript-eslint/no-restricted-imports": ["error", { patterns: [...EE_BAN, EE_ALIAS_BAN, TESTKIT_APP_BAN] }],
+    },
+  },
   restrictHubDependencies({
     files: ["packages/ui/src/**"],
     allowed: [],

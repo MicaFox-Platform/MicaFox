@@ -91,6 +91,30 @@ describe("hub app web imports", { timeout: 60_000 }, () => {
   );
 });
 
+describe("imports of the hub app", { timeout: 60_000 }, () => {
+  it.each([
+    ["packages/sdk/src/index.ts", "@micafox/hub"],
+    ["packages/sdk/src/index.ts", "@micafox/hub/cli"],
+    ["examples/frameworks/fastify/src/index.ts", "@micafox/hub"],
+  ])("rejects in %s: %s", async (file, specifier) => {
+    const messages = await findRestrictedImports(file, specifier);
+
+    expect(messages).toEqual([expect.stringContaining("Nothing imports the hub app but tools/testkit")]);
+  });
+
+  it.each(["@micafox/hub", "@micafox/hub/web"])("lets the test kit import only ./cli, not %s", async (specifier) => {
+    const messages = await findRestrictedImports("tools/testkit/src/hub.ts", specifier);
+
+    expect(messages).toEqual([expect.stringContaining("only through @micafox/hub/cli")]);
+  });
+
+  it("allows the test kit to start the hub through @micafox/hub/cli", async () => {
+    const messages = await findRestrictedImports("tools/testkit/src/hub.ts", "@micafox/hub/cli");
+
+    expect(messages).toEqual([]);
+  });
+});
+
 describe("ee/ outside the hub app", { timeout: 60_000 }, () => {
   it.each([
     ["packages/sdk/src/index.ts", "#ee"],
