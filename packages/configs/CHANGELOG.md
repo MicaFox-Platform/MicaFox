@@ -1,5 +1,11 @@
 # @micafox/configs
 
+## 0.2.0
+
+### Minor Changes
+
+- [#117](https://github.com/MicaFox-Platform/MicaFox/pull/117) [`abf3ff1`](https://github.com/MicaFox-Platform/MicaFox/commit/abf3ff14f515ae5f5b3661045875868854dab05c) Thanks [@artem-horovyi](https://github.com/artem-horovyi)! - Support React in `.tsx`: the ESLint preset lints `.tsx` with type information, the rules of hooks and PascalCase components; the Vitest preset runs `*.test.tsx`; the new `tsconfig/workspace-react.json` compiles JSX, and `@micafox/configs/css-modules` types `*.module.css` imports.
+
 ## 0.1.1
 
 ### Patch Changes
