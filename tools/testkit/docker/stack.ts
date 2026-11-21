@@ -1,4 +1,4 @@
-// The compose stack of the container tests: examples/compose.yaml with compose.test.yaml on top, under its own project
+// The compose stack of the container tests: sandbox/compose.yaml with compose.test.yaml on top, under its own project
 // name, so removing it never removes a stack of `pnpm docker:up`; both publish the same ports, so one runs at a time.
 // Every function runs the docker CLI, waits for it and throws when it fails, so a broken command never reads as a pass.
 
@@ -16,7 +16,7 @@ const COMPOSE_ARGS = [
   "--project-name",
   PROJECT,
   "--file",
-  path.join(ROOT, "examples", "compose.yaml"),
+  path.join(ROOT, "sandbox", "compose.yaml"),
   "--file",
   path.join(import.meta.dirname, "compose.test.yaml"),
 ];

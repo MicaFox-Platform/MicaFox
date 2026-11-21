@@ -165,7 +165,7 @@ micafox.run({ service: "checkout" }); // MICAFOX_HUB_URL and MICAFOX_TOKEN come 
 ## Layout
 
 ```text
-packages/hub-debugger/src/
+hub/debugger/src/
 ├── server/
 │   ├── index.ts            debuggerFeature: routes, jobs, retention and the protocol module
 │   ├── routes/             /api/v1/debugger: breakpoints, statuses, snapshots

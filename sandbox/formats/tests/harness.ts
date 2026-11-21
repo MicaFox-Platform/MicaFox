@@ -40,7 +40,7 @@ export const SUPPORTED_APPS: readonly App[] = [
 ];
 
 /** The path of `file` in the repository, as a hub sets a breakpoint on it. */
-export const toRepositoryPath = (file: string): string => `examples/formats/${file}`;
+export const toRepositoryPath = (file: string): string => `sandbox/formats/${file}`;
 
 /** The 1-based line of the return of `quote()` in `app`, found by its marker so edits do not break tests. */
 export const findQuoteLine = (app: App): number =>

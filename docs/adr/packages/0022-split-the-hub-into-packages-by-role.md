@@ -21,7 +21,7 @@ extension and the app, and nothing but the app imports `ee/`.
 
 ## Alternatives
 
-- **One `packages/hub` with folders** — an MIT folder inside an AGPL package muddles the licences, boundaries hold
+- **One hub package with folders** — an MIT folder inside an AGPL package muddles the licences, boundaries hold
   only by path rules, and the UI kit cannot be reused on its own.
 - **A server package and a web package** — a feature would be split across two packages, and adding one would touch
   both; the feature contract treats server and screens as one unit.

@@ -1,5 +1,7 @@
 packages:
   - packages/*
-  - examples/*
-  - examples/frameworks/*
+  - hub/*
+  - ee/*
+  - sandbox/*
+  - sandbox/frameworks/*
   - tools/*

@@ -19,19 +19,19 @@ fail() {
 # `changeset status` finds changed files and new changesets through `git diff`, which lists no untracked file
 check_tracked() {
   local untracked
-  untracked=$(git ls-files --others --exclude-standard -- .changeset packages ee)
+  untracked=$(git ls-files --others --exclude-standard -- .changeset packages hub ee)
   [[ -z $untracked ]] || fail "untracked files are not checked, git add them first:
 $(sed 's/^/  /' <<<"$untracked")"
 }
 
-# The image and chart of @micafox/hub are built from all the hub's packages and ee/, but `changeset status` sees only
-# the shipped files of @micafox/hub itself, the others being ignored: ADR 0035. Tests do not reach the image.
+# The image and chart of @micafox/hub are built from hub/, packages/ui and ee/, but `changeset status` sees only the
+# shipped files of @micafox/hub itself, the others being ignored: ADR 0035. Tests do not reach the image.
 check_hub() {
   local base=$1 plan=$2 fork changed
   # As `changeset status --since` does: changes of this branch and uncommitted ones, not those merged into the base
   fork=$(git merge-base "$base" HEAD) || fail "$base and HEAD have no common commit: rebase onto $base"
   changed=$(git diff --name-only "$fork" |
-    grep -E '^(packages/(hub[^/]*|ui)|ee)/' | grep -Ev '^(packages/[^/]+|ee/[^/]+)/test/|/__tests__/')
+    grep -E '^(hub|ee|packages/ui)/' | grep -Ev '^(hub|ee|packages)/[^/]+/test/|/__tests__/')
   [[ -z $changed ]] && return 0
   node -e '
     const plan = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));

@@ -6,13 +6,15 @@
 /LICENSE                @artem-horovyi
 
 # Testing
-/examples/              @artem-horovyi
+/sandbox/               @artem-horovyi
 /tools/                 @artem-horovyi
 
 # Packages
 /packages/configs/      @artem-horovyi
 /packages/sdk/          @artem-horovyi
 /packages/protocol/     @artem-horovyi
+/hub/                   @artem-horovyi
+/ee/                    @artem-horovyi
 
 # AI agent instructions and hooks
 /CLAUDE.md              @artem-horovyi

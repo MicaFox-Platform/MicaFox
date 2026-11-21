@@ -14,9 +14,9 @@ const SRC = "packages/lib/src";
 
 let repo: string;
 
-const writeFiles = (files: string[]): void => {
+const writeFiles = (files: string[], src = SRC): void => {
   for (const file of files) {
-    const target = path.join(repo, SRC, file);
+    const target = path.join(repo, src, file);
     mkdirSync(path.dirname(target), { recursive: true });
     writeFileSync(target, "export {};\n");
   }
@@ -88,5 +88,20 @@ describe("check-structure.sh", () => {
       status: 1,
       stderr: expect.stringContaining(`${SRC}/__tests__/render.tsx is not a test`) as unknown,
     });
+  });
+
+  it.each([
+    "hub/core/src",
+    "hub/core/test",
+    "ee/hub/src",
+    "sandbox/formats/src",
+    "sandbox/frameworks/fastify/src",
+    "tools/testkit/src",
+  ])("checks the sources of %s", (src) => {
+    writeFiles(sources(9, "ts"), src);
+
+    const result = run();
+
+    expect(result.stderr).toContain(`${src} has 9 source files, at most 8`);
   });
 });

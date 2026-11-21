@@ -7,7 +7,7 @@ name: micafox-examples
 
 x-build: &build
   context: ..
-  dockerfile: examples/Dockerfile
+  dockerfile: sandbox/Dockerfile
   args:
     NODE_IMAGE: ${NODE_IMAGE:-node:22-slim}
 

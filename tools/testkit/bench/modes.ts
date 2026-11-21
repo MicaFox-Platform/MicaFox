@@ -6,7 +6,7 @@ import path from "node:path";
 import { findMarkerLine } from "../src/markers.js";
 
 const ROOT = path.join(import.meta.dirname, "..", "..", "..");
-const APP_SOURCES = "examples/frameworks/fastify/src";
+const APP_SOURCES = "sandbox/frameworks/fastify/src";
 // /price runs quote() on every request; it never runs the routes of values.ts
 const HOT_FILE = `${APP_SOURCES}/pricing.ts`;
 const COLD_FILE = `${APP_SOURCES}/values.ts`;

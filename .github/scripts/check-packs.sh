@@ -24,7 +24,7 @@ versions=$(jq -s 'map({ (.name): .version }) | add' packages/*/package.json)
 for dir in packages/*/; do
   dir=${dir%/}
   name=$(jq -r '.name' "$dir/package.json")
-  # A private package is never published, such as the hub's (docs/architecture/hub/overview.md#packages)
+  # A private package is never published, such as @micafox/ui (docs/architecture/overview.md#packages)
   jq -e '.private == true' "$dir/package.json" >/dev/null && continue
   out="$tmp/${dir##*/}"
   mkdir -p "$out"

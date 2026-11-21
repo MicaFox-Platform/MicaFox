@@ -57,18 +57,18 @@ What a team running a hub can rely on:
 
 ## Packages
 
-| Package                 | Folder                  | Holds                                                  | Licence       | Depends on                       |
-| ----------------------- | ----------------------- | ------------------------------------------------------ | ------------- | -------------------------------- |
-| `@micafox/ui`           | `packages/ui`           | design tokens, fonts, icons, React components          | MIT           | -                                |
-| `@micafox/hub-core`     | `packages/hub-core`     | the feature contract, server, web shell, DB, access    | AGPL-3.0-only | protocol, ui                     |
-| `@micafox/hub-debugger` | `packages/hub-debugger` | the debugger feature                                   | AGPL-3.0-only | protocol, hub-core, ui           |
-| `@micafox/hub-ee`       | `ee/hub`                | the extension with paid features; empty in S2          | `ee/` terms   | protocol, hub-core, features, ui |
-| `@micafox/hub`          | `packages/hub`          | the app: both builds, image, Compose setup, Helm chart | AGPL-3.0-only | all of the above, ee via `#ee`   |
+- `@micafox/ui` in `packages/ui` — design tokens, fonts, icons and React components; MIT, reusable outside the hub.
+- `@micafox/hub-core` in `hub/core` — the feature contract, server, web shell, database and access.
+- `@micafox/hub-debugger` in `hub/debugger` — the debugger feature; later features go to `hub/<feature>`.
+- `@micafox/hub-ee` in `ee/hub` — the extension with the paid features, one part per entitlement, which may extend
+  hub features; not created yet, empty in S2.
+- `@micafox/hub` in `hub/app` — the app: the feature list, `#ee`, `createHub()`, the `micafox-hub` command, both
+  builds, the image, the Compose setup and the Helm chart. It is run, never imported.
 
-Every hub package is private: none is published to npm. Dependencies point down the table only, and no package
-imports `ee/` except `packages/hub` through `#ee`, which ESLint enforces. Each package carries its own `LICENSE`;
-`ee/LICENSE` is a proprietary, source-available licence: why, and what contributors sign:
-[ADR 0022](../../adr/packages/0022-split-the-hub-into-packages-by-role.md).
+Their licences and what each may import: [the dependency matrix](../overview.md#packages). Every hub package is
+private: none is published to npm. ESLint enforces the matrix, and nothing imports `ee/` except `hub/app` through
+`#ee`. Each package carries its own `LICENSE`; `ee/LICENSE` is a proprietary, source-available licence: why, and
+what contributors sign: [ADR 0022](../../adr/packages/0022-split-the-hub-into-packages-by-role.md).
 
 The hub packages are ES modules only; the dual build of
 [ADR 0013](../../adr/packages/0013-publish-the-packages-as-es-modules-and-commonjs.md) is for published packages.
@@ -102,35 +102,37 @@ Two builds come from the one app:
 
 Not in S2; each has the socket that adds it without a redesign.
 
-| What                                                 | Stage | Socket                                                                                   |
-| ---------------------------------------------------- | ----- | ---------------------------------------------------------------------------------------- |
-| Several hub replicas behind a load balancer          | S4    | events through one bus; jobs and migrations under advisory locks; state only in Postgres |
-| Personal API tokens, the CLI and MCP tools           | S3    | the `mfx_pat_` token kind and actor model; an `mcpTools` part of the feature contract    |
-| `Idempotency-Key` on creating requests               | S3    | an optional header, added without breaking `/api/v1`                                     |
-| The events stream in the public API                  | S3    | `/api/internal/events` moves to `/api/v1/events`                                         |
-| Cloud: sign-up, many organizations, subscriptions    | S5    | `org_id` and RLS on every table; `MICAFOX_DEPLOYMENT`; a subscription entitlement source |
-| Self-hosted licence keys                             | S7    | a licence entitlement source, `MICAFOX_LICENSE`                                          |
-| SSO and SCIM                                         | S7    | an `authProviders` part of the extension contract that creates a normal session          |
-| Fine-grained roles                                   | S7    | roles stored per membership; every check goes through one `can()`                        |
-| Audit log                                            | S7    | every change already publishes an event with its actor                                   |
-| Email (invites, password reset)                      | later | invite and reset links already exist; a mailer only sends them                           |
-| A path prefix behind a reverse proxy                 | later | `MICAFOX_PUBLIC_URL` accepts a path                                                      |
-| An encryption keyring for secrets the hub reads back | later | a keyring with `kid`, added with the first encrypted field                               |
-| Logo and fox mascot                                  | S4    | assets and tokens in `@micafox/ui`                                                       |
-| Mobile layouts and languages other than English      | later | layout primitives in `@micafox/ui`; UI strings in one `strings.ts` per package           |
-| Breakpoint conditions                                | S6    | a compatible optional field of `Breakpoint` in protocol version 1; the create dialog     |
-| Logpoints                                            | S6    | a new SDK module and feature package over the same session and contract                  |
-| Source view through git connectors                   | later | `file` and `line` are repository paths, and `commit` comes with every instance           |
-| SDK settings from the hub, such as capture limits    | later | a compatible module message sent with `state(session)`, as breakpoints are               |
-| Central redaction policies                           | S7    | an `ee/` extension part of the debugger; the SDK's redaction stays on                    |
-| Hit limits counted in the SDK                        | later | an optional `maxHits` in `Breakpoint`; the hub's own count stays the guard               |
-| Instances' online state across replicas              | S4    | online asked of the replica that holds the socket, through the event bus                 |
+| What                                                 | Stage | Socket                                                                                         |
+| ---------------------------------------------------- | ----- | ---------------------------------------------------------------------------------------------- |
+| Several hub replicas behind a load balancer          | S4    | events through one bus; jobs and migrations under advisory locks; state only in Postgres       |
+| Personal API tokens, the CLI and MCP tools           | S3    | the `mfx_pat_` token kind and actor model; an `mcpTools` part of the feature contract          |
+| `Idempotency-Key` on creating requests               | S3    | an optional header, added without breaking `/api/v1`                                           |
+| The events stream in the public API                  | S3    | `/api/internal/events` moves to `/api/v1/events`                                               |
+| Cloud: sign-up, many organizations, subscriptions    | S5    | `org_id` and RLS on every table; `MICAFOX_DEPLOYMENT`; a subscription entitlement source       |
+| Where the Stripe integration of `ee/` billing runs   | S5    | `MICAFOX_DEPLOYMENT=cloud`; billing reaches the gate only as a subscription entitlement source |
+| Self-hosted licence keys                             | S7    | a licence entitlement source, `MICAFOX_LICENSE`                                                |
+| SSO and SCIM                                         | S7    | an `authProviders` part of the extension contract that creates a normal session                |
+| Fine-grained roles                                   | S7    | roles stored per membership; every check goes through one `can()`                              |
+| Audit log                                            | S7    | every change already publishes an event with its actor                                         |
+| Email (invites, password reset)                      | later | invite and reset links already exist; a mailer only sends them                                 |
+| A path prefix behind a reverse proxy                 | later | `MICAFOX_PUBLIC_URL` accepts a path                                                            |
+| An encryption keyring for secrets the hub reads back | later | a keyring with `kid`, added with the first encrypted field                                     |
+| Logo and fox mascot                                  | S4    | assets and tokens in `@micafox/ui`                                                             |
+| Mobile layouts and languages other than English      | later | layout primitives in `@micafox/ui`; UI strings in one `strings.ts` per package                 |
+| Breakpoint conditions                                | S6    | a compatible optional field of `Breakpoint` in protocol version 1; the create dialog           |
+| Logpoints                                            | S6    | a new SDK module and feature package over the same session and contract                        |
+| Source view through git connectors                   | later | `file` and `line` are repository paths, and `commit` comes with every instance                 |
+| SDK settings from the hub, such as capture limits    | later | a compatible module message sent with `state(session)`, as breakpoints are                     |
+| Central redaction policies                           | S7    | an `ee/` extension part of the debugger; the SDK's redaction stays on                          |
+| Hit limits counted in the SDK                        | later | an optional `maxHits` in `Breakpoint`; the hub's own count stays the guard                     |
+| Instances' online state across replicas              | S4    | online asked of the replica that holds the socket, through the event bus                       |
 
 ## Decisions
 
 - [0022. Split the hub into packages by role](../../adr/packages/0022-split-the-hub-into-packages-by-role.md)
 - [0023. Build the open core and ee/ from one app with #ee](../../adr/hub/app/0023-build-the-open-core-and-ee-from-one-app-with-ee.md)
 - [0035. Release the hub as an image and a chart](../../adr/packages/0035-release-the-hub-as-an-image-and-a-chart.md)
+- [0039. Group the workspace by licence and delivery](../../adr/packages/0039-group-the-workspace-by-licence-and-delivery.md)
 - [0008. Use WebSocket for the hub connection](../../adr/protocol/0008-use-websocket-for-the-hub-connection.md)
 - [0017. Tag messages with their module and agree on modules](../../adr/protocol/0017-tag-messages-with-their-module-and-agree-on-modules.md)
 

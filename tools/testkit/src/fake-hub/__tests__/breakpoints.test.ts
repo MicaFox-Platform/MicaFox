@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { DEFAULT_EXPIRES_IN_MS, readBreakpoints, selectForService, startCountdown } from "../breakpoints.js";
 
-const SAMPLE = [{ id: "bp-quote", file: "examples/frameworks/fastify/src/pricing.ts", line: 33 }];
+const SAMPLE = [{ id: "bp-quote", file: "sandbox/frameworks/fastify/src/pricing.ts", line: 33 }];
 
 // The variables as the process environment holds them, by their wire names
 const envOf = (...entries: Array<[string, string]>): NodeJS.ProcessEnv => Object.fromEntries(entries);
@@ -149,14 +149,14 @@ describe("startCountdown", () => {
 });
 
 describe("selectForService", () => {
-  const forCjs = { id: "bp-cjs", file: "examples/formats/src/cjs/quote.js", line: 9, service: "formats-cjs" };
-  const forEsm = { id: "bp-esm", file: "examples/formats/src/esm/quote.js", line: 9, service: "formats-esm" };
-  const forAll = { id: "bp-quote", file: "examples/frameworks/fastify/src/pricing.ts", line: 33 };
+  const forCjs = { id: "bp-cjs", file: "sandbox/formats/src/cjs/quote.js", line: 9, service: "formats-cjs" };
+  const forEsm = { id: "bp-esm", file: "sandbox/formats/src/esm/quote.js", line: 9, service: "formats-esm" };
+  const forAll = { id: "bp-quote", file: "sandbox/frameworks/fastify/src/pricing.ts", line: 33 };
 
   it("keeps the entries of the app's service and those of none, without their service", () => {
     const selected = selectForService([forCjs, forEsm, forAll], "formats-cjs");
 
-    expect(selected).toEqual([{ id: "bp-cjs", file: "examples/formats/src/cjs/quote.js", line: 9 }, forAll]);
+    expect(selected).toEqual([{ id: "bp-cjs", file: "sandbox/formats/src/cjs/quote.js", line: 9 }, forAll]);
   });
 
   it("drops every entry of a service when the hello names no service", () => {

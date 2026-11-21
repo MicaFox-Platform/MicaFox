@@ -3,7 +3,7 @@
 The end-to-end test kit and the benchmark of the examples: it starts their apps and one fake hub as real child
 processes and waits on what each prints, and `pnpm bench` measures the SDK's overhead in the Fastify example. Its
 `test/` also checks the scripts of `.github/scripts/`. Private
-and never published; only the examples (`examples/*`, `examples/frameworks/*`) depend on it, and ESLint keeps it out
+and never published; only the examples (`sandbox/*`, `sandbox/frameworks/*`) depend on it, and ESLint keeps it out
 of `packages/`. It is never built: it exports its TypeScript sources, which Vitest and tsx run as
 they are.
 
@@ -33,7 +33,7 @@ they are.
   `signatures.test.ts`: the commit signature checks of `.github/scripts/check-signatures.sh`, against a stubbed `gh`
   and in a throwaway repository with SSH-signed commits.
 - `docker/` — the container tests of `pnpm test:docker`, run by `vitest.docker.config.ts` only, never by `pnpm test`:
-  `compose.test.yaml` locks down every service of `examples/compose.yaml` (read-only root filesystem, a writable
+  `compose.test.yaml` locks down every service of `sandbox/compose.yaml` (read-only root filesystem, a writable
   `/tmp`, 256 MB, SDK errors only) and reports it healthy once it serves; `stack.ts` starts, follows, stops and
   removes the stack with the docker CLI; `global-setup.ts` starts it once per run and always removes it; `apps.ts`
   describes each app; `__tests__/containers.test.ts` checks them.
@@ -75,7 +75,7 @@ the end of its path, so one app's `quote.js` breakpoint would also resolve in an
 `pnpm --filter @micafox/testkit start:hub` runs it by hand and reads a `.env` in this folder, if there is one. Copy
 `.env.example` to `.env` first: it sets `HUB_BREAKPOINTS` to one breakpoint for each example app, on the line marked
 `// breakpoint here`, and `test/env-examples.test.ts` fails when one moves. The tests never read `.env`. How to run the
-apps: [the examples' README](../../examples/README.md).
+apps: [the examples' README](../../sandbox/README.md).
 
 ## Benchmark
 
@@ -83,7 +83,7 @@ apps: [the examples' README](../../examples/README.md).
 [the SDK's overhead](../../docs/api/sdk/overview.md#overhead) as Markdown; copy it into the doc by hand. It needs `docker`
 on `PATH` with BuildKit and at least 7 vCPUs, and takes about 15 minutes.
 
-- **Containers.** It builds the `fastify` and `hub` targets of `examples/Dockerfile` and runs each run on fresh
+- **Containers.** It builds the `fastify` and `hub` targets of `sandbox/Dockerfile` and runs each run on fresh
   containers on one network, with no published ports. The app gets `--cpus 1` pinned to vCPU 1 and
   `--memory 512m`, the fake hub vCPU 2, and the load generator, a container of the hub image, vCPUs 3 to 6. The app's
   output goes to `--log-driver none`: Fastify logs every request, and writing that through Docker would cost CPU outside

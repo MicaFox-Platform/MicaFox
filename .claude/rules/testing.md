@@ -4,7 +4,9 @@ paths:
   - "**/*.test.tsx"
   - "**/*.test-d.ts"
   - "packages/*/test/**"
-  - "examples/**/tests/**"
+  - "hub/*/test/**"
+  - "ee/*/test/**"
+  - "sandbox/**/tests/**"
   - "tools/testkit/**"
 ---
 
@@ -34,13 +36,14 @@ A folder lists only the code it runs; its tests sit one level down, in its own `
 - `__tests__/` holds only `*.test.ts`, `*.test.tsx` and `*.test-d.ts` files, no subfolders and no helpers. A file is
   named after its module: `hello.test.ts`, or `hub-connector-connect.test.ts` when a module needs several, one per
   behavior.
-- A test that is not about one folder lives in `packages/<name>/test/`, never in `src/`:
+- A test that is not about one folder lives in the package's `test/` (`packages/<name>/test/`, `hub/<name>/test/`),
+  never in `src/`:
   - examples of `docs/api/` and their copies: `test/docs/<doc>.test.ts` and `test/docs/<doc>-<example>.test-d.ts`;
   - checks of the lint boundaries of the package's components: `test/boundaries.test.ts`;
   - helpers and fixtures shared by tests: `test/<component>/`;
   - end-to-end tests: `test/e2e/` (below).
-- An example's end-to-end tests of the whole system, with its own part of the harness: `examples/<name>/tests/` or
-  `examples/frameworks/<name>/tests/` (below). What every example shares, the process runner and the fake hub, lives in
+- A sandbox app's end-to-end tests of the whole system, with its own part of the harness: `sandbox/<name>/tests/` or
+  `sandbox/frameworks/<name>/tests/` (below). What every example shares, the process runner and the fake hub, lives in
   `tools/testkit/src/`; checks that span the examples, such as their `.env.example` files, and of the
   repository's CI scripts live in `tools/testkit/test/`.
 
@@ -62,8 +65,8 @@ A folder lists only the code it runs; its tests sit one level down, in its own `
   what a real process adds; each one starts a process.
 - A package's own: `packages/<name>/test/e2e/<component>/`, with a fixture app started as a child process, a harness
   that drives it, and one `<behavior>.test.ts` per behavior of the component, one `it` per scenario. They may import the
-  package's sources by relative path, since they live in it. The whole system: in `examples/<name>/tests/` or
-  `examples/frameworks/<name>/tests/`, through the public API only, with the example's harness beside them; it starts
+  package's sources by relative path, since they live in it. The whole system: in `sandbox/<name>/tests/` or
+  `sandbox/frameworks/<name>/tests/`, through the public API only, with the example's harness beside them; it starts
   the example's own `src/` and the fake hub as child processes through `@micafox/testkit`, imported by package name.
 - A real process runs on real time: never assert what a time limit can cut, such as a snapshot's values beyond the
   handler's own variables, which a pause lists first. Check content in the SDK's tests on the real V8 with a stopped

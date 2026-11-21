@@ -41,7 +41,7 @@ SDK connector                          SDK endpoint                             
 ## Layout
 
 ```text
-packages/hub-core/src/server/sdk-endpoint/
+hub/core/src/server/sdk-endpoint/
 ├── index.ts         the /sdk route
 ├── upgrade.ts       the key check and limits, and the HTTP answer before the upgrade
 ├── handshake.ts     the hello timer and checks, the welcome modules

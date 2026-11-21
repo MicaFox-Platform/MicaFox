@@ -87,7 +87,7 @@ The single-page app engineers use in the browser: the shell every feature plugs 
 ## Layout
 
 ```text
-packages/hub-core/src/web/
+hub/core/src/web/
 ├── index.ts         the web entry: defineWebFeature, the API client, hooks, shell parts features use
 ├── app.tsx          mounts the router, the query client and the theme
 ├── shell/           top bar, navigation, switchers, status bar, error screens, toasts

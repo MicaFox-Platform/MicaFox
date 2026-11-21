@@ -65,7 +65,7 @@ Fake hub: `PORT`, `HUB_TOKEN` and `HUB_BREAKPOINTS`, which replaces the sample b
 [its variables](../../../tools/testkit/README.md#fake-hub).
 
 A breakpoint names its file by the path in the repository, such as
-`[{"id":"bp-1","file":"examples/frameworks/fastify/src/a/util.ts","line":5}]`. `src/a/util.ts` and `src/b/util.ts` share
+`[{"id":"bp-1","file":"sandbox/frameworks/fastify/src/a/util.ts","line":5}]`. `src/a/util.ts` and `src/b/util.ts` share
 a name on purpose: a breakpoint on `util.ts` alone gets status `error`, and one on a file the app has not loaded
 `pending`.
 

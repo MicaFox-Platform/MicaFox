@@ -34,13 +34,13 @@ source maps, and TypeScript bundled by esbuild with a source map.
 
 Not supported: bundles without source maps, the Edge runtime, Vercel serverless functions, Bun and Deno.
 
-What each framework needs and the apps CI runs: [Express](../../../examples/frameworks/express/README.md),
-[NestJS](../../../examples/frameworks/nestjs/README.md), [Next.js](../../../examples/frameworks/nextjs/README.md),
-[Fastify](../../../examples/frameworks/fastify/README.md), [module formats](../../../examples/formats/README.md).
+What each framework needs and the apps CI runs: [Express](../../../sandbox/frameworks/express/README.md),
+[NestJS](../../../sandbox/frameworks/nestjs/README.md), [Next.js](../../../sandbox/frameworks/nextjs/README.md),
+[Fastify](../../../sandbox/frameworks/fastify/README.md), [module formats](../../../sandbox/formats/README.md).
 
 ### Overhead
 
-What MicaFox cost the [Fastify example](../../../examples/frameworks/fastify/README.md) serving `GET /price`, measured
+What MicaFox cost the [Fastify example](../../../sandbox/frameworks/fastify/README.md) serving `GET /price`, measured
 by `pnpm bench` on 2026-11-14. The app ran in its Docker image with `--cpus 1` pinned to one vCPU and `--memory 512m`,
 on Node.js 22.23.5, under OrbStack (11 vCPUs, 8.8 GiB) on an Apple M3 Pro. Max req/s is the most the app served; the
 other columns are at a fixed 15,000 requests a second. Each cell is the median of 3 runs, with their range. Method and

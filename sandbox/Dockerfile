@@ -1,8 +1,8 @@
-# One image per example app, built from the repository root: `docker build -f examples/Dockerfile --target express .`
+# One image per example app, built from the repository root: `docker build -f sandbox/Dockerfile --target express .`
 # The targets are the services of compose.yaml. NODE_IMAGE picks the base image: node:22-alpine, node:24-slim, ...
 #
 # Every app image holds one package deployed from the built workspace, at its path in the repository, so the hub's
-# breakpoints (`examples/frameworks/express/src/quote.js`) still match the files by their path.
+# breakpoints (`sandbox/frameworks/express/src/quote.js`) still match the files by their path.
 # The apps run as the non-root `node` user and are PID 1: no init process, no shell, no pnpm in front of them. Each
 # one stops itself on SIGTERM.
 
@@ -41,29 +41,29 @@ WORKDIR /app/tools/testkit
 CMD ["node", "--import", "tsx", "src/fake-hub/main.ts"]
 
 FROM runtime AS fastify
-COPY --from=build --chown=node:node /out/fastify /app/examples/frameworks/fastify
-WORKDIR /app/examples/frameworks/fastify
+COPY --from=build --chown=node:node /out/fastify /app/sandbox/frameworks/fastify
+WORKDIR /app/sandbox/frameworks/fastify
 CMD ["node", "dist/index.js"]
 
 FROM runtime AS express
-COPY --from=build --chown=node:node /out/express /app/examples/frameworks/express
-WORKDIR /app/examples/frameworks/express
+COPY --from=build --chown=node:node /out/express /app/sandbox/frameworks/express
+WORKDIR /app/sandbox/frameworks/express
 CMD ["node", "src/server.js"]
 
 FROM runtime AS nestjs
-COPY --from=build --chown=node:node /out/nestjs /app/examples/frameworks/nestjs
-WORKDIR /app/examples/frameworks/nestjs
+COPY --from=build --chown=node:node /out/nestjs /app/sandbox/frameworks/nestjs
+WORKDIR /app/sandbox/frameworks/nestjs
 CMD ["node", "dist/main.js"]
 
 FROM runtime AS nextjs
-COPY --from=build --chown=node:node /out/nextjs /app/examples/frameworks/nextjs
-WORKDIR /app/examples/frameworks/nextjs
+COPY --from=build --chown=node:node /out/nextjs /app/sandbox/frameworks/nextjs
+WORKDIR /app/sandbox/frameworks/nextjs
 # `next start` takes its address from the flag, not from HOST; its server writes to src/.next/cache, which `node` owns
 CMD ["node", "node_modules/next/dist/bin/next", "start", "src", "--hostname", "0.0.0.0"]
 
 FROM runtime AS formats
-COPY --from=build --chown=node:node /out/formats /app/examples/formats
-WORKDIR /app/examples/formats
+COPY --from=build --chown=node:node /out/formats /app/sandbox/formats
+WORKDIR /app/sandbox/formats
 
 FROM formats AS formats-cjs
 CMD ["node", "src/cjs/server.js"]
