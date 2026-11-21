@@ -12,7 +12,7 @@ fail() {
 }
 
 is_test() {
-  [[ $1 == *.test.ts || $1 == *.test-d.ts ]]
+  [[ $1 == *.test.ts || $1 == *.test.tsx || $1 == *.test-d.ts ]]
 }
 
 cd "$(git rev-parse --show-toplevel)" || exit 1
@@ -23,7 +23,8 @@ while IFS= read -r dir; do
     continue
   fi
 
-  sources=$(find "$dir" -maxdepth 1 -type f -name '*.ts' ! -name '*.test.ts' ! -name '*.test-d.ts' | grep -c .)
+  sources=$(find "$dir" -maxdepth 1 -type f \( -name '*.ts' -o -name '*.tsx' \) \
+    ! -name '*.test.ts' ! -name '*.test.tsx' ! -name '*.test-d.ts' | grep -c .)
   ((sources > max_sources)) &&
     fail "$dir has $sources source files, at most $max_sources: group them into sub-component folders with an index.ts"
 # Next.js writes its build to .next/ beside its sources; it is not ours to structure
@@ -35,7 +36,7 @@ while IFS= read -r file; do
   if is_test "$file" && [[ -z $in_tests_folder ]]; then
     fail "$file is a test outside __tests__/: move it to $(dirname "$file")/__tests__/"
   elif ! is_test "$file" && [[ -n $in_tests_folder ]]; then
-    fail "$file is not a test: __tests__/ holds only *.test.ts and *.test-d.ts; move it out"
+    fail "$file is not a test: __tests__/ holds only *.test.ts, *.test.tsx and *.test-d.ts; move it out"
   fi
 done < <(find packages/*/src examples/*/src examples/frameworks/*/src tools/*/src -type f -not -path '*/.next/*' 2>/dev/null)
 

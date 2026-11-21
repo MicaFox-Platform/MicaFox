@@ -13,7 +13,7 @@ changed=$({
   git diff --name-only "$base"
   git ls-files --others --exclude-standard
 } | sort -u)
-sources=$(grep -E '^(packages|tools)/[^/]+/src/.*\.ts$' <<<"$changed" | grep -vE '/__tests__/|\.(test|test-d|d)\.ts$')
+sources=$(grep -E '^(packages|tools)/[^/]+/src/.*\.tsx?$' <<<"$changed" | grep -vE '/__tests__/|\.(test|test-d|d)\.tsx?$')
 
 section() {
   echo "$1:"
@@ -40,20 +40,24 @@ sensitive=$(
 )
 
 importers=$(for file in $sources; do
-  name=$(basename "$file" .ts)
+  name=$(basename "${file%.tsx}" .ts)
   grep -rlE "from ['\"]\.{1,2}/([^'\"]*/)?$name\.js['\"]" packages/*/src examples/*/src examples/*/tests examples/frameworks/*/src examples/frameworks/*/tests tools/*/src 2>/dev/null |
     grep -vxF "$file" | sed "s|^|$file ← |"
 done)
 
-# Tests live in the module folder's __tests__/: foo.ts → foo.test.ts, foo.test-d.ts or foo-<behavior>.test.ts;
+# Tests live in the module folder's __tests__/: foo.ts or foo.tsx → foo.test.ts(x), foo.test-d.ts or
+# foo-<behavior>.test.ts(x);
 # index.ts may also be tested under its folder's name (hub-connector/index.ts → hub-connector-*.test.ts)
 has_test() {
-  compgen -G "$1/__tests__/$2.test.ts" >/dev/null || compgen -G "$1/__tests__/$2.test-d.ts" >/dev/null ||
-    compgen -G "$1/__tests__/$2-*.test.ts" >/dev/null
+  local pattern
+  for pattern in "$2.test.ts" "$2.test.tsx" "$2.test-d.ts" "$2-*.test.ts" "$2-*.test.tsx"; do
+    compgen -G "$1/__tests__/$pattern" >/dev/null && return 0
+  done
+  return 1
 }
 untested=$(for file in $sources; do
   dir=$(dirname "$file")
-  name=$(basename "$file" .ts)
+  name=$(basename "${file%.tsx}" .ts)
   has_test "$dir" "$name" && continue
   [[ $name == index ]] && has_test "$dir" "$(basename "$dir")" && continue
   echo "$file"

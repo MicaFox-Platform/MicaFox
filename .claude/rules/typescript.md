@@ -1,6 +1,7 @@
 ---
 paths:
   - "**/*.ts"
+  - "**/*.tsx"
 ---
 
 # TypeScript

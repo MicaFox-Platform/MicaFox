@@ -3,6 +3,12 @@ import { describe, expect, it } from "vitest";
 import { createVitestConfig } from "../vitest/index.js";
 
 describe("createVitestConfig", () => {
+  it("runs .test.ts and .test.tsx files", () => {
+    const config = createVitestConfig();
+
+    expect(config.test?.include).toEqual(["**/*.test.ts", "**/*.test.tsx"]);
+  });
+
   it("resolves the source condition before Vite's client defaults when one is given", () => {
     const config = createVitestConfig({ sourceCondition: "@acme/source" });
 

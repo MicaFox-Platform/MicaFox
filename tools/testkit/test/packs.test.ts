@@ -124,6 +124,15 @@ describe("check-packs.sh", { timeout: PACK_TEST_TIMEOUT_MS }, () => {
     expect(result.stderr).toContain("✗ @fixture/core: the tarball ships dist/index.test.js");
   });
 
+  it("fails when the tarball ships a .test.tsx file", () => {
+    write("packages/core/dist/button.test.tsx", "export {};\n");
+
+    const result = run();
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("✗ @fixture/core: the tarball ships dist/button.test.tsx");
+  });
+
   it("fails when a package has no README", () => {
     rmSync(path.join(repo, "packages/core/README.md"));
 

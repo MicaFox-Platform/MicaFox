@@ -99,3 +99,22 @@ describe("hub-core schema imports", { timeout: 60_000 }, () => {
     expect(messages).toEqual([]);
   });
 });
+
+// A .tsx file does not exist yet, and typed linting parses only files that exist: the resolved config shows its rules
+describe("hub-core .tsx web code", () => {
+  const findNodeBan = async (file: string): Promise<unknown> => {
+    // ESLint types the resolved config as `any`; a flat config always holds `rules`
+    const config = (await new ESLint({ cwd: ROOT }).calculateConfigForFile(
+      path.join("packages/hub-core/src/web", file),
+    )) as { rules: Record<string, unknown> };
+    return config.rules["import-x/no-nodejs-modules"];
+  };
+
+  it("bans Node built-ins in a .tsx file of ./web", async () => {
+    await expect(findNodeBan("app.tsx")).resolves.toEqual([2]);
+  });
+
+  it("leaves Node built-ins to a .test.tsx file of ./web", async () => {
+    await expect(findNodeBan("__tests__/app.test.tsx")).resolves.toBeUndefined();
+  });
+});

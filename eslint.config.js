@@ -1,6 +1,6 @@
 import config from "@micafox/configs/eslint";
 
-const TESTS = ["**/*.test.ts", "**/*.test-d.ts"];
+const TESTS = ["**/*.test.ts", "**/*.test.tsx", "**/*.test-d.ts"];
 
 const escapeRegex = (text) => text.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 
@@ -164,7 +164,7 @@ export default [
   },
   {
     // The test kit drives the examples' end-to-end tests; the packages never depend on it
-    files: ["packages/**/*.ts"],
+    files: ["packages/**/*.ts", "packages/**/*.tsx"],
     rules: { "no-restricted-imports": ["error", { paths: [TESTKIT_BAN] }] },
   },
   ...hubRules,

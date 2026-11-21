@@ -2,14 +2,16 @@
 
 Shared tooling configs for MicaFox and other TS/Node projects.
 
-| Export                                         | Tool       | Usage                                                                                       |
-| ---------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------- |
-| `@micafox/configs/tsconfig/base.json`          | TypeScript | `"extends": "@micafox/configs/tsconfig/base.json"`                                          |
-| `@micafox/configs/tsconfig/workspace.json`     | TypeScript | a monorepo package: `src/` → `dist/`, composite, tests and type tests left out of the build |
-| `@micafox/configs/tsconfig/workspace-cjs.json` | TypeScript | the CommonJS build of such a package: `src/` → `dist/cjs/`                                  |
-| `@micafox/configs/eslint`                      | ESLint     | `export default [...config, { /* overrides */ }]`                                           |
-| `@micafox/configs/prettier`                    | Prettier   | `export { default } from "@micafox/configs/prettier"`                                       |
-| `@micafox/configs/vitest`                      | Vitest     | `export default createVitestConfig()`, `mergeConfig` it for overrides                       |
+| Export                                           | Tool       | Usage                                                                                            |
+| ------------------------------------------------ | ---------- | ------------------------------------------------------------------------------------------------ |
+| `@micafox/configs/tsconfig/base.json`            | TypeScript | `"extends": "@micafox/configs/tsconfig/base.json"`                                               |
+| `@micafox/configs/tsconfig/workspace.json`       | TypeScript | a monorepo package: `src/` → `dist/`, composite, tests and type tests left out of the build      |
+| `@micafox/configs/tsconfig/workspace-cjs.json`   | TypeScript | the CommonJS build of such a package: `src/` → `dist/cjs/`                                       |
+| `@micafox/configs/tsconfig/workspace-react.json` | TypeScript | such a package with React in `.tsx`: JSX and CSS Module imports                                  |
+| `@micafox/configs/css-modules`                   | TypeScript | the `*.module.css` types, for a tsconfig that sets its own `types`                               |
+| `@micafox/configs/eslint`                        | ESLint     | `export default [...config, { /* overrides */ }]`; lints `.ts` and `.tsx`, React hooks in `.tsx` |
+| `@micafox/configs/prettier`                      | Prettier   | `export { default } from "@micafox/configs/prettier"`                                            |
+| `@micafox/configs/vitest`                        | Vitest     | `export default createVitestConfig()`, `mergeConfig` it for overrides                            |
 
 ESLint plugins are bundled as dependencies. `eslint`, `prettier`, `typescript` and `vitest` are optional peer
 dependencies — install only the tools you use.

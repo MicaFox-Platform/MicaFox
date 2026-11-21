@@ -70,7 +70,7 @@ packages/ui/src/
 ├── tokens/           tokens.css with both themes, the token names in TypeScript, the contrast pairs
 ├── fonts/            Departure Mono and IBM Plex, with their OFL licences
 ├── icons/            the pixelarticons the hub uses
-├── components/       one folder per component: <Name>.tsx and <Name>.module.css
+├── components/       one folder per component: <name>.tsx and <name>.module.css, kebab-case
 └── layout/           Stack, Grid, Spacer
 ```
 

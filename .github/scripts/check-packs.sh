@@ -44,7 +44,7 @@ for dir in packages/*/; do
     fail "$name: pnpm pack did not copy the root LICENSE: check the pnpm version or add LICENSE to $dir"
   while IFS= read -r file; do
     [[ -n $file ]] && fail "$name: the tarball ships ${file#package/}: narrow \"files\" in $dir/package.json"
-  done < <(grep -E '^package/(src|test)/|/__tests__/|\.test(-d)?\.[cm]?[jt]s$|\.tsbuildinfo$' <<<"$files")
+  done < <(grep -E '^package/(src|test)/|/__tests__/|\.test(-d)?\.[cm]?[jt]sx?$|\.tsbuildinfo$' <<<"$files")
 
   manifest=$(tar -xzOf "$tarball" package/package.json)
 

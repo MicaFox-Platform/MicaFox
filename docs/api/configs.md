@@ -7,14 +7,16 @@ pnpm add -D @micafox/configs
 ```
 
 `eslint`, `prettier`, `typescript` and `vitest` are optional peer dependencies: install what the presets you use
-need. The ESLint plugins come bundled.
+need. The ESLint plugins come bundled; `eslint-plugin-react-hooks` brings Babel, `hermes-parser` and `zod` with it,
+also into projects without React.
 
-| Preset     | Needs                              |
-| ---------- | ---------------------------------- |
-| `tsconfig` | `typescript` >= 5.8, `@types/node` |
-| `eslint`   | `eslint` ^10, `typescript` >= 5.8  |
-| `prettier` | `prettier` ^3                      |
-| `vitest`   | `vitest` ^4                        |
+| Preset                          | Needs                                              |
+| ------------------------------- | -------------------------------------------------- |
+| `tsconfig`                      | `typescript` >= 5.8, `@types/node`                 |
+| `tsconfig/workspace-react.json` | `typescript` >= 5.8, `@types/node`, `@types/react` |
+| `eslint`                        | `eslint` ^10, `typescript` >= 5.8                  |
+| `prettier`                      | `prettier` ^3                                      |
+| `vitest`                        | `vitest` ^4                                        |
 
 ## Exports
 
@@ -34,7 +36,7 @@ and `verbatimModuleSyntax`.
 ```
 
 `base.json` plus a composite build of one monorepo package: compiles `src/` to `dist/` with declarations and source
-maps. `*.test.ts` and `*.test-d.ts` are left out of the build and are not typechecked there; the root
+maps. `*.test.ts`, `*.test.tsx` and `*.test-d.ts` are left out of the build and are not typechecked there; the root
 `tsconfig.json` typechecks them, see [Usage](#usage). Paths are relative to the extending `tsconfig.json`.
 
 ### `@micafox/configs/tsconfig/workspace-cjs.json`
@@ -49,6 +51,36 @@ express them. The ES module build overrides `outDir` and `tsBuildInfoFile` of `w
 tsc does not mark the output as CommonJS: the build writes `dist/cjs/package.json` with `{ "type": "commonjs" }`,
 or Node loads it as ES modules in a `"type": "module"` package.
 
+### `@micafox/configs/tsconfig/workspace-react.json`
+
+```json
+{ "extends": "@micafox/configs/tsconfig/workspace-react.json" }
+```
+
+`workspace.json` for a package with React components in `.tsx`: compiles JSX with the automatic runtime
+(`"jsx": "react-jsx"`) and types CSS Module imports through [`@micafox/configs/css-modules`](#micafoxconfigscss-modules).
+Install `@types/react` beside `@types/node`. The DOM types come from TypeScript's default `lib` for the target, as in
+every preset.
+
+### `@micafox/configs/css-modules`
+
+```ts
+declare module "*.module.css" {
+  const classes: { readonly [className: string]: string };
+  export default classes;
+}
+```
+
+Types the default import of a `*.module.css` file as its class names. With `noUncheckedIndexedAccess` a class reads
+as `string | undefined`. `workspace-react.json` loads it through `types`; a tsconfig that sets its own `types`, such
+as a root one that typechecks the tests, lists it there:
+
+```json
+{ "compilerOptions": { "jsx": "react-jsx", "types": ["node", "@micafox/configs/css-modules"] } }
+```
+
+Do not combine it with `vite/client`, which declares the same module.
+
 ### `@micafox/configs/eslint`
 
 ```ts
@@ -57,9 +89,9 @@ export default config;
 ```
 
 Flat config: `@eslint/js` recommended, typescript-eslint `strictTypeChecked` and `stylisticTypeChecked`, and the
-Vitest recommended rules for `*.test.ts` and `*.test-d.ts`. It lints `*.ts` files with type information; `*.js`,
-`*.d.ts`, `dist/`, `coverage/` and `node_modules/` are ignored, and other extensions get the base rules only. On top
-of those presets, the highlights:
+Vitest recommended rules for `*.test.ts`, `*.test.tsx` and `*.test-d.ts`. It lints `*.ts` and `*.tsx` files with type
+information and the same rules; `*.js`, `*.d.ts`, `dist/`, `coverage/` and `node_modules/` are ignored, and other
+extensions get the base rules only. On top of those presets, the highlights:
 
 - **Size and shape:** at most 300 lines per file and 50 per function, not counting blank lines and comments (tests
   exempt), nesting depth 3, cyclomatic complexity 10, 3 parameters.
@@ -73,6 +105,8 @@ of those presets, the highlights:
   property names unchecked.
 - **Types:** explicit return types on exports, `readonly` for private fields never reassigned, exhaustive `switch`
   on unions and `default` on others.
+- **React, in `*.tsx` only:** the rules of hooks and exhaustive effect dependencies; a function-typed `const`, such as
+  a component, may also be `PascalCase`. In `*.ts`, `use*` names stay free for other APIs.
 - **Tests:** no skipped tests, no conditionals, a message on every `toThrow`, `describe` nested at most twice.
 
 ```js
@@ -112,7 +146,7 @@ export { default } from "@micafox/configs/prettier";
 const createVitestConfig: (options?: VitestConfigOptions) => UserWorkspaceConfig;
 ```
 
-Builds the Vitest project config: runs `**/*.test.ts`, keeps Vitest's default excludes and skips `dist/`.
+Builds the Vitest project config: runs `**/*.test.ts` and `**/*.test.tsx`, keeps Vitest's default excludes and skips `dist/`.
 `*.test-d.ts` files are not run; typecheck them with `tsc`.
 
 **Parameters**

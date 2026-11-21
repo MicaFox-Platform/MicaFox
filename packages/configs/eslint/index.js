@@ -1,7 +1,25 @@
 import js from "@eslint/js";
 import vitest from "@vitest/eslint-plugin";
 import { createNodeResolver, importX } from "eslint-plugin-import-x";
+import reactHooks from "eslint-plugin-react-hooks";
 import tseslint from "typescript-eslint";
+
+const NAMING = [
+  { selector: "default", format: ["camelCase"] },
+  { selector: "import", format: ["camelCase", "PascalCase"] },
+  { selector: "variable", modifiers: ["const"], format: ["camelCase", "UPPER_CASE"] },
+  { selector: "variable", modifiers: ["destructured"], format: null },
+  { selector: "parameter", format: ["camelCase"], leadingUnderscore: "allow" },
+  { selector: "classProperty", modifiers: ["static", "readonly"], format: ["camelCase", "UPPER_CASE"] },
+  { selector: "typeLike", format: ["PascalCase"] },
+  { selector: "interface", format: ["PascalCase"], custom: { regex: "^I[A-Z]", match: false } },
+  // Wire names such as HTTP headers are quoted and keep the spelling their protocol gives them
+  {
+    selector: ["objectLiteralProperty", "typeProperty", "objectLiteralMethod", "typeMethod"],
+    modifiers: ["requiresQuotes"],
+    format: null,
+  },
+];
 
 /** @type {import("eslint").Linter.Config[]} */
 export default [
@@ -14,7 +32,7 @@ export default [
   },
 
   {
-    files: ["**/*.ts"],
+    files: ["**/*.ts", "**/*.tsx"],
     languageOptions: {
       parserOptions: {
         projectService: true,
@@ -24,8 +42,8 @@ export default [
       "import-x": importX,
     },
     settings: {
-      // NodeNext imports use `.js` specifiers that point at `.ts` sources
-      "import-x/resolver-next": [createNodeResolver({ extensionAlias: { ".js": [".ts", ".js"] } })],
+      // NodeNext imports use `.js` specifiers that point at `.ts` and `.tsx` sources
+      "import-x/resolver-next": [createNodeResolver({ extensionAlias: { ".js": [".ts", ".tsx", ".js"] } })],
     },
     rules: {
       "import-x/no-cycle": "error",
@@ -92,21 +110,26 @@ export default [
       "@typescript-eslint/explicit-module-boundary-types": "error",
       "@typescript-eslint/prefer-readonly": "error",
       "@typescript-eslint/switch-exhaustiveness-check": ["error", { requireDefaultForNonUnion: true }],
+      "@typescript-eslint/naming-convention": ["error", ...NAMING],
+    },
+  },
+
+  {
+    // React code lives in `.tsx`: `.ts` keeps `use*` free for other APIs, such as test fixtures
+    files: ["**/*.tsx"],
+    plugins: { "react-hooks": reactHooks },
+    rules: {
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "error",
+      // A component is a function-typed const named in PascalCase; other consts keep their naming
       "@typescript-eslint/naming-convention": [
         "error",
-        { selector: "default", format: ["camelCase"] },
-        { selector: "import", format: ["camelCase", "PascalCase"] },
-        { selector: "variable", modifiers: ["const"], format: ["camelCase", "UPPER_CASE"] },
-        { selector: "variable", modifiers: ["destructured"], format: null },
-        { selector: "parameter", format: ["camelCase"], leadingUnderscore: "allow" },
-        { selector: "classProperty", modifiers: ["static", "readonly"], format: ["camelCase", "UPPER_CASE"] },
-        { selector: "typeLike", format: ["PascalCase"] },
-        { selector: "interface", format: ["PascalCase"], custom: { regex: "^I[A-Z]", match: false } },
-        // Wire names such as HTTP headers are quoted and keep the spelling their protocol gives them
+        ...NAMING,
         {
-          selector: ["objectLiteralProperty", "typeProperty", "objectLiteralMethod", "typeMethod"],
-          modifiers: ["requiresQuotes"],
-          format: null,
+          selector: "variable",
+          modifiers: ["const"],
+          types: ["function"],
+          format: ["camelCase", "UPPER_CASE", "PascalCase"],
         },
       ],
     },
@@ -121,7 +144,7 @@ export default [
   },
 
   {
-    files: ["**/*.test.ts", "**/*.test-d.ts"],
+    files: ["**/*.test.ts", "**/*.test.tsx", "**/*.test-d.ts"],
     plugins: { vitest },
     // Lets `vitest/expect-expect` count `expectTypeOf()` and `assertType()` as assertions
     settings: { vitest: { typecheck: true } },
