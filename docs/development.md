@@ -39,8 +39,9 @@ AGPL-3.0-only, where an outside pull request needs a signed CLA. Nothing imports
 `#ee`; until `ee/hub` exists, `#ee` and `#ee/web` resolve to the basic hub's stubs in both builds.
 
 - ESLint holds the hub's dependency rule: each package imports only the packages above it in
-  [the table](architecture/hub/overview.md#packages), a feature never imports another feature, and `./web` and
-  `./schema` import no server code and no Node built-in.
+  [the table](architecture/hub/overview.md#packages), a feature never imports another feature, `./web` and
+  `./schema` import no server code and no Node built-in, and nothing imports the hub app but `tools/testkit`,
+  through `@micafox/hub/cli` ([ADR 0038](adr/packages/0038-let-the-test-kit-start-the-built-hub.md)).
 - `pnpm lint` runs `.github/scripts/check-licences.sh`: the third-party dependencies of the AGPL packages and `ee/`
   take only permissive licences, LGPL and MPL-2.0, never GPL, AGPL, SSPL or an unknown one, and those of `ui` only
   permissive ones

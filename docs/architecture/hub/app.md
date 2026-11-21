@@ -67,7 +67,7 @@ packages/hub/
 │   ├── postgres-init.sql   the owner role for migrations and the app role for the hub
 │   └── chart/              the Helm chart
 ├── Dockerfile              one image; the EE build argument picks the build
-└── LICENSE                 AGPL-3.0
+└── LICENSE                 AGPL-3.0-only
 ```
 
 ## Key flows
