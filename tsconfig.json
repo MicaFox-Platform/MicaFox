@@ -2,12 +2,15 @@
   "extends": "@micafox/configs/tsconfig/base.json",
   "compilerOptions": {
     "noEmit": true,
-    "customConditions": ["@micafox/source"]
+    "customConditions": ["@micafox/source"],
+    "jsx": "react-jsx",
+    "types": ["node", "@micafox/configs/css-modules"]
   },
   "include": [
     "*.ts",
     "packages/*/vitest*.config.ts",
     "packages/*/src/**/*.test.ts",
+    "packages/*/src/**/*.test.tsx",
     "packages/*/src/**/*.test-d.ts",
     "examples/*/src/**/*.test.ts",
     "examples/frameworks/*/src/**/*.test.ts",

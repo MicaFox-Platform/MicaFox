@@ -17,6 +17,7 @@
     "${configDir}/dist",
     "${configDir}/node_modules",
     "${configDir}/src/**/*.test.ts",
+    "${configDir}/src/**/*.test.tsx",
     "${configDir}/src/**/*.test-d.ts"
   ]
 }

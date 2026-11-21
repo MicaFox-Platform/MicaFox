@@ -19,7 +19,7 @@ export const createVitestConfig = ({ sourceCondition } = {}) =>
   defineProject({
     ...sourceResolve(sourceCondition),
     test: {
-      include: ["**/*.test.ts"],
+      include: ["**/*.test.ts", "**/*.test.tsx"],
       exclude: [...configDefaults.exclude, "**/dist/**"],
     },
   });

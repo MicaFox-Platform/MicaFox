@@ -27,7 +27,8 @@ they are.
   their Dockerfile and `compose.yaml` against those files, and the hub's `HOST`; `changesets.test.ts`: the changeset
   checks of `.github/scripts/check-changesets.sh`, in a throwaway git repository; `packs.test.ts`: the tarball checks
   of `.github/scripts/check-packs.sh` (`pnpm test:pack`), in a throwaway workspace; `licences.test.ts`: the licence
-  checks of `.github/scripts/check-licences.sh`, against a stubbed `pnpm`; `release-github.test.ts`: the tags
+  checks of `.github/scripts/check-licences.sh`, against a stubbed `pnpm`; `structure.test.ts`: the folder checks of
+  `.github/scripts/check-structure.sh`, in a throwaway git repository; `release-github.test.ts`: the tags
   and GitHub Releases of `.github/scripts/release-github.sh`, in a throwaway repository with stubbed `npm` and `gh`;
   `signatures.test.ts`: the commit signature checks of `.github/scripts/check-signatures.sh`, against a stubbed `gh`
   and in a throwaway repository with SSH-signed commits.

@@ -9,8 +9,9 @@ specific to MicaFox, so the package can also serve any TS/Node project that inst
 
 ## Boundaries
 
-- Owns: general presets per tool (`tsconfig/base.json`, `tsconfig/workspace.json`, `eslint`, `prettier`, `vitest`)
-  and the ESLint plugins they need, bundled as dependencies.
+- Owns: general presets per tool (`tsconfig/base.json`, `tsconfig/workspace.json`, `tsconfig/workspace-react.json`
+  with the `css-modules` types, `eslint`, `prettier`, `vitest`) and the ESLint plugins they need, bundled as
+  dependencies.
 - Does not own: repo-level orchestration and gates, such as the Vitest projects list, the coverage thresholds and the
   root `tsconfig.json` include list. Each repo keeps them in its own root config. It also does not own repo
   conventions such as the `@micafox/source` condition name, which the consumer passes in.
@@ -32,14 +33,16 @@ specific to MicaFox, so the package can also serve any TS/Node project that inst
 Consumers apply a preset in their own config file and add their overrides on top.
 Signatures and examples: [`docs/api/configs.md`](../api/configs.md).
 
-| Preset                        | Applied with                                                            |
-| ----------------------------- | ----------------------------------------------------------------------- |
-| `tsconfig/base.json`          | `"extends"` in `tsconfig.json`                                          |
-| `tsconfig/workspace.json`     | `"extends"` in a package's `tsconfig.json`                              |
-| `tsconfig/workspace-cjs.json` | `"extends"` in a package's `tsconfig.cjs.json`, beside `workspace.json` |
-| `eslint`                      | spread into the flat config array                                       |
-| `prettier`                    | re-exported from `prettier.config.js`                                   |
-| `vitest`                      | `createVitestConfig()` or the default export in a project config        |
+| Preset                          | Applied with                                                            |
+| ------------------------------- | ----------------------------------------------------------------------- |
+| `tsconfig/base.json`            | `"extends"` in `tsconfig.json`                                          |
+| `tsconfig/workspace.json`       | `"extends"` in a package's `tsconfig.json`                              |
+| `tsconfig/workspace-cjs.json`   | `"extends"` in a package's `tsconfig.cjs.json`, beside `workspace.json` |
+| `tsconfig/workspace-react.json` | `"extends"` in the `tsconfig.json` of a package with React components   |
+| `css-modules`                   | `types` of a tsconfig that sets its own, such as the root one           |
+| `eslint`                        | spread into the flat config array                                       |
+| `prettier`                      | re-exported from `prettier.config.js`                                   |
+| `vitest`                        | `createVitestConfig()` or the default export in a project config        |
 
 ## Key flows
 

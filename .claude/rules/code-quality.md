@@ -1,6 +1,7 @@
 ---
 paths:
   - "**/*.ts"
+  - "**/*.tsx"
 ---
 
 # Code quality
@@ -20,8 +21,9 @@ A reader finds a file from the folder names alone. The tree of a component is de
   (`pnpm lint`). Before it outgrows that, group its files by sub-concept into sub-component folders, each with its
   own `index.ts` (`connector/session/`, `connector/outbound/`). A root file imports a sub-component as `./session/index.js`; a sub-component imports a
   sibling as `../outbound/index.js`, never its files, and never the files of its parent (ESLint).
-- Folders and files are kebab-case and named after the concept they hold (`outbound/`, `token-bucket.ts`), not after
-  a ticket, a flow step or a test kind. The one exception is `__tests__/`: [testing](testing.md#where-tests-live).
+- Folders and files are kebab-case and named after the concept they hold (`outbound/`, `token-bucket.ts`), React
+  components too (`button.tsx`, `button.module.css`), not after a ticket, a flow step or a test kind. The one
+  exception is `__tests__/`: [testing](testing.md#where-tests-live).
 - No empty folders and no leftovers: a move or split that is given up is undone completely (`pnpm lint`).
 - No `utils.ts`, `helpers.ts` or `common.ts`: name a module after what it does (`backoff.ts`, `redact.ts`).
 - Split by responsibility, not by size. A file over 300 lines or a function over 50 lines is split (ESLint), and each
@@ -47,7 +49,8 @@ A reader finds a file from the folder names alone. The tree of a component is de
 
 - Case: `UpperCamelCase` for types and type parameters, `lowerCamelCase` for values and members, `CONSTANT_CASE`
   only for module-level and static readonly constants (`PROTOCOL_VERSION`), quoted wire names as the wire spells
-  them (`"Authorization"`, `MICAFOX_TOKEN`). ESLint checks the shapes but allows `CONSTANT_CASE` on any `const`.
+  them (`"Authorization"`, `MICAFOX_TOKEN`), and `UpperCamelCase` for React components in `.tsx` (`Button`). ESLint
+  checks the shapes but allows `CONSTANT_CASE` on any `const`.
 - Acronyms are words: `instanceId`, `hubUrl`, `parseJson`. No `I` prefix, no `_` prefix or suffix except an unused
   parameter, no type in the name (`breakpointList`). (Google § Naming)
 - Descriptive over short: one letter only in a scope of ≤ 10 lines; only well-known abbreviations (`id`, `url`).

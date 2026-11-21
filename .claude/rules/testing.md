@@ -1,6 +1,7 @@
 ---
 paths:
   - "**/*.test.ts"
+  - "**/*.test.tsx"
   - "**/*.test-d.ts"
   - "packages/*/test/**"
   - "examples/**/tests/**"
@@ -30,8 +31,9 @@ A folder lists only the code it runs; its tests sit one level down, in its own `
 - A unit test lives in the `__tests__/` of the folder that holds its module: `connection/__tests__/hello.test.ts`
   tests `connection/hello.ts`. A sub-component with tests has its own `__tests__/`; a `__tests__/` never holds the
   tests of a sibling, parent or child folder.
-- `__tests__/` holds only `*.test.ts` and `*.test-d.ts` files, no subfolders and no helpers. A file is named after
-  its module: `hello.test.ts`, or `hub-connector-connect.test.ts` when a module needs several, one per behavior.
+- `__tests__/` holds only `*.test.ts`, `*.test.tsx` and `*.test-d.ts` files, no subfolders and no helpers. A file is
+  named after its module: `hello.test.ts`, or `hub-connector-connect.test.ts` when a module needs several, one per
+  behavior.
 - A test that is not about one folder lives in `packages/<name>/test/`, never in `src/`:
   - examples of `docs/api/` and their copies: `test/docs/<doc>.test.ts` and `test/docs/<doc>-<example>.test-d.ts`;
   - checks of the lint boundaries of the package's components: `test/boundaries.test.ts`;

@@ -40,3 +40,18 @@ describe("ui imports", { timeout: 60_000 }, () => {
     expect(messages).toEqual([]);
   });
 });
+
+// A .tsx file does not exist yet, and typed linting parses only files that exist: the resolved config shows its rules
+describe("ui .tsx imports", () => {
+  it("bans the test kit in a .tsx component", async () => {
+    // ESLint types the resolved config as `any`; a flat config always holds `rules`
+    const config = (await new ESLint({ cwd: ROOT }).calculateConfigForFile(
+      "packages/ui/src/components/button.tsx",
+    )) as { rules: Record<string, unknown> };
+
+    expect(config.rules["no-restricted-imports"]).toEqual([
+      2,
+      { paths: [expect.objectContaining({ name: "@micafox/testkit" })] },
+    ]);
+  });
+});

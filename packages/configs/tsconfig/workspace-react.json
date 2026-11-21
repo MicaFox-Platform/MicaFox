@@ -1,0 +1,7 @@
+{
+  "extends": "./workspace.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "types": ["node", "@micafox/configs/css-modules"]
+  }
+}
