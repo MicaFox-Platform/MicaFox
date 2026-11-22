@@ -1,13 +1,8 @@
+import { sendProblem } from "../app/index.js";
 import type { HubApp } from "../app/index.js";
 
 /** Where the hub is in its life; only `ready` serves anything but `/healthz`. */
 export type Phase = "starting" | "ready" | "stopping";
-
-const NOT_READY = {
-  type: "urn:micafox:problem:not-ready",
-  title: "The hub is not ready",
-  status: 503,
-} as const;
 
 /** Adds `/healthz`, `/readyz` and the gate that answers 503 `not-ready` on every other route until the hub is ready. */
 export const registerHealth = (app: HubApp, getPhase: () => Phase): void => {
@@ -16,7 +11,7 @@ export const registerHealth = (app: HubApp, getPhase: () => Phase): void => {
       return;
     }
     // A stopping hub asks the client to open its next connection elsewhere
-    await reply.code(503).header("connection", "close").type("application/problem+json").send(NOT_READY);
+    await sendProblem(reply.header("connection", "close"), "not-ready");
   });
 
   // A request that was running when the stop began ends its keep-alive connection, so the drain need not wait for it

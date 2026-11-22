@@ -32,11 +32,13 @@
     "node": ">=22"
   },
   "dependencies": {
+    "@fastify/swagger": "^9.9.5",
     "@micafox/protocol": "workspace:*",
     "@micafox/ui": "workspace:*",
     "fastify": "^5.12.7",
     "pino": "^10.4.0",
-    "pino-pretty": "^13.2.0"
+    "pino-pretty": "^13.2.0",
+    "typebox": "^1.4.7"
   },
   "devDependencies": {
     "@micafox/configs": "workspace:*"

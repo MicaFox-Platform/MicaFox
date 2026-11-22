@@ -8,7 +8,9 @@ with the session cookie; personal API tokens for scripts, the CLI and MCP tools 
 
 Conventions:
 
-- JSON in and out; ids are UUIDs, times are ISO 8601 in UTC.
+- JSON in and out; ids are UUIDs, times are ISO 8601 in UTC. A request body is at most 1 MiB.
+- Every response carries `x-request-id`, the id the hub gives the request and logs it under; a client's own
+  `x-request-id` is ignored.
 - A changing request with the cookie must send an `Origin` equal to the hub's, as browsers do.
 - Errors are `application/problem+json` (RFC 9457):
 
@@ -17,15 +19,21 @@ Conventions:
     "type": "urn:micafox:problem:validation",
     "title": "The request is not valid",
     "status": 400,
-    "detail": "email: must be an email address",
-    "errors": [{ "path": "/email", "message": "must be an email address" }],
+    "detail": "email: must match format \"email\"",
+    "errors": [{ "path": "/email", "in": "body", "message": "must match format \"email\"" }],
     "requestId": "c0a8…"
   }
   ```
 
   `type` never changes once released: `validation` (400), `unauthenticated`, `session-expired`,
   `invalid-credentials` (401), `forbidden`, `origin-mismatch`, `entitlement-required` (403), `not-found` (404, also
-  for what you may not see), `conflict` (409), `rate-limited` (429), `not-ready` (503), `internal` (500).
+  for what you may not see), `conflict` (409), `payload-too-large` (413), `rate-limited` (429), `not-ready` (503),
+  `internal` (500).
+
+  A `validation` problem lists the field that failed in `errors`: `path` is a JSON Pointer into the part of the
+  request that `in` names, `body`, `query`, `params` or `headers`. Malformed JSON, an unsupported `Content-Type` or a
+  malformed URL is a `validation` problem too; an unknown path or method is `not-found`. An `internal` problem never
+  says what failed: quote its `requestId` to the hub's operator, who finds the error in the log.
 
 - Lists take `?limit=` (1 to 200, default 50) and `?cursor=`, and answer `{ "items": [...], "nextCursor": "…" }`;
   `nextCursor` is missing on the last page.

@@ -65,13 +65,49 @@ describe("createHub", () => {
       await expect(get(running.url, path)).resolves.toMatchObject({
         status: 503,
         contentType: "application/problem+json; charset=utf-8",
-        body: '{"type":"urn:micafox:problem:not-ready","title":"The hub is not ready","status":503}',
+        body: expect.stringMatching(
+          /^\{"type":"urn:micafox:problem:not-ready","title":"The hub is not ready","status":503,"requestId":"[\da-f-]{36}"\}$/,
+        ) as unknown,
       });
     }
     step.finish();
     await running.ready;
     await expect(get(running.url, "/readyz")).resolves.toMatchObject({ status: 200, body: '{"status":"ready"}' });
     await expect(get(running.url, "/api/v1/anything")).resolves.toMatchObject({ status: 404 });
+  });
+
+  it("answers the 503 gate with the request id and the security headers", async () => {
+    const { hub } = create();
+    hub.addReadinessStep("database", controlledStep().run);
+    const running = await hub.start();
+
+    const reply = await get(running.url, "/api/v1/anything");
+
+    expect(reply.headers).toMatchObject({
+      "content-security-policy": expect.stringContaining("default-src 'self'") as unknown,
+      "x-content-type-options": "nosniff",
+    });
+    expect(JSON.parse(reply.body)).toMatchObject({ requestId: reply.headers["x-request-id"] });
+  });
+
+  it("sends HSTS when the public URL is HTTPS", async () => {
+    // The public URL names the proxy, not the bound port, so the test picks a free port itself
+    const probe = net.createServer();
+    await new Promise<void>((resolve) => probe.listen(0, "127.0.0.1", resolve));
+    const { port } = probe.address() as net.AddressInfo;
+    await new Promise((resolve) => probe.close(resolve));
+    const { hub } = create([
+      "MICAFOX_TEST_MODE=true",
+      "MICAFOX_DATABASE_URL=pglite:memory",
+      "MICAFOX_HOST=127.0.0.1",
+      `MICAFOX_PORT=${String(port)}`,
+      "MICAFOX_PUBLIC_URL=https://hub.example.com",
+    ]);
+    await hub.start();
+
+    const reply = await get(`http://127.0.0.1:${String(port)}`, "/healthz");
+
+    expect(reply.headers["strict-transport-security"]).toBe("max-age=31536000");
   });
 
   it("stays not ready until every step has passed, in the order added", async () => {

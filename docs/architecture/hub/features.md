@@ -101,7 +101,8 @@ hub/core/src/web/feature/
 ├── index.ts          defineWebFeature, defineWebExtension and their types
 └── compose.ts        builds the navigation, the route tree and the slots from the features
 hub/core/src/schema/
-└── index.ts          TypeBox schemas the core's server and web share: the ./schema entry
+├── index.ts          TypeBox schemas the core's server and web share: the ./schema entry
+└── pagination.ts     the page query parameters and the page of every list
 hub/<feature>/src/
 ├── server/index.ts   the feature's server part
 ├── web/index.ts      the feature's web part
