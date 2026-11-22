@@ -7,7 +7,7 @@ import type { ReadinessStep } from "./readiness.js";
 import { createShutdown } from "./shutdown.js";
 import type { Clock, StopHook, StopResult } from "./shutdown.js";
 import { createApp } from "../app/index.js";
-import type { HubApp } from "../app/index.js";
+import type { AppOptions, HubApp } from "../app/index.js";
 import type { Settings } from "../config/index.js";
 import { loadSettings, readSecretFile, summarizeSettings } from "../config/index.js";
 import { createLogger } from "../observability/index.js";
@@ -105,6 +105,11 @@ const createRegistry = (
   };
 };
 
+const appSettingsOf = (settings: Settings): Pick<AppOptions, "trustProxy" | "publicUrl"> => ({
+  trustProxy: settings.trustProxy,
+  publicUrl: settings.publicUrl,
+});
+
 /** Checks every setting and builds the hub; throws a `ConfigError` with all problems when any is not valid. */
 export const createHub = (options: HubOptions): Hub => {
   const settings = loadSettings({ env: options.env, readFile: options.readFile ?? readSecretFile });
@@ -115,7 +120,7 @@ export const createHub = (options: HubOptions): Hub => {
     stream: options.logStream,
     timers: clock,
   });
-  const app = createApp({ logger: logger.log, trustProxy: settings.trustProxy });
+  const app = createApp({ ...appSettingsOf(settings), logger: logger.log, version: options.version });
   let phase: Phase = "starting";
   let stopping: Promise<StopResult> | undefined;
   const registry = createRegistry(() => phase);

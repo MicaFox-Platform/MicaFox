@@ -6,6 +6,7 @@ export interface Reply {
   status: number;
   contentType: string | undefined;
   connection: string | undefined;
+  headers: http.IncomingHttpHeaders;
   body: string;
 }
 
@@ -20,6 +21,7 @@ export const get = async (url: string, path: string, agent: http.Agent | false =
           status: response.statusCode ?? 0,
           contentType: response.headers["content-type"],
           connection: response.headers.connection,
+          headers: response.headers,
           body: Buffer.concat(chunks).toString(),
         });
       });

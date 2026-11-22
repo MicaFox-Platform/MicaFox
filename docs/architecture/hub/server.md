@@ -45,7 +45,11 @@ events between parts, runs background jobs, and starts and stops the whole hub s
 ```text
 hub/core/src/server/
 ├── index.ts          the server entry's exports: createHub(), runHub()
-├── app/              the Fastify app, plugin order, request context, error handler, the web app's files
+├── app/              the Fastify app, plugin order, request context, the web app's files
+│   ├── index.ts      createApp(): the conventions below, in their order, on the root instance
+│   ├── hub-app.ts    the HubApp type and its TypeBox type provider
+│   ├── response-headers.ts, request-log.ts, openapi.ts, framework-errors.ts
+│   └── problem/      the problem catalog, HttpProblem, the error handler
 ├── config/           the settings' schema, *_FILE values, the start-up report of problems
 ├── observability/    the pino logger with redaction, Prometheus metrics
 ├── events/           the event bus and the SSE events stream
@@ -94,19 +98,32 @@ hub/core/src/server/
 
 ### Serving a request
 
-1. Fastify gives the request an id, echoed in `x-request-id`, and sets the security headers: a CSP of
-   `default-src 'self'` with no inline scripts, `frame-ancestors 'none'`, `nosniff`,
-   `Referrer-Policy: same-origin`, and HSTS when `MICAFOX_PUBLIC_URL` is HTTPS. `MICAFOX_TRUST_PROXY` decides
-   which proxies' forwarded headers it believes.
+1. Fastify gives the request a random UUID as its id, echoed in `x-request-id`; a client's own `x-request-id` is
+   ignored. Every response gets the security headers: a CSP of `default-src 'self'`, `base-uri 'none'`,
+   `form-action 'self'` and `frame-ancestors 'none'`, so no inline scripts; `nosniff`; `Referrer-Policy: same-origin`;
+   and `Strict-Transport-Security: max-age=31536000` when `MICAFOX_PUBLIC_URL` is HTTPS. `MICAFOX_TRUST_PROXY`
+   decides which proxies' forwarded headers it believes.
 2. [Access](access.md#logging-in) finds the actor from the session cookie, and rejects a changing request whose
    `Origin` is not the hub's.
-3. TypeBox schemas check the path, query and body, at most 1 MiB; a failure is a 400 problem of type `validation`.
+3. TypeBox schemas check the path, query and body, at most 1 MiB; a failure is a 400 problem of type `validation`
+   that names the first field to fail, and a bigger body is a 413 `payload-too-large`.
 4. A route under an organization checks the actor's membership, answering 404 to a non-member so nothing leaks
    that it exists, and gets [`db.forOrg(orgId)`](database.md#scoping-a-query).
 5. The response goes through its schema, which drops any field it does not list. Errors become
    `application/problem+json`; an unexpected one is a 500 of type `internal` with the request id, logged with its
-   stack, never with its message in the response.
-6. One log line per request at `info`: method, route, status, duration, request id, organization and user.
+   stack, never with its message in the response. A client's error, such as malformed JSON, a malformed URL or an
+   unknown route, is answered with its problem and not logged as an error.
+6. One log line per request at `info`: method, route, status, duration, request id, organization and user; a
+   request the client gives up on logs `request.aborted` instead.
+
+The headers, the request log and the error handler are added to the root instance when the app is created, before
+the readiness gate's hook, so they cover every route, the 404 and the 503 of the [readiness gate](#starting). A
+malformed URL fails before routing, without any hook, so its handler sets the headers and logs the request itself.
+A hijacked reply, such as the [events stream](#events), skips the hooks and sets its own headers.
+
+`GET /api/v1/openapi.json` is built from the routes' schemas by `@fastify/swagger` and lists only `/api/v1`. The
+plugin sees a route when it is added, so routes, the core's and the features', come in plugins registered after the
+app is created.
 
 Paths, errors and pagination: [HTTP API](../../api/hub/http.md). Why:
 [ADR 0025](../../adr/hub/server/0025-build-the-hub-server-on-fastify-with-typebox-schemas.md),

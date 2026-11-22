@@ -52,7 +52,7 @@ interface Setup {
 const setup = async (options: { failOnClose?: boolean } = {}): Promise<Setup> => {
   const log = captureLog();
   const { default: pino } = await import("pino");
-  const app = createApp({ logger: pino({}, log.stream), trustProxy: false });
+  const app = createApp({ logger: pino({}, log.stream), trustProxy: false, publicUrl: undefined, version: "1.2.3" });
   let phase: Phase = "ready";
   registerHealth(app, () => phase);
   if (options.failOnClose === true) {
