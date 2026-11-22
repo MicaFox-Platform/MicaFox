@@ -44,13 +44,13 @@ events between parts, runs background jobs, and starts and stops the whole hub s
 
 ```text
 hub/core/src/server/
-├── index.ts          createHub() and the server entry's exports
+├── index.ts          the server entry's exports: createHub(), runHub()
 ├── app/              the Fastify app, plugin order, request context, error handler, the web app's files
 ├── config/           the settings' schema, *_FILE values, the start-up report of problems
 ├── observability/    the pino logger with redaction, Prometheus metrics
 ├── events/           the event bus and the SSE events stream
 ├── jobs/             the scheduler, advisory locks, the retention runner
-├── lifecycle/        start, readiness, /healthz and /readyz, shutdown
+├── lifecycle/        createHub(), readiness steps, /healthz and /readyz, stop hooks, shutdown, runHub()
 ├── feature/          the feature contract: features.md
 ├── sdk-endpoint/     the SDK's WebSocket: sdk-endpoint.md
 ├── db/               Kysely, access modes, migrator, writer: database.md
@@ -169,6 +169,11 @@ Paths, errors and pagination: [HTTP API](../../api/hub/http.md). Why:
 3. It stops accepting connections and lets running requests finish for up to 10 s, then waits up to 10 s for
    running jobs, writes the [write queue](database.md#writing-in-batches) for up to 5 s, closes its pools and exits
    with code 0, within Kubernetes' 30 s. A second signal exits at once with code 1.
+
+Each of these is a stop hook that a part adds to the hub, in order: those added `before-drain` run before the server
+stops accepting connections, the rest after the running requests are done. A hook gets up to 10 s and the whole stop
+25 s; a hook that fails or runs out of time is logged and the next one still runs, and the exit code is 1. The stop
+logs `hub.stopping` when it begins and `hub.stopped` when it ends.
 
 ## Decisions
 
