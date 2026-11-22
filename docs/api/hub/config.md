@@ -4,7 +4,8 @@
 
 The hub reads its settings from the environment when it starts. It checks all of them first; on any problem it
 prints every one and exits with code 1. Settings marked `_FILE` can instead be read from a file, such as a Docker or
-Kubernetes secret: `MICAFOX_DATABASE_URL_FILE=/run/secrets/db`.
+Kubernetes secret: `MICAFOX_DATABASE_URL_FILE=/run/secrets/db`. A file is read as text up to 64 KiB, without its
+final newline. A setting given both directly and as `_FILE` is a problem, and an empty variable counts as not set.
 
 ## Exports
 
