@@ -15,9 +15,16 @@ afterEach(async () => {
   );
 });
 
+interface List {
+  app: FastifyInstance;
+  /** The queries as the handler saw them, after defaults and coercion; kept on the server, never echoed back. */
+  seenQueries: unknown[];
+}
+
 // A list as a route declares it, under Fastify's own validator: the page parameters beside a filter of its own
-const createList = (nextCursor?: string): FastifyInstance => {
+const createList = (nextCursor?: string): List => {
   const app = fastify();
+  const seenQueries: unknown[] = [];
   app.get(
     "/instances",
     {
@@ -31,37 +38,46 @@ const createList = (nextCursor?: string): FastifyInstance => {
       ...(nextCursor === undefined ? {} : { nextCursor }),
     }),
   );
-  // The query as the handler saw it, after defaults and coercion
   app.get(
     "/query",
     { schema: { querystring: Type.Object({ ...pageQueryProperties, online: Type.Optional(Type.Boolean()) }) } },
-    (request) => request.query,
+    (request) => {
+      seenQueries.push(request.query);
+      return { ok: true };
+    },
   );
   apps.push(app);
-  return app;
+  return { app, seenQueries };
 };
 
 describe("pageQueryProperties", () => {
   it("defaults the limit to 50", async () => {
-    const response = await createList().inject({ url: "/query" });
+    const { app, seenQueries } = createList();
 
-    expect(response.json()).toEqual({ limit: 50 });
+    await app.inject({ url: "/query" });
+
+    expect(seenQueries).toEqual([{ limit: 50 }]);
   });
 
   it("takes a limit from 1 to 200, a cursor and the list's own filters", async () => {
-    const response = await createList().inject({ url: "/query?limit=200&cursor=c2&online=true" });
+    const { app, seenQueries } = createList();
 
-    expect(response.json()).toEqual({ limit: 200, cursor: "c2", online: true });
+    await app.inject({ url: "/query?limit=200&cursor=c2&online=true" });
+
+    expect(seenQueries).toEqual([{ limit: 200, cursor: "c2", online: true }]);
   });
 
   it.each(["0", "201", "1.5", "many"])("rejects the limit %s", async (limit) => {
-    const response = await createList().inject({ url: `/query?limit=${limit}` });
+    const { app, seenQueries } = createList();
+
+    const response = await app.inject({ url: `/query?limit=${limit}` });
 
     expect(response.statusCode).toBe(400);
+    expect(seenQueries).toEqual([]);
   });
 
   it("rejects an empty cursor and one over 512 characters", async () => {
-    const app = createList();
+    const { app, seenQueries } = createList();
 
     const responses = await Promise.all([
       app.inject({ url: "/query?cursor=" }),
@@ -69,18 +85,19 @@ describe("pageQueryProperties", () => {
     ]);
 
     expect(responses.map((response) => response.statusCode)).toEqual([400, 400]);
+    expect(seenQueries).toEqual([]);
   });
 });
 
 describe("pageOf", () => {
   it("answers the items and the next cursor, without fields the item schema does not list", async () => {
-    const response = await createList("c2").inject({ url: "/instances" });
+    const response = await createList("c2").app.inject({ url: "/instances" });
 
     expect(response.json()).toEqual({ items: [{ id: "i1" }], nextCursor: "c2" });
   });
 
   it("leaves out nextCursor on the last page", async () => {
-    const response = await createList().inject({ url: "/instances" });
+    const response = await createList().app.inject({ url: "/instances" });
 
     expect(response.json()).toEqual({ items: [{ id: "i1" }] });
   });
