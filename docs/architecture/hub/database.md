@@ -44,7 +44,7 @@ hub/core/src/server/db/
 ├── value-types.ts    the Postgres types both dialects return as text
 ├── migrator/         the ordered migrator: what is missing, history, target (lock and connection), RLS check, grants
 ├── writer/           the write queue: batching, upserts, per-organization groups, limits, rejected rows
-├── pglite/           the PGlite dialect, the app role inside it, the seed (the seed comes later)
+├── pglite/           the PGlite dialect, the app role inside it, loading and writing the seed
 └── migrations/       hub-core's own migrations and its global tables: index.ts, 0001-<name>.ts, ...
 ```
 
@@ -133,8 +133,10 @@ Why Kysely and per-package migrations:
    on PGlite guards against a forgotten filter, not hostile SQL, and a PGlite database never holds real data.
    Kysely lends its one session to a caller at a time, so a `db.global` query never runs inside another
    organization's transaction.
-3. `pglite:memory` loads `pglite-seed.tar.gz`, a database already migrated at build time, then runs only what is
-   missing, so start-up stays within 2 s however many migrations exist.
+3. `pglite:memory` and a missing or empty `pglite:<folder>` load `pglite-seed.tar.gz`, a database already migrated
+   at build time by `buildPgliteSeed`, then run only what is missing, so start-up stays within 2 s however many
+   migrations exist. A folder with files in it is opened as it is. A hub run from the sources has no seed: it logs a
+   warning and runs every migration.
 4. PGlite has one connection, so `pnpm verify` cannot prove locks or concurrency; those tests run only on
    Postgres, in CI on 15 and 18, with the rest of the database tests. `MICAFOX_TEST_DATABASE_URL`, the URL of a
    superuser, makes `pnpm test:db` run them on that server, in a database and a role of their own per test file. Why PGlite:

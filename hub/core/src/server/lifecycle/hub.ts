@@ -21,6 +21,8 @@ export interface HubOptions {
   version: string;
   build: "hub" | "basic-hub";
   features: readonly string[];
+  /** The migrated `.tar.gz` a `pglite:memory` or a new `pglite:<folder>` starts from. */
+  pgliteSeed?: string;
   logStream: NodeJS.WritableStream;
   /** Reads a `*_FILE` setting's file; the default refuses a file over 64 KiB. */
   readFile?: (path: string) => string;
@@ -120,17 +122,20 @@ const createRegistry = (
 };
 
 // The database of the settings, and the readiness steps that wait for it and for its schema: the hub adds them first,
-// in that order, so every step a part adds later finds the database reachable, its role checked and its schema current
-const openDatabase = (
+// in that order, so every step a part adds later finds the database reachable, its role checked and its schema current;
+// micafox-hub migrate runs the same steps
+export const openDatabase = (
   settings: Settings,
   logger: HubLogger,
-  timers: Clock,
+  options: { timers: Clock; pgliteSeed: string | undefined },
 ): { db: Database; steps: ReadinessStep[] } => {
+  const { timers, pgliteSeed } = options;
   const db = createDatabase({
     url: settings.databaseUrl,
     poolSize: settings.databasePoolSize,
     log: logger.log,
     warnCollapsed: logger.warnCollapsed,
+    ...(pgliteSeed === undefined ? {} : { pgliteSeed }),
   });
   const migrationUrl = settings.migrationDatabaseUrl;
   return {
@@ -192,9 +197,9 @@ export const createHub = (options: HubOptions): Hub => {
     timers: clock,
   });
   const app = createApp({ ...appSettingsOf(settings), logger: logger.log, version: options.version });
-  const { db, steps: databaseSteps } = openDatabase(settings, logger, clock);
+  const { db, steps } = openDatabase(settings, logger, { pgliteSeed: options.pgliteSeed, timers: clock });
   let phase: Phase = "starting";
-  const registry = createRegistry(() => phase, databaseSteps);
+  const registry = createRegistry(() => phase, steps);
   const aborter = new AbortController();
   registerHealth(app, () => phase);
 
