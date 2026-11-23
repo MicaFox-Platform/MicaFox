@@ -111,6 +111,12 @@ jobs:
         if: ${{ matrix.primary }}
         run: pnpm format
 
+      # Builds the basic hub (EE=false) and fails on any module of ee/ in it (ADR 0023); before the build, as in
+      # `pnpm verify`, which then builds the hub with ee/ over it
+      - name: Open-core check of the basic hub
+        if: ${{ matrix.primary }}
+        run: pnpm test:open-core
+
       # Before the typecheck, as in `pnpm verify`: a package's typecheck is the same `tsc -b` and finds it up to date
       - name: Build
         run: pnpm build
