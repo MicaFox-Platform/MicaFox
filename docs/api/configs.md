@@ -168,12 +168,16 @@ export default createVitestConfig({ sourceCondition: "@acme/source" });
 ```ts
 interface VitestConfigOptions {
   sourceCondition?: string;
+  conditions?: readonly string[];
 }
 ```
 
 - `sourceCondition` — `string`, optional. An export condition resolved before Vite's defaults in both the client and
   server environments, so tests import workspace packages from their sources without a build. Without it, or when
   it is empty, Vite's default conditions apply.
+- `conditions` — `readonly string[]`, optional. More export conditions, such as a build variant's
+  (`["acme-lite"]`), resolved after `sourceCondition` and before Vite's defaults in both environments. Without it, or
+  when it is empty, only `sourceCondition` is added.
 
 ### `@micafox/configs/vitest` default export
 
