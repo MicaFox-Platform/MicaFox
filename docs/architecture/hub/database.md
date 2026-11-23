@@ -37,15 +37,15 @@ tests and the test mode.
 
 ```text
 hub/core/src/server/db/
-├── index.ts          the pool, the three handles and the readiness step that waits for the database
+├── index.ts          the pool, the three handles, and the readiness steps for the database and its migrations
 ├── scope.ts          forOrg, global and system: transactions and session settings
 ├── policies.ts       the RLS policy helpers migrations use
 ├── connect.ts        waiting for an unreachable database with backoff, and the check of the app role
 ├── value-types.ts    the Postgres types both dialects return as text
-├── migrator/         the ordered migrator, its lock, the unknown-migration and RLS checks
+├── migrator/         the ordered migrator: what is missing, history, target (lock and connection), RLS check, grants
 ├── writer/           the write queue: batching, upserts, per-organization groups, limits, rejected rows
 ├── pglite/           the PGlite dialect, the app role inside it, the seed (the seed comes later)
-└── migrations/       hub-core's own migrations: 0001-<name>.ts, ...
+└── migrations/       hub-core's own migrations and its global tables: index.ts, 0001-<name>.ts, ...
 ```
 
 ## Key flows
@@ -80,15 +80,22 @@ hub/core/src/server/db/
 ### Migrating
 
 1. On every start, and with `micafox-hub migrate`, the migrator takes a session advisory lock on a client of its
-   own, so two starting replicas never migrate at once and the lock never stays on a pooled connection.
+   own, so two starting replicas never migrate at once and the lock never stays on a pooled connection. It is the
+   hub's second readiness step, after the database answers: `/readyz` stays 503 until it is done. On PGlite, which
+   has one session and no other client, there is no lock.
 2. It reads the migrations of hub-core, then of each feature in the app's order, then of the extension. Each
-   package has its own table of migrations run, so a new core migration never conflicts with a feature's.
-3. A migration this image does not know stops the start: the database belongs to a newer hub
-   ([upgrading](app.md#upgrading)). Otherwise it runs the missing ones in order, each in a transaction unless it
-   exports `transaction = false`, as `CREATE INDEX CONCURRENTLY` needs. Migrations have no `down`: released ones
-   never change, and any released version migrates to the latest.
-4. Afterwards it checks that every table outside the global list has `org_id`, RLS enabled and forced; otherwise
-   the start fails, naming the table.
+   package has its own table of migrations run, `micafox_migrations_<package>`, so a new core migration never
+   conflicts with a feature's.
+3. A migration this image does not know stops the start before any runs: the database belongs to a newer hub
+   ([upgrading](app.md#upgrading)). Otherwise it runs the missing ones in order, each in a transaction with its
+   record, unless it exports `transaction = false`, as `CREATE INDEX CONCURRENTLY` needs; such a migration must be
+   safe to run again. Migrations have no `down`: released ones never change, and any released version migrates to
+   the latest.
+4. Afterwards it checks that every table of the `public` schema outside the global list has `org_id`, RLS enabled
+   and forced; otherwise the start fails, naming the table.
+5. Migrations run as the owner role, which owns the tables. When it is not the app role, the migrator then grants the
+   app role `SELECT`, `INSERT`, `UPDATE` and `DELETE` on every table but the migration tables, and use of the
+   sequences, so the app role can neither alter a table nor switch its RLS off.
 
 Why Kysely and per-package migrations:
 [ADR 0026](../../adr/hub/database/0026-query-postgres-with-kysely-and-migrate-per-package.md).

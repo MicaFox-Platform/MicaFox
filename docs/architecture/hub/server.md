@@ -70,8 +70,9 @@ hub/core/src/server/
 2. The app registers every plugin and listens on `MICAFOX_PORT`, and on `MICAFOX_METRICS_PORT` when set.
    `/healthz` answers 200 from now on; `/readyz`, every other route and SDK upgrades answer 503 until step 5.
 3. It connects to Postgres, [retrying with backoff](database.md#waiting-for-the-database) while it is unreachable.
-   It exits with code 1 when the app role is a superuser or has `BYPASSRLS`, or when the database holds a migration
-   this image does not know; otherwise it [migrates](database.md#migrating).
+   It exits with code 1 when the app role is a superuser or has `BYPASSRLS`. Then it
+   [migrates](database.md#migrating) as its second readiness step, and exits with code 1 when the database holds a
+   migration this image does not know, the migration role cannot connect, or a table escapes row-level security.
 4. Without an owner, it prints the one-time [setup token](access.md#creating-the-first-owner).
 5. It starts the jobs, turns ready and logs `hub.started` with the version, the build (hub or basic hub), the
    features and the settings without secrets.

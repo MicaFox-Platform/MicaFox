@@ -15,7 +15,7 @@ final newline. A setting given both directly and as `_FILE` is a problem, and an
 | ------------------------------------------ | --------------------- | --------------------------------------------------------------------------------------------- |
 | `MICAFOX_PUBLIC_URL`                       | required              | the URL users open: `https://…`, or `http://` on `localhost`, `127.0.0.1` or `[::1]`; no path |
 | `MICAFOX_DATABASE_URL` (`_FILE`)           | required              | `postgres://…` for the app role, or `pglite:memory` / `pglite:<folder>` for tests and trials  |
-| `MICAFOX_MIGRATION_DATABASE_URL` (`_FILE`) | the database URL      | the owner role that runs migrations                                                           |
+| `MICAFOX_MIGRATION_DATABASE_URL` (`_FILE`) | the database URL      | the owner role that runs migrations; unset or the same URL for a `pglite:` database           |
 | `MICAFOX_DATABASE_POOL_SIZE`               | `10`                  | connections in the pool                                                                       |
 | `MICAFOX_HOST`, `MICAFOX_PORT`             | `0.0.0.0`, `8080`     | where the hub listens; port `0` takes a free one                                              |
 | `MICAFOX_TRUST_PROXY`                      | `false`               | which proxies' `X-Forwarded-*` to believe: `true`, a hop count, or IPs and CIDRs              |
@@ -36,10 +36,11 @@ final newline. A setting given both directly and as `_FILE` is a problem, and an
 | `MICAFOX_TEST_PROJECT_KEY` (`_FILE`)       | generated, logged     | the seeded environment's project key in test mode, `mfx_pk_` and 43 characters                |
 | `MICAFOX_TEST_PASSWORD` (`_FILE`)          | generated, logged     | the seeded owner's password in test mode, 12 to 256 characters                                |
 
-The hub refuses to start when `MICAFOX_PUBLIC_URL` is HTTP on another host, when its database role is a superuser
-or has `BYPASSRLS`, when the database refuses it (such as for a wrong password), or when the database was migrated by a
-newer hub. While the database is unreachable it waits and retries, with `/readyz` at 503. On a `pglite:` database it
-logs that PGlite is not for production.
+The hub refuses to start when `MICAFOX_PUBLIC_URL` is HTTP on another host, when its database role is a superuser or has
+`BYPASSRLS`, when the database refuses it (such as for a wrong password), when the database was migrated by a newer hub,
+when the migration role cannot connect, or when a table other than the global ones lacks `org_id` under forced row-level
+security. While the database is unreachable it waits and retries, with `/readyz` at 503. On a `pglite:` database it logs
+that PGlite is not for production.
 
 ### Test mode
 

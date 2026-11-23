@@ -59,6 +59,11 @@ const readDatabase = (reader: SettingsReader): Database => {
   const databaseUrl = reader.require("MICAFOX_DATABASE_URL", parseDatabaseUrl, { file: true });
   const migrationDatabaseUrl = reader.read("MICAFOX_MIGRATION_DATABASE_URL", parseDatabaseUrl, { file: true });
   const databasePoolSize = reader.read("MICAFOX_DATABASE_POOL_SIZE", (raw) => parseInteger(raw, 1, 1000)) ?? 10;
+  // PGlite is the hub's own process's database, with one role: migrations reach it only through the hub's session
+  const isPglite = [databaseUrl, migrationDatabaseUrl].some((url) => url?.startsWith("pglite:") === true);
+  if (isPglite && migrationDatabaseUrl !== undefined && migrationDatabaseUrl !== databaseUrl) {
+    reader.addProblem("MICAFOX_MIGRATION_DATABASE_URL: with a pglite: database, leave it unset or give the same URL");
+  }
   return { databaseUrl, migrationDatabaseUrl: migrationDatabaseUrl ?? databaseUrl, databasePoolSize };
 };
 

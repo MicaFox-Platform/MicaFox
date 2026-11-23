@@ -10,7 +10,7 @@ import { createApp } from "../app/index.js";
 import type { AppOptions, HubApp } from "../app/index.js";
 import type { Settings } from "../config/index.js";
 import { loadSettings, readSecretFile, summarizeSettings } from "../config/index.js";
-import { connect, createDatabase } from "../db/index.js";
+import { connect, CORE_MIGRATIONS, createDatabase, migrate } from "../db/index.js";
 import type { Database } from "../db/index.js";
 import { createLogger } from "../observability/index.js";
 import type { HubLogger } from "../observability/index.js";
@@ -88,13 +88,14 @@ const listen = async (app: HubApp, settings: Settings): Promise<string> => {
 // What parts of the server register: steps before ready, and hooks for the stop
 const createRegistry = (
   getPhase: () => Phase,
+  firstSteps: readonly ReadinessStep[],
 ): Pick<Hub, "addReadinessStep" | "addStopHook"> & {
   steps: ReadinessStep[];
   /** Refuses further steps: the start has begun, and a step added now could be skipped. */
   sealSteps: () => void;
   hooks: StopHook[];
 } => {
-  const steps: ReadinessStep[] = [];
+  const steps: ReadinessStep[] = [...firstSteps];
   const hooks: StopHook[] = [];
   let isSealed = false;
   return {
@@ -118,23 +119,36 @@ const createRegistry = (
   };
 };
 
-// The database of the settings, and the readiness step that waits for it
+// The database of the settings, and the readiness steps that wait for it and for its schema: the hub adds them first,
+// in that order, so every step a part adds later finds the database reachable, its role checked and its schema current
 const openDatabase = (
   settings: Settings,
   logger: HubLogger,
   timers: Clock,
-): { db: Database; connect: ReadinessStep["run"] } => {
+): { db: Database; steps: ReadinessStep[] } => {
   const db = createDatabase({
     url: settings.databaseUrl,
     poolSize: settings.databasePoolSize,
     log: logger.log,
     warnCollapsed: logger.warnCollapsed,
   });
+  const migrationUrl = settings.migrationDatabaseUrl;
   return {
     db,
-    connect: async (signal) => {
-      await connect(db, { warnCollapsed: logger.warnCollapsed, timers }, signal);
-    },
+    steps: [
+      {
+        name: "database",
+        run: async (signal) => {
+          await connect(db, { warnCollapsed: logger.warnCollapsed, timers }, signal);
+        },
+      },
+      {
+        name: "migrations",
+        run: async (signal) => {
+          await migrate(db, { url: migrationUrl, packages: [CORE_MIGRATIONS], log: logger.log }, signal);
+        },
+      },
+    ],
   };
 };
 
@@ -178,14 +192,11 @@ export const createHub = (options: HubOptions): Hub => {
     timers: clock,
   });
   const app = createApp({ ...appSettingsOf(settings), logger: logger.log, version: options.version });
-  const { db, connect: connectDatabase } = openDatabase(settings, logger, clock);
+  const { db, steps: databaseSteps } = openDatabase(settings, logger, clock);
   let phase: Phase = "starting";
-  const registry = createRegistry(() => phase);
+  const registry = createRegistry(() => phase, databaseSteps);
   const aborter = new AbortController();
-
   registerHealth(app, () => phase);
-  // First, so every step a part adds later finds the database reachable and its role checked
-  registry.addReadinessStep("database", connectDatabase);
 
   const becomeReady = async (url: string): Promise<void> => {
     await runReadinessSteps(registry.steps, aborter.signal);

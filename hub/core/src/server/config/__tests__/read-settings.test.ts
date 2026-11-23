@@ -184,6 +184,48 @@ describe("loadSettings", () => {
     ]);
   });
 
+  it("refuses a Postgres migration URL for a PGlite database", () => {
+    const problems = problemsOf([
+      "MICAFOX_TEST_MODE=true",
+      "MICAFOX_DATABASE_URL=pglite:memory",
+      "MICAFOX_MIGRATION_DATABASE_URL=postgres://owner:pw@db:5432/hub",
+    ]);
+
+    expect(problems).toEqual([
+      "MICAFOX_MIGRATION_DATABASE_URL: with a pglite: database, leave it unset or give the same URL",
+    ]);
+  });
+
+  it("refuses another PGlite folder for the migrations than the database's", () => {
+    const problems = problemsOf([
+      "MICAFOX_TEST_MODE=true",
+      "MICAFOX_DATABASE_URL=pglite:/data/hub",
+      "MICAFOX_MIGRATION_DATABASE_URL=pglite:/data/other",
+    ]);
+
+    expect(problems).toEqual([
+      "MICAFOX_MIGRATION_DATABASE_URL: with a pglite: database, leave it unset or give the same URL",
+    ]);
+  });
+
+  it("accepts the database's own PGlite URL for the migrations", () => {
+    const problems = problemsOf([
+      "MICAFOX_TEST_MODE=true",
+      "MICAFOX_DATABASE_URL=pglite:memory",
+      "MICAFOX_MIGRATION_DATABASE_URL=pglite:memory",
+    ]);
+
+    expect(problems).toEqual([]);
+  });
+
+  it("refuses a PGlite migration URL for a Postgres database", () => {
+    const problems = problemsOf([...VALID, "MICAFOX_MIGRATION_DATABASE_URL=pglite:memory"]);
+
+    expect(problems).toEqual([
+      "MICAFOX_MIGRATION_DATABASE_URL: with a pglite: database, leave it unset or give the same URL",
+    ]);
+  });
+
   it("checks the test project key and password", () => {
     const problems = problemsOf([
       "MICAFOX_TEST_MODE=true",

@@ -59,9 +59,14 @@ Run checks only through `package.json` scripts, never retyped tool commands, so 
 - Before carrying out a plan that changes the public API or protocol, or adds a package or dependency, delegate it
   to `critic` and show its points with the plan; the skills above already do this at their own steps.
 - Hand-over: at most 6 lines (what changed, the changeset or why none, checks and coverage, review result, what is
-  left for the user), then the commit message in a code block and the question whether to ship.
-- Ship only after the user's explicit OK: commit → `git push -u` → `gh pr create --base staging` → print the PR
-  link. Fixes to an open PR: same flow, then commit and push to its branch.
+  left for the user), then the ship command in one `bash` code block, and as the very last line the question
+  `Ship it? Answer "yes" and I run the command above and print the PR link.`
+- The ship command is one copyable command, its steps joined with `&&` so it stops at the first failure: one
+  `git add <paths> && git commit -m "<subject>" -m "<body>"` per commit (several when the work splits into
+  logical commits), then `git push -u origin <branch>`, then
+  `gh pr create --base staging --title "<subject>" --body "<card link, what changed, how it was tested>"`. A fix to
+  an open PR ends with the push.
+- Ship only after the user's explicit OK: run exactly that command, then print the PR link.
 - Never merge PRs, push to `main`/`staging` or edit `pnpm-lock.yaml` by hand.
 
 Hooks format every edited file, block git commands that break this flow and run `pnpm verify:brief` before you
