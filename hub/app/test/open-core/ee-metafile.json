@@ -1,0 +1,15 @@
+{
+  "inputs": {
+    "src/index.ts": { "bytes": 1200 },
+    "../../ee/hub/src/server/index.ts": { "bytes": 800 },
+    "../../node_modules/.pnpm/fee@1.0.0/node_modules/fee/index.js": { "bytes": 90 }
+  },
+  "outputs": {
+    "dist/server/index.js": {
+      "imports": [
+        { "path": "@electric-sql/pglite", "kind": "dynamic-import", "external": true },
+        { "path": "@micafox/hub-ee/web", "kind": "import-statement", "external": true }
+      ]
+    }
+  }
+}

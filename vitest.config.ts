@@ -14,7 +14,8 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: ["{packages,hub,ee}/*/src/**/*.ts", "{packages,hub,ee}/*/src/**/*.tsx"],
-      exclude: ["**/*.test.ts", "**/*.test.tsx", "**/*.test-d.ts"],
+      // hub/app's bin.ts only runs as the built executable, which hub/app's `pnpm test:build` runs
+      exclude: ["**/*.test.ts", "**/*.test.tsx", "**/*.test-d.ts", "hub/app/src/bin.ts"],
       reporter: ["text-summary", "json-summary"],
       thresholds: { lines: 80, branches: 80, functions: 80, statements: 80 },
     },

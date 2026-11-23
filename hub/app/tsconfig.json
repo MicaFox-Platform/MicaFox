@@ -1,5 +1,10 @@
 {
   "extends": "@micafox/configs/tsconfig/workspace-react.json",
+  // esbuild writes the JavaScript (scripts/build.ts); tsc only checks the types and writes declarations aside
+  "compilerOptions": {
+    "emitDeclarationOnly": true,
+    "outDir": "${configDir}/dist/types"
+  },
   "references": [
     {
       "path": "../../packages/protocol"

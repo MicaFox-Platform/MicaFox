@@ -78,8 +78,8 @@ plus `./schema` for the TypeBox schemas both share, so the web bundle never pull
 Two builds come from the one app:
 
 - **hub** — the default build, with `ee/`: the official image, run self-hosted and in Cloud.
-- **basic hub** — `EE=false`, AGPL code only: built in CI to prove the open core works without `ee/`, never
-  published.
+- **basic hub** — `EE=false`, AGPL code only: built in CI to prove the open core works without `ee/`, and checked
+  to hold no module of it; never published.
 
 ## Key flows
 

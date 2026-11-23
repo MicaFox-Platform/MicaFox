@@ -62,9 +62,14 @@ Run them inside the hub's container: `docker compose exec hub micafox-hub <comma
 `kubectl exec deploy/hub -- micafox-hub <command>`.
 
 - `micafox-hub start` — the image's default: migrate, then serve.
-- `micafox-hub migrate` — run the missing migrations and exit.
-- `micafox-hub reset-password <email>` — print a one-time link, valid for an hour, to set a new password.
-- `micafox-hub version` — print the version and the build.
+- `micafox-hub migrate` — run the missing migrations and exit with 0; it waits for an unreachable database as
+  `start` does, and exits with 1 on a settings problem, a failed migration, a database migrated by a newer hub, or
+  `SIGTERM` or `SIGINT`; a second signal, or 30 s after the first, exits with 1 at once.
+- `micafox-hub reset-password <email>` — print a one-time link, valid for an hour, to set a new password; not built
+  yet, so until then it exits with 2 as an unknown command.
+- `micafox-hub version` — print the version and the build: `1.4.0 (ee)`, or `1.4.0 (basic)` for the basic hub.
+
+Any other command, or none, prints the usage to stderr and exits with 2.
 
 ### Health and metrics
 

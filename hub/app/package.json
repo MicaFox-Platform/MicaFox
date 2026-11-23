@@ -14,16 +14,18 @@
       "default": "./src/web/ee-stub.ts"
     }
   },
+  "bin": {
+    "micafox-hub": "./dist/server/bin.js"
+  },
   "exports": {
-    ".": {
-      "@micafox/source": "./src/index.ts",
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
-    }
+    "./cli": "./dist/server/bin.js"
   },
   "scripts": {
-    "build": "rm -rf ./dist && tsc -b tsconfig.json",
-    "typecheck": "tsc -b tsconfig.json"
+    "build": "rm -rf ./dist && tsc -b tsconfig.json && node --import tsx scripts/build.ts",
+    "typecheck": "tsc -b tsconfig.json && tsc -p tsconfig.open-core.json",
+    "test:build": "vitest run --config vitest.build.config.ts",
+    "check-open-core": "node --import tsx scripts/check-open-core.ts",
+    "test:open-core": "EE=false pnpm build && pnpm check-open-core"
   },
   "keywords": [],
   "author": "Artem Horovyi",
@@ -32,12 +34,14 @@
     "node": ">=22"
   },
   "dependencies": {
+    "@electric-sql/pglite": "^0.5.17",
     "@micafox/hub-core": "workspace:*",
     "@micafox/hub-debugger": "workspace:*",
     "@micafox/protocol": "workspace:*",
     "@micafox/ui": "workspace:*"
   },
   "devDependencies": {
-    "@micafox/configs": "workspace:*"
+    "@micafox/configs": "workspace:*",
+    "esbuild": "^0.28.2"
   }
 }
