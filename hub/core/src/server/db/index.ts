@@ -4,6 +4,9 @@ import pg from "pg";
 import type { Logger } from "pino";
 
 import { connectDatabase, probeRole } from "./connect.js";
+import { GLOBAL_TABLES } from "./migrations/index.js";
+import { migrate as runMigrator } from "./migrator/index.js";
+import type { MigrationPackage } from "./migrator/index.js";
 import { createPgliteDialect } from "./pglite/index.js";
 import { createScopes } from "./scope.js";
 import type { Database, HubTables } from "./scope.js";
@@ -11,6 +14,9 @@ import { asText, TEXT_TYPE_IDS } from "./value-types.js";
 import type { Timers } from "../observability/index.js";
 
 export { DatabaseRoleError } from "./connect.js";
+export { CORE_MIGRATIONS } from "./migrations/index.js";
+export { MigrationPackageError, UnknownMigrationError, UnprotectedTablesError } from "./migrator/index.js";
+export type { Migration, MigrationPackage } from "./migrator/index.js";
 export { addOrgPolicy, ORG_POLICY } from "./policies.js";
 export { APP_ROLE } from "./pglite/index.js";
 export { NestedScopeError } from "./scope.js";
@@ -79,4 +85,28 @@ export const connect = async (
   signal: AbortSignal,
 ): Promise<void> => {
   await connectDatabase({ probe: async () => await probeRole(db.global), ...options }, signal);
+};
+
+/** What the migrations step needs besides the database. */
+export interface MigrateOptions extends Pick<DatabaseOptions, "log"> {
+  /** `MICAFOX_MIGRATION_DATABASE_URL`, which is the database URL when not set. */
+  url: string;
+  /** hub-core's migrations first, then the features' and the extension's, in the app's order. */
+  packages: readonly MigrationPackage[];
+}
+
+/** The hub's readiness step for the schema: see `migrate` in `migrator/`; it runs after `connect`. */
+export const migrate = async (db: Database, options: MigrateOptions, signal: AbortSignal): Promise<void> => {
+  const { role } = await probeRole(db.global);
+  await runMigrator(
+    {
+      packages: options.packages,
+      globalTables: GLOBAL_TABLES,
+      appRole: role,
+      url: options.url,
+      session: options.url.startsWith(PGLITE_PREFIX) ? db.global : undefined,
+      log: options.log,
+    },
+    signal,
+  );
 };

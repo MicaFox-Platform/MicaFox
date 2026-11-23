@@ -1,8 +1,11 @@
 import { sql } from "kysely";
+import { mkdtemp, rm } from "node:fs/promises";
 import net from "node:net";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { isOnPostgres, TEST_DATABASE_URL } from "../../../../test/db/test-database.js";
+import { isOnPostgres, openTestDatabase, TEST_DATABASE_URL } from "../../../../test/db/test-database.js";
 import { envOf, TEST_MODE_LINES } from "../../../../test/server/env.js";
 import { get } from "../../../../test/server/http.js";
 import { captureLog } from "../../../../test/server/log-capture.js";
@@ -60,6 +63,24 @@ describe("the hub's database", () => {
     expect(role).toBe("micafox_app");
   });
 
+  it("runs the migrations, after the database step and before any step a part adds, so /readyz waits for them", async () => {
+    const { hub } = create(TEST_MODE_LINES);
+    const seen: Array<string | null> = [];
+    hub.addReadinessStep("probe", async () => {
+      const orgs = await hub.db.system("test", async (trx) => {
+        const { rows } = await sql<{ orgs: string | null }>`select to_regclass('orgs')::text as orgs`.execute(trx);
+        return rows[0]?.orgs ?? null;
+      });
+      seen.push(orgs);
+    });
+
+    const running = await hub.start();
+    await running.ready;
+
+    expect(seen).toEqual(["orgs"]);
+    await expect(get(running.url, "/readyz")).resolves.toMatchObject({ status: 200 });
+  });
+
   it("stops cleanly when it never started, without opening the database", async () => {
     const { hub, log } = create(TEST_MODE_LINES);
 
@@ -90,6 +111,29 @@ describe("the hub's database", () => {
 });
 
 describe.runIf(isOnPostgres)("the hub's database role on Postgres", () => {
+  it("migrates as the role of MICAFOX_MIGRATION_DATABASE_URL, which then owns the tables", async () => {
+    const test = await openTestDatabase();
+    const ownerUrl = test.ownerUrl ?? "";
+    try {
+      const { hub } = create([...(await postgresLines(test.url)), `MICAFOX_MIGRATION_DATABASE_URL=${ownerUrl}`]);
+      await (
+        await hub.start()
+      ).ready;
+
+      const owner = await hub.db.system("test", async (trx) => {
+        const { rows } = await sql<{ owner: string }>`
+          select tableowner as owner from pg_tables where tablename = 'orgs'
+        `.execute(trx);
+        return rows[0]?.owner;
+      });
+
+      expect(owner).toBe(new URL(ownerUrl).username);
+      await hub.stop();
+    } finally {
+      await test.close();
+    }
+  });
+
   it("exits with 1 when the hub connects as a superuser", async () => {
     const log = captureLog();
     let exit: (code: number) => void = () => undefined;
@@ -121,5 +165,55 @@ describe.runIf(isOnPostgres)("the hub's database role on Postgres", () => {
       }),
     );
     expect(log.text()).toContain("SUPERUSER");
+  });
+});
+
+describe("the hub's database after a newer hub", () => {
+  const folders: string[] = [];
+
+  afterEach(async () => {
+    await Promise.all(
+      folders.splice(0).map(async (folder) => {
+        await rm(folder, { recursive: true, force: true });
+      }),
+    );
+  });
+
+  it("exits with 1, saying a newer hub migrated the database", async () => {
+    const folder = await mkdtemp(path.join(tmpdir(), "micafox-newer-"));
+    folders.push(folder);
+    const lines = [
+      ...TEST_MODE_LINES.filter((line) => !line.startsWith("MICAFOX_DATABASE_URL")),
+      `MICAFOX_DATABASE_URL=pglite:${folder}`,
+    ];
+    const { hub: newer } = create(lines);
+    await (
+      await newer.start()
+    ).ready;
+    await newer.db.system("test", async (trx) => {
+      await sql`insert into micafox_migrations_core (name) values ('9999-from-a-newer-hub')`.execute(trx);
+    });
+    await newer.stop();
+    const log = captureLog();
+    let exit: (code: number) => void = () => undefined;
+    const exited = new Promise<number>((resolve) => {
+      exit = resolve;
+    });
+
+    await runHub(
+      { version: "1", build: "hub", features: [] },
+      {
+        env: envOf(lines),
+        stdout: log.stream,
+        stderr: { write: () => true },
+        on: () => undefined,
+        exit: (code) => {
+          exit(code);
+        },
+      },
+    );
+
+    await expect(exited).resolves.toBe(1);
+    expect(log.text()).toContain("a newer hub migrated it");
   });
 });

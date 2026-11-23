@@ -3,6 +3,7 @@ import type { Kysely } from "kysely";
 import { randomBytes } from "node:crypto";
 import pg from "pg";
 import pino from "pino";
+import type { Logger } from "pino";
 
 import { addOrgPolicy, createDatabase } from "../../src/server/db/index.js";
 import type { Database } from "../../src/server/db/index.js";
@@ -26,7 +27,11 @@ export interface TestDatabase {
   db: Database;
   /** The app role's URL: the settings URL a hub would get. */
   url: string;
+  /** On Postgres, the URL of a separate owner role that may create tables, as `MICAFOX_MIGRATION_DATABASE_URL` is. */
+  ownerUrl: string | undefined;
   log: LogCapture;
+  /** The logger the database writes to, which `log` captures. */
+  logger: Logger;
   /** On Postgres, gives the app role an attribute, as an operator could by mistake; PGlite has no such role. */
   alterRole: (attribute: "bypassrls") => Promise<void>;
   /** Settles with the next collapsed warning the database gives. */
@@ -42,6 +47,7 @@ export interface Warning {
 
 interface PostgresScratch {
   url: string;
+  ownerUrl: string;
   alterRole: TestDatabase["alterRole"];
   drop: () => Promise<void>;
 }
@@ -58,25 +64,36 @@ const asAdmin = async (adminUrl: string, statements: readonly string[]): Promise
   }
 };
 
-// One database and one login role per file, named alike, since test files run in parallel on one server
+const urlOf = (adminUrl: string, login: { name: string; password: string; database: string }): string => {
+  const url = new URL(adminUrl);
+  url.username = login.name;
+  url.password = login.password;
+  url.pathname = `/${login.database}`;
+  return url.toString();
+};
+
+// One database, an app role that owns it and a second role for migrations, per file, named alike, since test files
+// run in parallel on one server. The migration role gets no more than an operator's init script would give it.
 const createPostgresScratch = async (adminUrl: string): Promise<PostgresScratch> => {
   const name = `micafox_test_${randomBytes(6).toString("hex")}`;
+  const ownerName = `${name}_owner`;
   const password = randomBytes(12).toString("hex");
   await asAdmin(adminUrl, [
     `create role ${name} login password '${password}' nosuperuser nobypassrls`,
+    `create role ${ownerName} login password '${password}' nosuperuser nobypassrls`,
     `create database ${name} owner ${name}`,
   ]);
-  const url = new URL(adminUrl);
-  url.username = name;
-  url.password = password;
-  url.pathname = `/${name}`;
+  const inDatabase = new URL(adminUrl);
+  inDatabase.pathname = `/${name}`;
+  await asAdmin(inDatabase.toString(), [`grant usage, create on schema public to ${ownerName}`]);
   return {
-    url: url.toString(),
+    url: urlOf(adminUrl, { name, password, database: name }),
+    ownerUrl: urlOf(adminUrl, { name: ownerName, password, database: name }),
     alterRole: async (attribute) => {
       await asAdmin(adminUrl, [`alter role ${name} ${attribute}`]);
     },
     drop: async () => {
-      await asAdmin(adminUrl, [`drop database ${name} with (force)`, `drop role ${name}`]);
+      await asAdmin(adminUrl, [`drop database ${name} with (force)`, `drop role ${name}`, `drop role ${ownerName}`]);
     },
   };
 };
@@ -88,10 +105,11 @@ export const openTestDatabase = async (options: { poolSize?: number } = {}): Pro
   const url = scratch?.url ?? "pglite:memory";
   const log = captureLog();
   const waiting: Array<(warning: Warning) => void> = [];
+  const logger = pino({ level: "debug" }, log.stream);
   const db = createDatabase({
     url,
     poolSize: options.poolSize ?? 10,
-    log: pino({ level: "debug" }, log.stream),
+    log: logger,
     warnCollapsed: (key, fields) => {
       waiting.shift()?.({ key, fields });
     },
@@ -99,7 +117,9 @@ export const openTestDatabase = async (options: { poolSize?: number } = {}): Pro
   return {
     db,
     url,
+    ownerUrl: scratch?.ownerUrl,
     log,
+    logger,
     alterRole: async (attribute) => {
       if (scratch === undefined) {
         throw new Error("PGlite has no app role to alter");
