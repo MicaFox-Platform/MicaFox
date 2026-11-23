@@ -352,13 +352,20 @@ describe.runIf(isOnPostgres)("migrate on Postgres", () => {
     const gate = new Promise<void>((resolve) => {
       release = resolve;
     });
+    let markReached = (): void => undefined;
+    const reached = new Promise<void>((resolve) => {
+      markReached = resolve;
+    });
     const held: Migration = {
       name: "0001-held",
       up: async () => {
+        markReached();
         await gate;
       },
     };
+    // The first hub holds the lock before the second starts, so the one that stops is the one that waits
     const first = run(test, [{ name: "core", migrations: [held] }]);
+    await reached;
     const stopper = new AbortController();
     const second = run(test, [{ name: "core", migrations: [held] }], stopper.signal);
     await waitUntilTheSecondWaits(test);
