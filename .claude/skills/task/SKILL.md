@@ -70,11 +70,10 @@ the `impact` reply with its **Facts**, or the `impact.sh` output for S. Fix ever
 
 ## 8. Hand over and ship
 
-Hand over per the Workflow section of `CLAUDE.md`. On the user's OK:
+Hand over per the Workflow section of `CLAUDE.md`, with the ship command and the question last. On the user's OK:
 
-1. Commit, `git push -u origin <branch>`.
-2. `gh pr create --base staging`: title = commit subject; body = card link, what changed, how it was tested.
-3. Print the PR link, move the card to **In Review** and comment the PR link. Never touch the card again.
+1. Run the ship command from the hand-over: commits, push, `gh pr create --base staging`.
+2. Print the PR link, move the card to **In Review** and comment the PR link. Never touch the card again.
 
 ## Rework
 
@@ -82,4 +81,4 @@ The user asks for changes on an open PR: switch to its branch and pull it. The b
 pushed to it, which the last review saw; when others pushed or `staging` was merged into the PR since, take the
 merge-base with `origin/staging` instead. Run steps 5–8 on the delta from the base: pass it to
 `.claude/scripts/impact.sh` or `impact`, and give `reviewer` the base and the changes the user requested. On OK
-commit and push to the same branch. Do not move the card.
+run the ship command, which commits and pushes to the same branch. Do not move the card.
