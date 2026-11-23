@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed · 2026-11-20
+Accepted · 2026-11-23
 
 ## Context
 
@@ -34,5 +34,5 @@ work across organizations use an explicit system access.
 - The batch writer sets the organization before each organization's group of rows in one transaction.
 - Every start checks that each table outside the global list has row-level security forced; an isolation test calls
   every endpoint and the events stream with another organization's ids.
-- Proposed until the PGlite spike of [ADR 0027](0027-run-hub-tests-and-the-test-mode-on-pglite.md) passes, since
-  `pnpm verify` relies on it.
+- The PGlite spike of [ADR 0027](0027-run-hub-tests-and-the-test-mode-on-pglite.md) passed: the same isolation
+  tests run on PGlite in `pnpm verify` and on Postgres 15 and 18 in CI.

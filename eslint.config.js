@@ -118,6 +118,20 @@ const TESTKIT_APP_BAN = {
   message: "The test kit starts the hub only through @micafox/hub/cli (ADR 0038).",
 };
 
+// `db.global` reads and writes the tables without an organization, and no row-level security guards them. Only the
+// folders that own them reach it: docs/architecture/hub/database.md#scoping-a-query. It is a property, so the
+// rule is on syntax. The shared config's selectors come first: a later block for the same rule replaces them.
+const SHARED_SYNTAX_BANS = config
+  .find((block) => block.rules?.["no-restricted-syntax"] !== undefined)
+  .rules["no-restricted-syntax"].slice(1);
+const GLOBAL_HANDLE_MESSAGE =
+  "db.global is for access/ and db/ only; other code uses db.forOrg(orgId, run) or db.system(reason, run) (database.md#scoping-a-query).";
+const GLOBAL_HANDLE_BANS = [
+  "MemberExpression[computed=false][property.name='global']",
+  "MemberExpression[computed=true][property.value='global']",
+  "ObjectPattern > Property[key.name='global']",
+].map((selector) => ({ selector, message: GLOBAL_HANDLE_MESSAGE }));
+
 const hubRules = [
   {
     rules: { "@typescript-eslint/no-restricted-imports": ["error", { patterns: [...EE_BAN, EE_ALIAS_BAN, APP_BAN] }] },
@@ -161,6 +175,11 @@ const hubRules = [
         },
       ],
     },
+  },
+  {
+    files: ["{hub,ee}/*/src/server/**", "{hub,ee}/*/test/**", "hub/app/src/**"],
+    ignores: ["hub/core/src/server/{db,access}/**", "hub/core/test/db/**"],
+    rules: { "no-restricted-syntax": ["error", ...SHARED_SYNTAX_BANS, ...GLOBAL_HANDLE_BANS] },
   },
   // packages/: MIT building blocks, which never import hub/, ee/, tools/ or sandbox/
   restrictDependencies({

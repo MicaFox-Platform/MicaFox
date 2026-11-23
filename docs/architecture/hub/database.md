@@ -16,7 +16,7 @@ tests and the test mode.
 - Does not own: the tables of a feature, which the feature defines in its migrations; backups, which are the
   operator's job with `pg_dump`.
 - Constraints:
-  - Postgres 15 or later in production; CI tests 15 and 18, and PGlite runs 17.
+  - Postgres 15 or later in production; CI tests 15 and 18, and PGlite runs 18.
   - Every table holds rows of one organization, with `org_id` and a policy, unless it is one of the global tables
     below. The start fails on any other table without row-level security.
   - The app role is neither a superuser nor `BYPASSRLS`, or the hub does not start.
@@ -25,7 +25,7 @@ tests and the test mode.
 
 ```text
 ┌──────────────────┐ request db   ┌─────────────────────── db ────────────────────────┐   SQL   ┌──────────┐
-│ route, feature   │─────────────▶│ db.forOrg(orgId): a transaction with the org set  │────────▶│ Postgres │
+│ route, feature   │─────────────▶│ db.forOrg(orgId, run): a transaction, org set     │────────▶│ Postgres │
 ├──────────────────┤ lookups      │ db.global: global tables, auth only               │────────▶│ RLS on   │
 │ access (auth)    │─────────────▶│ db.system(reason): jobs across organizations      │────────▶│ org rows │
 ├──────────────────┤ rows         │ writer: batches per org, one transaction a flush  │────────▶│          │
@@ -37,12 +37,14 @@ tests and the test mode.
 
 ```text
 hub/core/src/server/db/
-├── index.ts          the pool and the three handles
+├── index.ts          the pool, the three handles and the readiness step that waits for the database
 ├── scope.ts          forOrg, global and system: transactions and session settings
 ├── policies.ts       the RLS policy helpers migrations use
+├── connect.ts        waiting for an unreachable database with backoff, and the check of the app role
+├── value-types.ts    the Postgres types both dialects return as text
 ├── migrator/         the ordered migrator, its lock, the unknown-migration and RLS checks
 ├── writer/           the write queue: batching, upserts, per-organization groups, limits, rejected rows
-├── pglite/           the PGlite dialect, the app role inside it, the seed
+├── pglite/           the PGlite dialect, the app role inside it, the seed (the seed comes later)
 └── migrations/       hub-core's own migrations: 0001-<name>.ts, ...
 ```
 
@@ -53,10 +55,12 @@ hub/core/src/server/db/
 1. Each organization's table has `org_id` and the policy
    `org_id = nullif(current_setting('micafox.org_id', true), '')::uuid`, with `FORCE ROW LEVEL SECURITY`. A
    setting left empty by an earlier transaction on the same pooled connection matches no row instead of failing.
-2. `db.forOrg(orgId)` opens a transaction and runs `set_config('micafox.org_id', $1, true)` first, so the setting
-   ends with the transaction. Routes under an organization get only this handle.
-3. `db.global` reads and writes the global tables, without RLS. Only `access` and `db` may import it, which ESLint
-   enforces.
+2. `db.forOrg(orgId, run)` opens a transaction, runs `set_config('micafox.org_id', $1, true)` first, so the setting
+   ends with the transaction, and passes `run` that transaction. Routes under an organization get only this handle.
+   A query through `db` inside `run` fails with `NestedScopeError`: it would need a second connection, which a pool
+   of one or PGlite does not have. `db.global.transaction()` inside `run` is not caught and waits for itself there.
+3. `db.global` reads and writes the global tables, without RLS. Only `access` and `db` may use it, which ESLint
+   enforces on any `.global` access outside them.
 4. `db.system(reason)` sets `micafox.system` for one transaction, which the policies also accept, and logs the
    reason. Only jobs that work across organizations use it, such as retention.
 5. The hub connects as an app role without superuser or `BYPASSRLS`; migrations run as the owner role when
@@ -102,17 +106,31 @@ Why Kysely and per-package migrations:
    the good rows, and drops and counts the rows Postgres rejects, with a collapsed warning naming the table.
 5. The pool has `MICAFOX_DATABASE_POOL_SIZE` connections (10); a larger machine raises it together with the limits.
 
+### Waiting for the database
+
+1. The hub's first readiness step probes the database with `select current_user` and the role's `rolsuper` and
+   `rolbypassrls`. A probe that gets no answer in 5 s counts as unreachable.
+2. While the database is unreachable, which covers refused or dropped connections, DNS failures, a server that is
+   starting, shutting down or full (SQLSTATE class 08, `57P03`, `57P01`, `53300`), it retries with a doubling delay
+   from 250 ms to 10 s and logs one collapsed warning. `/readyz` stays 503, and a stop ends the wait.
+3. Any other error, such as a wrong password, fails the start, and so does a role that is a superuser or has
+   `BYPASSRLS`: the hub exits with code 1.
+
 ### Running on PGlite
 
 1. `MICAFOX_DATABASE_URL=pglite:memory` or `pglite:<folder>` runs the hub on PGlite inside its own process, for tests,
    the [test mode](server.md#running-in-test-mode) and trials; the hub logs that it is not for production. A new
    folder starts from the same seed as `pglite:memory`.
 2. PGlite connects as a superuser, so the adapter creates the app role and runs as it with `SET ROLE`; the
-   superuser check applies to that role.
+   superuser check applies to that role. The session user stays a superuser, so SQL could still `RESET ROLE`: RLS
+   on PGlite guards against a forgotten filter, not hostile SQL, and a PGlite database never holds real data.
+   Kysely lends its one session to a caller at a time, so a `db.global` query never runs inside another
+   organization's transaction.
 3. `pglite:memory` loads `pglite-seed.tar.gz`, a database already migrated at build time, then runs only what is
    missing, so start-up stays within 2 s however many migrations exist.
-4. PGlite has one connection, so `pnpm verify` cannot prove locks or concurrency; those tests run only in CI on
-   Postgres 15 and 18, with the rest of the database tests. Why PGlite:
+4. PGlite has one connection, so `pnpm verify` cannot prove locks or concurrency; those tests run only on
+   Postgres, in CI on 15 and 18, with the rest of the database tests. `MICAFOX_TEST_DATABASE_URL`, the URL of a
+   superuser, makes `pnpm test:db` run them on that server, in a database and a role of their own per test file. Why PGlite:
    [ADR 0027](../../adr/hub/database/0027-run-hub-tests-and-the-test-mode-on-pglite.md).
 
 ### Keeping data within bounds

@@ -268,7 +268,9 @@ describe("runHub when the hub cannot start", () => {
         build: "hub",
         features: [],
         configure: (hub) => {
-          hub.addReadinessStep("database", () => Promise.reject(new Error("the app role is a superuser")));
+          hub.addReadinessStep("migrations", () =>
+            Promise.reject(new Error("the database holds an unknown migration")),
+          );
         },
       },
       proc,
@@ -280,8 +282,8 @@ describe("runHub when the hub cannot start", () => {
         msg: "The hub could not start",
         err: expect.objectContaining({
           type: "ReadinessError",
-          step: "database",
-          message: expect.stringContaining("the app role is a superuser") as unknown,
+          step: "migrations",
+          message: expect.stringContaining("the database holds an unknown migration") as unknown,
         }) as unknown,
       }),
     );
@@ -295,7 +297,7 @@ describe("runHub when the hub cannot start", () => {
         build: "hub",
         features: [],
         configure: (hub) => {
-          hub.addReadinessStep("database", (stepSignal) => {
+          hub.addReadinessStep("migrations", (stepSignal) => {
             return new Promise<void>((_resolve, reject) => {
               stepSignal.addEventListener("abort", () => {
                 reject(new Error("aborted"));

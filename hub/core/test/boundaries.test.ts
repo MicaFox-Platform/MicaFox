@@ -118,3 +118,106 @@ describe("hub-core .tsx web code", () => {
     await expect(findNodeBan("__tests__/app.test.tsx")).resolves.toBeUndefined();
   });
 });
+
+// Lints `code` as if it were `file`, an existing file (typed linting parses only those), with the repository's real
+// ESLint config, and returns the messages of `rule`
+const lintCode = async (file: string, code: string, rule: string): Promise<string[]> => {
+  const [result] = await new ESLint({ cwd: ROOT }).lintText(code, { filePath: path.join(ROOT, file) });
+  const fatal = result?.messages.find((message) => message.fatal);
+  if (fatal) {
+    throw new Error(fatal.message);
+  }
+  return (result?.messages ?? []).filter((message) => message.ruleId === rule).map((message) => message.message);
+};
+
+// The selectors of `no-restricted-syntax` for a file that need not exist: the resolved config, not a lint
+const syntaxBansOf = async (file: string): Promise<string[]> => {
+  // ESLint types the resolved config as `any`; a flat config always holds `rules`
+  const config = (await new ESLint({ cwd: ROOT }).calculateConfigForFile(path.join(ROOT, file))) as {
+    rules: Record<string, [number, ...Array<{ selector: string }>] | undefined>;
+  };
+  return (config.rules["no-restricted-syntax"] ?? []).slice(1).map((ban) => (ban as { selector: string }).selector);
+};
+
+const GLOBAL_HANDLE = "db.global is for access/ and db/ only";
+const READ_GLOBAL = "export const read = (db: { global: unknown }): unknown => db.global;\n";
+const GLOBAL_SELECTOR = "MemberExpression[computed=false][property.name='global']";
+
+describe("db.global", { timeout: 60_000 }, () => {
+  it.each([
+    ["a member", READ_GLOBAL],
+    ["a computed member", "export const read = (db: { global: unknown }): unknown => db['global'];\n"],
+    [
+      "a destructuring",
+      "export const read = (db: { global: unknown }): unknown => { const { global } = db; return global; };\n",
+    ],
+  ])("is rejected outside access/ and db/ as %s", async (_form, code) => {
+    const messages = await lintCode("hub/core/src/server/app/index.ts", code, "no-restricted-syntax");
+
+    expect(messages).toEqual([expect.stringContaining(GLOBAL_HANDLE)]);
+  });
+
+  it.each([
+    "hub/core/src/server/lifecycle/__tests__/hub.test.ts",
+    "hub/core/test/server/env.ts",
+    "hub/debugger/src/server/index.ts",
+  ])("is rejected in %s", async (file) => {
+    const messages = await lintCode(file, READ_GLOBAL, "no-restricted-syntax");
+
+    expect(messages).toEqual([expect.stringContaining(GLOBAL_HANDLE)]);
+  });
+
+  it.each([
+    "hub/core/src/server/db/index.ts",
+    "hub/core/src/server/db/__tests__/scope.test.ts",
+    "hub/core/test/db/test-database.ts",
+  ])("is allowed in %s", async (file) => {
+    const messages = await lintCode(file, READ_GLOBAL, "no-restricted-syntax");
+
+    expect(messages).toEqual([]);
+  });
+
+  // Files that do not exist yet: access/ and ee/ are designed, not written
+  it.each([
+    "hub/core/src/server/db/migrator/index.ts",
+    "hub/core/src/server/access/index.ts",
+    "hub/core/test/db/fixture.ts",
+  ])("is allowed in %s by the resolved config", async (file) => {
+    await expect(syntaxBansOf(file)).resolves.not.toContain(GLOBAL_SELECTOR);
+  });
+
+  it.each([
+    "hub/core/src/server/access-keys/index.ts",
+    "hub/core/src/server/jobs/index.ts",
+    "hub/billing/src/server/index.ts",
+    "hub/app/src/index.ts",
+    "ee/hub/src/server/index.ts",
+  ])("is rejected in %s by the resolved config", async (file) => {
+    await expect(syntaxBansOf(file)).resolves.toContain(GLOBAL_SELECTOR);
+  });
+
+  it("is left to the web code, which cannot reach the database", async () => {
+    await expect(syntaxBansOf("hub/core/src/web/index.ts")).resolves.not.toContain(GLOBAL_SELECTOR);
+  });
+
+  // The rule lives in a block beside the import rules, so it must not replace what they or the shared config ban
+  it("keeps the shared bans where it applies", async () => {
+    const messages = await lintCode(
+      "hub/core/src/server/app/index.ts",
+      "export enum Mode { On }\n",
+      "no-restricted-syntax",
+    );
+
+    expect(messages).toEqual([expect.stringContaining("Use a union of string literals")]);
+  });
+
+  it.each([
+    ["@micafox/testkit", "Only the sandbox/ apps use @micafox/testkit"],
+    ["@micafox/sdk", "hub-core imports only @micafox/protocol and @micafox/ui"],
+    ["@micafox/hub-ee", "ADR 0023"],
+  ])("keeps the ban on importing %s in server code", async (specifier, message) => {
+    const messages = await findRestrictedImports("server/app/index.ts", specifier);
+
+    expect(messages).toContainEqual(expect.stringContaining(message));
+  });
+});

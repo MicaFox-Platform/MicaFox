@@ -37,7 +37,9 @@ final newline. A setting given both directly and as `_FILE` is a problem, and an
 | `MICAFOX_TEST_PASSWORD` (`_FILE`)          | generated, logged     | the seeded owner's password in test mode, 12 to 256 characters                                |
 
 The hub refuses to start when `MICAFOX_PUBLIC_URL` is HTTP on another host, when its database role is a superuser
-or has `BYPASSRLS`, or when the database was migrated by a newer hub.
+or has `BYPASSRLS`, when the database refuses it (such as for a wrong password), or when the database was migrated by a
+newer hub. While the database is unreachable it waits and retries, with `/readyz` at 503. On a `pglite:` database it
+logs that PGlite is not for production.
 
 ### Test mode
 
@@ -66,7 +68,8 @@ Run them inside the hub's container: `docker compose exec hub micafox-hub <comma
 ### Health and metrics
 
 - `GET /healthz` — 200 while the process runs, also during migrations.
-- `GET /readyz` — 200 when the database answers, migrations are done and the hub is not stopping; 503 otherwise.
+- `GET /readyz` — 200 when the database answers, migrations are done and the hub is not stopping; 503 otherwise,
+  also while the hub waits for an unreachable database.
 - `GET /metrics` on `MICAFOX_METRICS_PORT` — Prometheus metrics of the process, HTTP, SDK connections, the database
   and jobs, without organization or user labels.
 
