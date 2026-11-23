@@ -18,6 +18,7 @@
     "hub/*/src/**/*.test.tsx",
     "hub/*/src/**/*.test-d.ts",
     "hub/*/test",
+    "hub/*/scripts",
     "ee/*/vitest*.config.ts",
     "ee/*/src/**/*.test.ts",
     "ee/*/src/**/*.test.tsx",

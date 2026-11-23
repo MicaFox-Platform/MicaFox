@@ -47,6 +47,9 @@ importers:
 
   hub/app:
     dependencies:
+      '@electric-sql/pglite':
+        specifier: ^0.5.17
+        version: 0.5.17
       '@micafox/hub-core':
         specifier: workspace:*
         version: link:../core
@@ -63,6 +66,9 @@ importers:
       '@micafox/configs':
         specifier: workspace:*
         version: link:../../packages/configs
+      esbuild:
+        specifier: ^0.28.2
+        version: 0.28.2
 
   hub/core:
     dependencies:

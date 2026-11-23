@@ -75,13 +75,14 @@ pnpm typecheck    → typecheck every package, then the root files and tests
 pnpm test         → one Vitest run over all packages; pnpm test <paths> runs only those test files
 pnpm lint         → one ESLint run over the repo
 pnpm format       → one Prettier check over the repo
+pnpm test:open-core → build the basic hub (EE=false) and fail on any module of ee/ in its bundle
 pnpm test:build   → tests of the built output: packages loaded with import and require(), sandbox/formats
                     and sandbox/frameworks/*; run pnpm build first
 pnpm test:pack    → pack each package under packages/ as npm would receive it and check the tarball: no src/ or
                     tests, README.md and LICENSE, exports and workspace ranges, publint and Are the Types Wrong;
                     run pnpm build first
-pnpm verify       → lint → format → build → typecheck → test:pack → test:build → test:coverage (≥ 80%), stops at the
-                    first failure; a green run is recorded for its tree, see On your machine
+pnpm verify       → lint → format → test:open-core → build → typecheck → test:pack → test:build → test:coverage
+                    (≥ 80%), stops at the first failure; a green run is recorded for its tree, see On your machine
 pnpm verify:brief → the same steps, one line per green step and the start of a failure (for AI agents)
 pnpm verify:fix   → auto-fix lint and formatting
 pnpm docker:up    → optional, needs Docker: build an image per example app and start them with the fake hub
@@ -277,12 +278,14 @@ legs pass. Steps, in order:
 | Changesets        | into `staging`: a public package's shipped files changed without a changeset, or a `major` one at 0.x; a hub file changed without one for `@micafox/hub` or an empty one |
 | No changeset left | into `main`: a changeset that names a package is left; merge the version PR first                                                                                        |
 | Linter, Formatter | `pnpm lint` or `pnpm format` fails                                                                                                                                       |
+| Open-core check   | `pnpm test:open-core` finds a module of `ee/` in the basic hub's bundle                                                                                                  |
 | Build … Tests     | `pnpm build`, `pnpm typecheck` or `pnpm test` fails; coverage is checked once                                                                                            |
 | Tests of the …    | `pnpm test:pack` fails on a tarball, or `pnpm test:build` on the build                                                                                                   |
 
 Only the Node 22.13 leg runs the name steps, the signature step, the changeset steps, the linter, the formatter, the
-typecheck and the coverage run (`pnpm test:coverage`): none of them depends on the Node version. A new push to a
-pull request cancels the CI and CodeQL runs of its previous commit; a rename does not cancel the run of a push.
+open-core check, the typecheck and the coverage run (`pnpm test:coverage`): none of them depends on the Node version.
+A new push to a pull request cancels the CI and CodeQL runs of its previous commit; a rename does not cancel the run
+of a push.
 
 The signature step runs `.github/scripts/check-signatures.sh` with the default read-only token, also on pull requests
 from forks. The changeset steps run `.github/scripts/check-changesets.sh`; check a

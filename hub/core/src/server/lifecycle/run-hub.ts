@@ -34,7 +34,7 @@ const buildHub = (options: RunHubOptions, proc: RunHubProcess): Hub | undefined 
 };
 
 // Kubernetes kills the pod 30 s after SIGTERM; exiting first keeps the exit code and the last log lines the hub's
-const EXIT_DEADLINE_MS = 30_000;
+export const EXIT_DEADLINE_MS = 30_000;
 
 /**
  * Starts the hub as a process: prints every settings problem and exits with 1, listens for SIGTERM and SIGINT to

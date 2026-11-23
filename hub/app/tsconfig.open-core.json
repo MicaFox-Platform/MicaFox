@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  // The basic hub's typecheck: #ee and #ee/web resolve to the stubs, so they must keep the extension's type. The
+  // condition is OPEN_CORE_CONDITION in src/conditions.ts; test/imports.test.ts keeps the two equal
+  "compilerOptions": {
+    "customConditions": ["micafox-open-core"],
+    "composite": false,
+    "incremental": false,
+    "tsBuildInfoFile": null,
+    "emitDeclarationOnly": false,
+    "noEmit": true
+  }
+}

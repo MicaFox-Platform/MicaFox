@@ -21,6 +21,30 @@ describe("createVitestConfig", () => {
     expect(config.ssr?.resolve?.conditions).toEqual(["@acme/source", "module", "node", "development|production"]);
   });
 
+  it("resolves further conditions after the source condition and before Vite's client defaults", () => {
+    const config = createVitestConfig({ sourceCondition: "@acme/source", conditions: ["acme-lite"] });
+
+    expect(config.resolve?.conditions).toEqual([
+      "@acme/source",
+      "acme-lite",
+      "module",
+      "browser",
+      "development|production",
+    ]);
+  });
+
+  it("resolves further conditions before Vite's server defaults without a source condition", () => {
+    const config = createVitestConfig({ conditions: ["acme-lite"] });
+
+    expect(config.ssr?.resolve?.conditions).toEqual(["acme-lite", "module", "node", "development|production"]);
+  });
+
+  it("keeps Vite's default conditions when the further conditions are empty", () => {
+    const config = createVitestConfig({ conditions: [] });
+
+    expect(config.resolve).toBeUndefined();
+  });
+
   it("keeps Vite's default conditions when no source condition is given", () => {
     const config = createVitestConfig();
 
