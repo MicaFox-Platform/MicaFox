@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed · 2026-11-20
+Accepted · 2026-11-23
 
 ## Context
 
@@ -29,4 +29,7 @@ database tests on Postgres 15 and 18.
   and lock and concurrency tests run only on real Postgres in CI.
 - The image carries a database migrated at build time, so `pglite:memory` starts within 2 s however many
   migrations exist.
-- Proposed until a spike shows that `CREATE ROLE` and `SET ROLE` enforce row-level security in PGlite.
+- The spike passed: in PGlite, a role created with `CREATE ROLE` and entered with `SET ROLE` is subject to forced
+  row-level security, and its tests run in `pnpm verify` (`hub/core/src/server/db/`, its `__tests__/` and `pglite/__tests__/`). The session user stays
+  a superuser that can `RESET ROLE`, so a PGlite database guards against a forgotten filter, not hostile SQL, and
+  never holds real data.

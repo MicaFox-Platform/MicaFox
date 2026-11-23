@@ -36,8 +36,8 @@ Postgres except the SDK sockets it holds.
   health and shutdown.
 - [SDK endpoint](sdk-endpoint.md) — the WebSocket the SDK connects to: the project key, the handshake, limits and
   routing of module messages to features.
-- [Database](database.md) — Kysely over Postgres, migrations, tenant isolation by row-level security, batched
-  writes and PGlite for tests.
+- [Database](database.md) — Kysely over Postgres, the scoped handles `forOrg`, `global` and `system`, migrations,
+  tenant isolation by row-level security, batched writes and PGlite for tests.
 - [Access](access.md) — organizations, users, the first run, sessions, project keys, roles, entitlements and the
   threat model.
 - [Debugger](debugger.md) — `@micafox/hub-debugger`: breakpoints, their statuses per instance, snapshots, their

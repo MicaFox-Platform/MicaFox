@@ -49,7 +49,7 @@ interface Setup {
   requestRunning: Gate;
 }
 
-const setup = async (options: { failOnClose?: boolean } = {}): Promise<Setup> => {
+const setup = async (options: { failOnClose?: boolean; closeDatabase?: () => Promise<void> } = {}): Promise<Setup> => {
   const log = captureLog();
   const { default: pino } = await import("pino");
   const app = createApp({ logger: pino({}, log.stream), trustProxy: false, publicUrl: undefined, version: "1.2.3" });
@@ -69,7 +69,13 @@ const setup = async (options: { failOnClose?: boolean } = {}): Promise<Setup> =>
   });
   await app.listen({ host: "127.0.0.1", port: 0 });
   const hooks: StopHook[] = [];
-  const runShutdown = createShutdown({ app, hooks: () => hooks, log: pino({}, log.stream), clock });
+  const closeDatabase =
+    options.closeDatabase ??
+    (async (): Promise<void> => {
+      events.push("database closed");
+      await Promise.resolve();
+    });
+  const runShutdown = createShutdown({ app, hooks: () => hooks, closeDatabase, log: pino({}, log.stream), clock });
   const stop = async (): Promise<StopResult> => {
     phase = "stopping";
     return await runShutdown();
@@ -94,7 +100,7 @@ describe("createShutdown", () => {
     vi.useRealTimers();
   });
 
-  it("lets a running request finish, then runs the hooks in the order they were added", async () => {
+  it("lets a running request finish, then runs the hooks in the order they were added, then closes the database", async () => {
     const { hooks, events, url, stop, slowRequest, requestRunning } = await setup();
     hooks.push(
       hook("queue", "after-drain", () => {
@@ -116,7 +122,7 @@ describe("createShutdown", () => {
 
     await expect(stopping).resolves.toEqual({ clean: true });
     await expect(request).resolves.toMatchObject({ status: 200, body: "finished" });
-    expect(events).toEqual(["still draining", "handler finished", "hook queue", "hook pool"]);
+    expect(events).toEqual(["still draining", "handler finished", "hook queue", "hook pool", "database closed"]);
   });
 
   it("runs a before-drain hook while the request is still running", async () => {
@@ -136,7 +142,7 @@ describe("createShutdown", () => {
 
     await stopping;
     await request;
-    expect(events).toEqual(["hook sockets", "handler finished"]);
+    expect(events).toEqual(["hook sockets", "handler finished", "database closed"]);
   });
 
   it("closes the connection of a request that outlasts 10 s and still ends cleanly", async () => {
@@ -170,7 +176,7 @@ describe("createShutdown", () => {
     await vi.advanceTimersByTimeAsync(10_000);
 
     await expect(stopping).resolves.toEqual({ clean: false });
-    expect(events).toEqual(["hook pool"]);
+    expect(events).toEqual(["hook pool", "database closed"]);
     expect(log.lines()).toContainEqual(expect.objectContaining({ hook: "stuck", msg: "A stop hook ran out of time" }));
   });
 
@@ -186,7 +192,7 @@ describe("createShutdown", () => {
 
     await expect(stop()).resolves.toEqual({ clean: false });
 
-    expect(events).toEqual(["hook pool"]);
+    expect(events).toEqual(["hook pool", "database closed"]);
     expect(log.lines()).toContainEqual(expect.objectContaining({ hook: "queue", msg: "A stop hook failed" }));
   });
 
@@ -215,6 +221,30 @@ describe("createShutdown", () => {
     await expect(outcome).resolves.toBe("connection closed");
     slowRequest.open();
   });
+  it("logs a database that fails to close and reports an unclean stop", async () => {
+    const { log, stop } = await setup({ closeDatabase: () => Promise.reject(new Error("the pool is broken")) });
+
+    const result = await stop();
+
+    expect(result).toEqual({ clean: false });
+    expect(log.lines()).toContainEqual(
+      expect.objectContaining({ level: 50, msg: "The database failed to close", err: expect.anything() as unknown }),
+    );
+  });
+
+  it("gives a database that never closes 10 s, then reports an unclean stop", async () => {
+    const { log, stop } = await setup({ closeDatabase: () => new Promise<void>(() => undefined) });
+
+    const stopping = stop();
+    await flush();
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    await expect(stopping).resolves.toEqual({ clean: false });
+    expect(log.lines()).toContainEqual(
+      expect.objectContaining({ msg: "The database did not close within the stop time" }),
+    );
+  });
+
   it("closes a keep-alive connection once its running request is answered, without waiting for the drain time", async () => {
     const { url, stop, log, slowRequest, requestRunning } = await setup();
     const agent = new http.Agent({ keepAlive: true });
@@ -242,7 +272,7 @@ describe("createShutdown", () => {
 
     await expect(stop()).resolves.toEqual({ clean: false });
 
-    expect(events).toEqual(["hook pool"]);
+    expect(events).toEqual(["hook pool", "database closed"]);
     expect(log.lines()).toContainEqual(expect.objectContaining({ msg: "The server failed to close" }));
   });
 });

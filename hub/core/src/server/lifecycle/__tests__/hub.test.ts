@@ -23,16 +23,32 @@ const create = (lines: readonly string[] = TEST_MODE_LINES): { hub: Hub; log: Re
   return { hub, log };
 };
 
+interface ControlledStep {
+  run: () => Promise<void>;
+  /** Settles once the hub runs the step, after the database step before it. */
+  reached: Promise<void>;
+  finish: () => void;
+  fail: (error: Error) => void;
+}
+
 // A step the test finishes itself, so "not ready yet" can be observed
-const controlledStep = (): { run: () => Promise<void>; finish: () => void; fail: (error: Error) => void } => {
+const controlledStep = (): ControlledStep => {
   let finish = (): void => undefined;
   let fail: (error: Error) => void = () => undefined;
+  let markReached = (): void => undefined;
   const pending = new Promise<void>((resolve, reject) => {
     finish = resolve;
     fail = reject;
   });
+  const reached = new Promise<void>((resolve) => {
+    markReached = resolve;
+  });
   return {
-    run: () => pending,
+    run: async () => {
+      markReached();
+      await pending;
+    },
+    reached,
     finish: () => {
       finish();
     },
@@ -56,7 +72,7 @@ describe("createHub", () => {
   it("answers /healthz at once and 503 not-ready everywhere else until the steps pass", async () => {
     const { hub } = create();
     const step = controlledStep();
-    hub.addReadinessStep("database", step.run);
+    hub.addReadinessStep("migrations", step.run);
 
     const running = await hub.start();
 
@@ -78,7 +94,7 @@ describe("createHub", () => {
 
   it("answers the 503 gate with the request id and the security headers", async () => {
     const { hub } = create();
-    hub.addReadinessStep("database", controlledStep().run);
+    hub.addReadinessStep("migrations", controlledStep().run);
     const running = await hub.start();
 
     const reply = await get(running.url, "/api/v1/anything");
@@ -124,7 +140,7 @@ describe("createHub", () => {
     });
 
     const running = await hub.start();
-    await new Promise((resolve) => setImmediate(resolve));
+    await second.reached;
 
     expect(order).toEqual(["first", "second"]);
     await expect(get(running.url, "/readyz")).resolves.toMatchObject({ status: 503 });
@@ -133,7 +149,7 @@ describe("createHub", () => {
     await expect(get(running.url, "/readyz")).resolves.toMatchObject({ status: 200 });
   });
 
-  it("is ready at once without steps", async () => {
+  it("turns ready once the database answers when no part adds a step", async () => {
     const { hub } = create();
 
     const running = await hub.start();
@@ -145,7 +161,7 @@ describe("createHub", () => {
   it("logs hub.started once it is ready, with version, build, features and settings without secrets", async () => {
     const { hub, log } = create([...TEST_MODE_LINES, "MICAFOX_SETUP_TOKEN=setup-secret", "MICAFOX_LOG_LEVEL=debug"]);
     const step = controlledStep();
-    hub.addReadinessStep("database", step.run);
+    hub.addReadinessStep("migrations", step.run);
 
     const running = await hub.start();
     expect(log.lines().filter((line) => line.msg === "hub.started")).toEqual([]);
@@ -181,15 +197,16 @@ describe("createHub", () => {
   it("rejects ready with the step's name when a step fails, and stays not ready", async () => {
     const { hub } = create();
     const step = controlledStep();
-    hub.addReadinessStep("database", step.run);
+    hub.addReadinessStep("migrations", step.run);
     const running = await hub.start();
-    const failure = new Error("the app role is a superuser");
+    await step.reached;
+    const failure = new Error("the database holds an unknown migration");
 
     step.fail(failure);
 
     await expect(running.ready).rejects.toMatchObject({
       constructor: ReadinessError,
-      step: "database",
+      step: "migrations",
       cause: failure,
     });
     await expect(get(running.url, "/readyz")).resolves.toMatchObject({ status: 503 });
@@ -202,9 +219,12 @@ describe("createHub", () => {
       unhandled.push(reason);
     };
     process.on("unhandledRejection", record);
-    hub.addReadinessStep("database", () => Promise.reject(new Error("down")));
+    const step = controlledStep();
+    hub.addReadinessStep("migrations", step.run);
 
     await hub.start();
+    await step.reached;
+    step.fail(new Error("down"));
     await new Promise((resolve) => setImmediate(resolve));
     await new Promise((resolve) => setImmediate(resolve));
     process.off("unhandledRejection", record);
@@ -212,9 +232,19 @@ describe("createHub", () => {
     expect(unhandled).toEqual([]);
   });
 
-  it("refuses a readiness step once it has started", async () => {
+  it("refuses a readiness step once it has started, while its steps still run", async () => {
     const { hub } = create();
     await hub.start();
+
+    expect(() => {
+      hub.addReadinessStep("late", () => Promise.resolve());
+    }).toThrow(HubStateError);
+  });
+
+  it("refuses a readiness step once it is ready", async () => {
+    const { hub } = create();
+    const running = await hub.start();
+    await running.ready;
 
     expect(() => {
       hub.addReadinessStep("late", () => Promise.resolve());
@@ -265,25 +295,26 @@ describe("createHub", () => {
   it("aborts a readiness step that is waiting when the hub stops", async () => {
     const { hub } = create();
     const seen: AbortSignal[] = [];
-    hub.addReadinessStep("database", async (signal) => {
+    const step = controlledStep();
+    hub.addReadinessStep("migrations", async (signal) => {
       seen.push(signal);
-      await new Promise((_resolve, reject) => {
-        signal.addEventListener("abort", () => {
-          reject(new Error("aborted"));
-        });
+      signal.addEventListener("abort", () => {
+        step.fail(new Error("aborted"));
       });
+      await step.run();
     });
     const running = await hub.start();
-    await new Promise((resolve) => setImmediate(resolve));
+    await step.reached;
 
     await hub.stop();
 
     expect(seen[0]?.aborted).toBe(true);
     await expect(running.ready).rejects.toThrow("aborted");
   });
+
   it("answers /healthz with a query string before it is ready", async () => {
     const { hub } = create();
-    hub.addReadinessStep("database", controlledStep().run);
+    hub.addReadinessStep("migrations", controlledStep().run);
 
     const running = await hub.start();
 

@@ -43,6 +43,9 @@ AGPL-3.0-only, where an outside pull request needs a signed CLA. Nothing imports
   `hub/app/deploy/compose.yaml`.
 - `pnpm verify` runs the hub's tests on PGlite and checks that the basic hub build (`EE=false`) holds no file from
   `ee/`; CI also runs the database tests on Postgres 15 and 18.
+- `pnpm test:db` runs the database tests alone; with `MICAFOX_TEST_DATABASE_URL` set to the URL of a Postgres
+  superuser it runs them on that server, in a database and a role of their own per test file, with the tests that need
+  several connections.
 - `pnpm test:e2e` runs the browser tests with Playwright against both builds; like `pnpm test:docker` it is not part
   of `pnpm verify`.
 - A change under `hub/`, `packages/ui/` or `ee/` takes a changeset for `@micafox/hub`, or

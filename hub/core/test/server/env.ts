@@ -7,7 +7,7 @@ export const envOf = (lines: readonly string[]): Record<string, string> =>
     }),
   );
 
-// Test mode with a free port: the hub takes its URL from the port it binds, and no database is reached
+// Test mode with a free port: the hub takes its URL from the port it binds, and its database is PGlite in memory
 export const TEST_MODE_LINES = [
   "MICAFOX_TEST_MODE=true",
   "MICAFOX_DATABASE_URL=pglite:memory",

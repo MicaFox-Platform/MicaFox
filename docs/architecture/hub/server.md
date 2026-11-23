@@ -69,9 +69,9 @@ hub/core/src/server/
    the hub prints all of them and exits with code 1. [Settings](../../api/hub/config.md).
 2. The app registers every plugin and listens on `MICAFOX_PORT`, and on `MICAFOX_METRICS_PORT` when set.
    `/healthz` answers 200 from now on; `/readyz`, every other route and SDK upgrades answer 503 until step 5.
-3. It connects to Postgres, retrying with backoff while it is unreachable. It exits with code 1 when the app role is
-   a superuser or has `BYPASSRLS`, or when the database holds a migration this image does not know; otherwise it
-   [migrates](database.md#migrating).
+3. It connects to Postgres, [retrying with backoff](database.md#waiting-for-the-database) while it is unreachable.
+   It exits with code 1 when the app role is a superuser or has `BYPASSRLS`, or when the database holds a migration
+   this image does not know; otherwise it [migrates](database.md#migrating).
 4. Without an owner, it prints the one-time [setup token](access.md#creating-the-first-owner).
 5. It starts the jobs, turns ready and logs `hub.started` with the version, the build (hub or basic hub), the
    features and the settings without secrets.
@@ -108,7 +108,7 @@ hub/core/src/server/
 3. TypeBox schemas check the path, query and body, at most 1 MiB; a failure is a 400 problem of type `validation`
    that names the first field to fail, and a bigger body is a 413 `payload-too-large`.
 4. A route under an organization checks the actor's membership, answering 404 to a non-member so nothing leaks
-   that it exists, and gets [`db.forOrg(orgId)`](database.md#scoping-a-query).
+   that it exists, and gets [`db.forOrg(orgId, run)`](database.md#scoping-a-query).
 5. The response goes through its schema, which drops any field it does not list. Errors become
    `application/problem+json`; an unexpected one is a 500 of type `internal` with the request id, logged with its
    stack, never with its message in the response. A client's error, such as malformed JSON, a malformed URL or an

@@ -10,6 +10,8 @@ import { createApp } from "../app/index.js";
 import type { AppOptions, HubApp } from "../app/index.js";
 import type { Settings } from "../config/index.js";
 import { loadSettings, readSecretFile, summarizeSettings } from "../config/index.js";
+import { connect, createDatabase } from "../db/index.js";
+import type { Database } from "../db/index.js";
 import { createLogger } from "../observability/index.js";
 import type { HubLogger } from "../observability/index.js";
 
@@ -34,6 +36,8 @@ export interface RunningHub {
 /** The hub as parts of the server use it: they add what must finish before ready and what must run on stop. */
 export interface Hub {
   log: Logger;
+  /** The database, through its three scopes; usable once the hub is ready. */
+  db: Database;
   /** Logs a warning by key: the first at once, then one line a minute with the count of its repeats. */
   warnCollapsed: HubLogger["warnCollapsed"];
   /** Adds a step that must finish before the hub is ready; steps run in the order added, after `start()` listens. */
@@ -84,14 +88,23 @@ const listen = async (app: HubApp, settings: Settings): Promise<string> => {
 // What parts of the server register: steps before ready, and hooks for the stop
 const createRegistry = (
   getPhase: () => Phase,
-): Pick<Hub, "addReadinessStep" | "addStopHook"> & { steps: ReadinessStep[]; hooks: StopHook[] } => {
+): Pick<Hub, "addReadinessStep" | "addStopHook"> & {
+  steps: ReadinessStep[];
+  /** Refuses further steps: the start has begun, and a step added now could be skipped. */
+  sealSteps: () => void;
+  hooks: StopHook[];
+} => {
   const steps: ReadinessStep[] = [];
   const hooks: StopHook[] = [];
+  let isSealed = false;
   return {
     steps,
     hooks,
+    sealSteps: () => {
+      isSealed = true;
+    },
     addReadinessStep: (name, run) => {
-      if (getPhase() !== "starting") {
+      if (isSealed || getPhase() !== "starting") {
         throw new HubStateError("Readiness steps are added before the hub starts");
       }
       steps.push({ name, run });
@@ -102,6 +115,50 @@ const createRegistry = (
       }
       hooks.push({ name, run, phase: options.phase ?? "after-drain" });
     },
+  };
+};
+
+// The database of the settings, and the readiness step that waits for it
+const openDatabase = (
+  settings: Settings,
+  logger: HubLogger,
+  timers: Clock,
+): { db: Database; connect: ReadinessStep["run"] } => {
+  const db = createDatabase({
+    url: settings.databaseUrl,
+    poolSize: settings.databasePoolSize,
+    log: logger.log,
+    warnCollapsed: logger.warnCollapsed,
+  });
+  return {
+    db,
+    connect: async (signal) => {
+      await connect(db, { warnCollapsed: logger.warnCollapsed, timers }, signal);
+    },
+  };
+};
+
+// One stop however often it is called; a second call returns the first one's result
+const createStop = (parts: {
+  app: HubApp;
+  hooks: () => readonly StopHook[];
+  db: Database;
+  logger: HubLogger;
+  clock: Clock;
+  beginStop: () => void;
+}): Hub["stop"] => {
+  const { app, hooks, db, logger, clock } = parts;
+  const runShutdown = createShutdown({ app, hooks, closeDatabase: db.close, log: logger.log, clock });
+  let stopping: Promise<StopResult> | undefined;
+  return () => {
+    stopping ??= (async () => {
+      parts.beginStop();
+      const result = await runShutdown();
+      parts.logger.log.info({ clean: result.clean }, "hub.stopped");
+      parts.logger.flush();
+      return result;
+    })();
+    return stopping;
   };
 };
 
@@ -121,13 +178,14 @@ export const createHub = (options: HubOptions): Hub => {
     timers: clock,
   });
   const app = createApp({ ...appSettingsOf(settings), logger: logger.log, version: options.version });
+  const { db, connect: connectDatabase } = openDatabase(settings, logger, clock);
   let phase: Phase = "starting";
-  let stopping: Promise<StopResult> | undefined;
   const registry = createRegistry(() => phase);
   const aborter = new AbortController();
 
   registerHealth(app, () => phase);
-  const runShutdown = createShutdown({ app, hooks: () => registry.hooks, log: logger.log, clock });
+  // First, so every step a part adds later finds the database reachable and its role checked
+  registry.addReadinessStep("database", connectDatabase);
 
   const becomeReady = async (url: string): Promise<void> => {
     await runReadinessSteps(registry.steps, aborter.signal);
@@ -137,6 +195,7 @@ export const createHub = (options: HubOptions): Hub => {
   };
 
   const start: Hub["start"] = async () => {
+    registry.sealSteps();
     const url = await listen(app, settings);
     const ready = becomeReady(url);
     // A caller that never awaits `ready` must not turn a failed step into an unhandled rejection
@@ -144,20 +203,21 @@ export const createHub = (options: HubOptions): Hub => {
     return { url, ready };
   };
 
-  const stop: Hub["stop"] = () => {
-    stopping ??= (async () => {
+  const stop = createStop({
+    app,
+    hooks: () => registry.hooks,
+    db,
+    logger,
+    clock,
+    beginStop: () => {
       phase = "stopping";
       aborter.abort();
-      const result = await runShutdown();
-      logger.log.info({ clean: result.clean }, "hub.stopped");
-      logger.flush();
-      return result;
-    })();
-    return stopping;
-  };
+    },
+  });
 
   return {
     log: logger.log,
+    db,
     warnCollapsed: logger.warnCollapsed,
     addReadinessStep: registry.addReadinessStep,
     addStopHook: registry.addStopHook,

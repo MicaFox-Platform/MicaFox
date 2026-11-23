@@ -29,6 +29,8 @@ export interface StopResult {
 interface ShutdownOptions {
   app: HubApp;
   hooks: () => readonly StopHook[];
+  /** Runs after every hook. */
+  closeDatabase: () => Promise<void>;
   log: Logger;
   clock: Clock;
 }
@@ -51,7 +53,20 @@ const withTimeout = async (work: Promise<void>, limitMs: number, clock: Clock): 
   }
 };
 
-/** Creates the stop sequence: hooks before the drain, the drain of running requests, hooks after it. */
+// Last of all, so no hook, whenever it was added, finds the database closed
+const closeDatabase = async (options: ShutdownOptions, limitMs: number): Promise<boolean> => {
+  try {
+    if ((await withTimeout(options.closeDatabase(), limitMs, options.clock)) === "done") {
+      return true;
+    }
+    options.log.error("The database did not close within the stop time");
+  } catch (error) {
+    options.log.error({ err: error }, "The database failed to close");
+  }
+  return false;
+};
+
+/** Creates the stop sequence: hooks before the drain, the drain of running requests, hooks after it, the database. */
 export const createShutdown = (options: ShutdownOptions): (() => Promise<StopResult>) => {
   const { app, log, clock } = options;
 
@@ -102,6 +117,7 @@ export const createShutdown = (options: ShutdownOptions): (() => Promise<StopRes
     const beforeClean = await runHooks("before-drain", startedAt);
     const isDrained = await drain(startedAt);
     const afterClean = await runHooks("after-drain", startedAt);
-    return { clean: beforeClean && isDrained && afterClean };
+    const isClosed = await closeDatabase(options, Math.min(HOOK_MS, remainingMs(startedAt)));
+    return { clean: beforeClean && isDrained && afterClean && isClosed };
   };
 };
