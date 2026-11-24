@@ -54,9 +54,10 @@ hub/core/src/server/
 ├── observability/    the pino logger with redaction, Prometheus metrics
 ├── events/           the event bus and the SSE events stream
 ├── jobs/             the scheduler, advisory locks, the retention runner
-├── lifecycle/        createHub(), readiness steps, /healthz and /readyz, stop hooks, shutdown, runHub(),
+├── lifecycle/        createHub(), readiness steps, the start-up parts it wires (database, public URL, setup token,
+│                     features, listening), /healthz and /readyz, stop hooks, shutdown, runHub(),
 │                     runMigrations() for micafox-hub migrate
-├── feature/          the feature contract: features.md
+├── feature/          the feature contract, its registry, routes and entitlement gate: features.md
 ├── sdk-endpoint/     the SDK's WebSocket: sdk-endpoint.md
 ├── db/               Kysely, access modes, migrator, writer: database.md
 └── access/           organizations, users, sessions, keys, entitlements: access.md

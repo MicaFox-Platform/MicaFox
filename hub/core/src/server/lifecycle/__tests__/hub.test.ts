@@ -2,11 +2,14 @@ import { sql } from "kysely";
 import net from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { ORG_A } from "../../../../test/db/test-database.js";
+import { emptyFeature, fixtureExtension } from "../../../../test/feature/fixtures.js";
 import { envOf, TEST_MODE_LINES } from "../../../../test/server/env.js";
 import { get } from "../../../../test/server/http.js";
 import { captureLog } from "../../../../test/server/log-capture.js";
 import { hashToken } from "../../access/tokens/index.js";
 import { ConfigError } from "../../config/index.js";
+import { FeatureRegistryError } from "../../feature/index.js";
 import { createHub, HubStateError, ReadinessError } from "../index.js";
 import type { Hub } from "../index.js";
 
@@ -18,7 +21,7 @@ const create = (lines: readonly string[] = TEST_MODE_LINES): { hub: Hub; log: Re
     env: envOf(lines),
     version: "1.2.3",
     build: "basic-hub",
-    features: ["debugger"],
+    features: [emptyFeature("debugger")],
     logStream: log.stream,
   });
   hubs.push(hub);
@@ -69,6 +72,36 @@ describe("createHub", () => {
     expect(() =>
       createHub({ env: {}, version: "1", build: "hub", features: [], logStream: captureLog().stream }),
     ).toThrow(ConfigError);
+  });
+
+  it("throws a FeatureRegistryError naming the conflict, before it listens", () => {
+    expect(() =>
+      createHub({
+        env: envOf(TEST_MODE_LINES),
+        version: "1",
+        build: "hub",
+        features: [emptyFeature("debugger"), emptyFeature("debugger")],
+        logStream: captureLog().stream,
+      }),
+    ).toThrow(FeatureRegistryError);
+  });
+
+  it("gives the parts that run features their registry and the gate: an extension is not entitled in S2", async () => {
+    const hub = createHub({
+      env: envOf(TEST_MODE_LINES),
+      version: "1",
+      build: "basic-hub",
+      features: [emptyFeature("debugger")],
+      extension: fixtureExtension(),
+      logStream: captureLog().stream,
+    });
+    hubs.push(hub);
+
+    expect([
+      hub.registry.features.map(({ feature }) => feature.name),
+      await hub.gate.isEntitled(ORG_A, "debugger"),
+      await hub.gate.isEntitled(ORG_A, "fixture"),
+    ]).toEqual([["debugger", "fixture"], true, false]);
   });
 
   it("answers /healthz at once and 503 not-ready everywhere else until the steps pass", async () => {
@@ -262,6 +295,7 @@ describe("createHub", () => {
         version: "1.2.3",
         build: "basic-hub",
         features: ["debugger"],
+        extension: [],
         settings: expect.objectContaining({
           publicUrl: running.url,
           setupToken: "[redacted]",

@@ -1,6 +1,7 @@
 import { createHub, createSystemClock } from "./hub.js";
 import type { Hub, HubOptions } from "./hub.js";
 import { ConfigError } from "../config/index.js";
+import { FeatureRegistryError } from "../feature/index.js";
 
 /** The parts of `process` that `runHub` uses, so a test can stand in for it. */
 export interface RunHubProcess {
@@ -24,7 +25,7 @@ const buildHub = (options: RunHubOptions, proc: RunHubProcess): Hub | undefined 
     configure?.(hub);
     return hub;
   } catch (error) {
-    if (!(error instanceof ConfigError)) {
+    if (!(error instanceof ConfigError || error instanceof FeatureRegistryError)) {
       throw error;
     }
     proc.stderr.write(`${error.report()}\n`);

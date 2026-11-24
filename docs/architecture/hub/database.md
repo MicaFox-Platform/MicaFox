@@ -83,8 +83,8 @@ hub/core/src/server/db/
    own, so two starting replicas never migrate at once and the lock never stays on a pooled connection. It is the
    hub's second readiness step, after the database answers: `/readyz` stays 503 until it is done. On PGlite, which
    has one session and no other client, there is no lock.
-2. It reads the migrations of hub-core, then of each feature in the app's order, then of the extension. Each
-   package has its own table of migrations run, `micafox_migrations_<package>`, so a new core migration never
+2. It reads the migrations of hub-core, then of each feature in the app's order, then of the extension; a feature is
+   a package named after it. Each package has its own table of migrations run, `micafox_migrations_<package>`, so a new core migration never
    conflicts with a feature's.
 3. A migration this image does not know stops the start before any runs: the database belongs to a newer hub
    ([upgrading](app.md#upgrading)). Otherwise it runs the missing ones in order, each in a transaction with its

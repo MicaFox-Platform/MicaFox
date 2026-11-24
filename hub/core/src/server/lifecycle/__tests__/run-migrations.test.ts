@@ -5,9 +5,12 @@ import path from "node:path";
 import pino from "pino";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { emptyFeature, paidFeature } from "../../../../test/feature/fixtures.js";
 import { envOf, TEST_MODE_LINES } from "../../../../test/server/env.js";
 import { captureLog } from "../../../../test/server/log-capture.js";
-import { createDatabase } from "../../db/index.js";
+import { addOrgPolicy, createDatabase } from "../../db/index.js";
+import type { Migration } from "../../db/index.js";
+import { defineExtension } from "../../feature/index.js";
 import type { RunHubProcess } from "../index.js";
 import { runMigrations } from "../index.js";
 
@@ -46,6 +49,17 @@ const createProcess = (lines: readonly string[]): Fixture => {
     },
   };
 };
+
+// A migration that adds a table of an organization's rows, which the hub requires to be under row-level security
+const createTable = (name: string, table: string): Migration => ({
+  name,
+  up: async (db) => {
+    await sql`create table ${sql.table(table)} (id uuid primary key, org_id uuid not null references orgs (id))`.execute(
+      db,
+    );
+    await addOrgPolicy(db, table);
+  },
+});
 
 const folders: string[] = [];
 
@@ -93,7 +107,7 @@ describe("runMigrations", () => {
   it("runs the missing migrations and exits with 0", async () => {
     const { proc, exits, log } = createProcess(TEST_MODE_LINES);
 
-    await runMigrations({}, proc);
+    await runMigrations({ features: [] }, proc);
 
     expect(exits).toEqual([0]);
     expect(log.lines().map((line) => line.msg)).toEqual(expect.arrayContaining(["db.migrated", "db.migrations-done"]));
@@ -101,10 +115,10 @@ describe("runMigrations", () => {
 
   it("keeps a pglite:<folder> migrated after it exits, so the next run has nothing to do", async () => {
     const url = `pglite:${await createFolder()}`;
-    await runMigrations({}, createProcess(withDatabase(url)).proc);
+    await runMigrations({ features: [] }, createProcess(withDatabase(url)).proc);
     const again = createProcess(withDatabase(url));
 
-    await runMigrations({}, again.proc);
+    await runMigrations({ features: [] }, again.proc);
 
     expect(again.exits).toEqual([0]);
     expect(again.log.lines().map((line) => line.msg)).not.toContain("db.migrated");
@@ -113,7 +127,7 @@ describe("runMigrations", () => {
   it("prints every settings problem and exits with 1 without logging", async () => {
     const { proc, exits, log, stderr } = createProcess(["MICAFOX_DATABASE_URL=mysql://app:hunter2@db/hub"]);
 
-    await runMigrations({}, proc);
+    await runMigrations({ features: [] }, proc);
 
     expect(exits).toEqual([1]);
     expect(stderr()).toContain("MICAFOX_DATABASE_URL: must be a postgres:// URL");
@@ -121,13 +135,43 @@ describe("runMigrations", () => {
     expect(log.text()).toBe("");
   });
 
+  it("runs the migrations of the features and of the extension after hub-core's, each as its own package", async () => {
+    const { proc, exits, log } = createProcess(TEST_MODE_LINES);
+    const notes = emptyFeature("notes", { migrations: [createTable("0001-notes", "notes")] });
+    const logs = paidFeature("logs", { migrations: [createTable("0001-logs", "log_lines")] });
+
+    await runMigrations({ features: [notes], extension: defineExtension({ features: [logs] }) }, proc);
+
+    expect(exits).toEqual([0]);
+    expect(
+      log
+        .lines()
+        .filter((line) => line.msg === "db.migrated" && line.package !== "core")
+        .map((line) => [line.package, line.migration]),
+    ).toEqual([
+      ["notes", "0001-notes"],
+      ["logs", "0001-logs"],
+    ]);
+    expect(log.lines().find((line) => line.msg === "db.migrated")?.package).toBe("core");
+  });
+
+  it("prints every conflict of the features, exits with 1 and runs nothing", async () => {
+    const { proc, exits, stderr, log } = createProcess(TEST_MODE_LINES);
+
+    await runMigrations({ features: [emptyFeature("notes"), emptyFeature("notes")] }, proc);
+
+    expect(exits).toEqual([1]);
+    expect(stderr()).toContain('Two features are named "notes"');
+    expect(log.text()).toBe("");
+  });
+
   it("exits with 1 when a newer hub migrated the database", async () => {
     const folder = await createFolder();
-    await runMigrations({}, createProcess(withDatabase(`pglite:${folder}`)).proc);
+    await runMigrations({ features: [] }, createProcess(withDatabase(`pglite:${folder}`)).proc);
     await recordFutureMigration(folder);
     const { proc, exits, log } = createProcess(withDatabase(`pglite:${folder}`));
 
-    await runMigrations({}, proc);
+    await runMigrations({ features: [] }, proc);
 
     expect(exits).toEqual([1]);
     expect(log.lines()).toContainEqual(expect.objectContaining({ level: "error", msg: "The migrations failed" }));
@@ -138,7 +182,7 @@ describe("runMigrations", () => {
     async (name) => {
       vi.useFakeTimers();
       const { proc, exits, log, signal } = createProcess(UNREACHABLE_LINES);
-      const running = runMigrations({}, proc);
+      const running = runMigrations({ features: [] }, proc);
       await vi.waitFor(() => {
         expect(log.text()).toContain("db.unreachable");
       });
@@ -156,7 +200,7 @@ describe("runMigrations", () => {
   it("exits with 1 at once on a second signal", async () => {
     vi.useFakeTimers();
     const { proc, exits, log, signal } = createProcess(UNREACHABLE_LINES);
-    const running = runMigrations({}, proc);
+    const running = runMigrations({ features: [] }, proc);
     await vi.waitFor(() => {
       expect(log.text()).toContain("db.unreachable");
     });
@@ -171,7 +215,7 @@ describe("runMigrations", () => {
   it("exits with 1 when the migrations do not stop within 30 s of the signal", async () => {
     vi.useFakeTimers();
     const { proc, exits, log, signal } = createProcess(UNREACHABLE_LINES);
-    const running = runMigrations({}, proc);
+    const running = runMigrations({ features: [] }, proc);
     await vi.waitFor(() => {
       expect(log.text()).toContain("db.unreachable");
     });

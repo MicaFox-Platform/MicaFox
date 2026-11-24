@@ -109,6 +109,15 @@ describe("buildPgliteSeed", () => {
     expect(ran).toEqual(["extra/0001-extra"]);
   });
 
+  it("holds the features' migrations it is given, so a start from it runs none of them either", async () => {
+    const withExtra = path.join(await createFolder(), "pglite-seed.tar.gz");
+    await buildPgliteSeed({ file: withExtra, log: pino({ level: "silent" }), packages: [EXTRA] });
+
+    const ran = await migrateAndList("pglite:memory", [CORE_MIGRATIONS, EXTRA], withExtra);
+
+    expect(ran).toEqual([]);
+  });
+
   it("holds the core tables, as the app role can read them", async () => {
     const db = open("pglite:memory", { seed });
 

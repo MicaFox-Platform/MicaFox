@@ -1,4 +1,5 @@
-export { createHub, HubStateError } from "./hub.js";
+export { createHub } from "./hub.js";
+export { HubStateError } from "./startup.js";
 export type { Hub, HubOptions, RunningHub } from "./hub.js";
 export { ReadinessError } from "./readiness.js";
 export { runHub } from "./run-hub.js";

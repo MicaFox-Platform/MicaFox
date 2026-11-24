@@ -6,14 +6,24 @@ import { runReadinessSteps } from "./readiness.js";
 import type { ReadinessStep } from "./readiness.js";
 import { createShutdown } from "./shutdown.js";
 import type { Clock, StopHook, StopResult } from "./shutdown.js";
-import { addAccess, ensureSetupToken } from "../access/index.js";
+import type { FeatureParts } from "./startup.js";
+import {
+  createFeatureParts,
+  createPublicUrl,
+  createStart,
+  HubStateError,
+  openDatabase,
+  setupTokenSteps,
+} from "./startup.js";
+import { addAccess } from "../access/index.js";
 import type { AccessOptions, ActorResolver } from "../access/index.js";
 import { createApp } from "../app/index.js";
 import type { AppOptions, HubApp } from "../app/index.js";
 import type { Settings } from "../config/index.js";
 import { loadSettings, readSecretFile, summarizeSettings } from "../config/index.js";
-import { connect, CORE_MIGRATIONS, createDatabase, migrate } from "../db/index.js";
 import type { Database } from "../db/index.js";
+import { addFeatureRoutes } from "../feature/index.js";
+import type { Extension, Feature, FeatureRegistry, Gate } from "../feature/index.js";
 import { createLogger } from "../observability/index.js";
 import type { HubLogger } from "../observability/index.js";
 
@@ -22,7 +32,10 @@ export interface HubOptions {
   env: Readonly<Record<string, string | undefined>>;
   version: string;
   build: "hub" | "basic-hub";
-  features: readonly string[];
+  /** The core features in the order of their migrations; the extension's come after them. */
+  features: readonly Feature[];
+  /** The paid features of `ee/`, gated by entitlements; none in the basic hub. */
+  extension?: Extension;
   /** The migrated `.tar.gz` a `pglite:memory` or a new `pglite:<folder>` starts from. */
   pgliteSeed?: string;
   logStream: NodeJS.WritableStream;
@@ -44,6 +57,10 @@ export interface Hub {
   log: Logger;
   /** The database, through its three scopes; usable once the hub is ready. */
   db: Database;
+  /** The checked features with their jobs, retention policies and SDK modules, for the parts that run them. */
+  registry: FeatureRegistry;
+  /** Whether an organization may use a feature or an SDK module. */
+  gate: Gate;
   /** Logs a warning by key: the first at once, then one line a minute with the count of its repeats. */
   warnCollapsed: HubLogger["warnCollapsed"];
   /** Adds a step that must finish before the hub is ready; steps run in the order added, after `start()` listens. */
@@ -53,14 +70,6 @@ export interface Hub {
   start: () => Promise<RunningHub>;
   /** Stops the hub within 25 s; a second call returns the first one's result. */
   stop: () => Promise<StopResult>;
-}
-
-/** A step or hook was added when the hub's phase no longer allows it. */
-export class HubStateError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "HubStateError";
-  }
 }
 
 /** Node's own clock and timers. */
@@ -77,18 +86,12 @@ const announceStarted = (log: Logger, options: HubOptions, settings: Settings): 
     {
       version: options.version,
       build: options.build,
-      features: options.features,
+      features: options.features.map((feature) => feature.name),
+      extension: options.extension?.features.map((feature) => feature.name) ?? [],
       settings: summarizeSettings(settings),
     },
     "hub.started",
   );
-};
-
-// Binds the port and returns the URL users open; in test mode it is the bound port, which may be a free one
-const listen = async (app: HubApp, settings: Settings): Promise<string> => {
-  await app.listen({ host: settings.host, port: settings.port });
-  const port = app.addresses()[0]?.port ?? settings.port;
-  return settings.publicUrl ?? `http://localhost:${String(port)}`;
 };
 
 // What parts of the server register: steps before ready, and hooks for the stop
@@ -124,82 +127,6 @@ const createRegistry = (
     },
   };
 };
-
-// The database of the settings, and the readiness steps that wait for it and for its schema: the hub adds them first,
-// in that order, so every step a part adds later finds the database reachable, its role checked and its schema current;
-// micafox-hub migrate runs the same steps
-export const openDatabase = (
-  settings: Settings,
-  logger: HubLogger,
-  options: { timers: Clock; pgliteSeed: string | undefined },
-): { db: Database; steps: ReadinessStep[] } => {
-  const { timers, pgliteSeed } = options;
-  const db = createDatabase({
-    url: settings.databaseUrl,
-    poolSize: settings.databasePoolSize,
-    log: logger.log,
-    warnCollapsed: logger.warnCollapsed,
-    ...(pgliteSeed === undefined ? {} : { pgliteSeed }),
-  });
-  const migrationUrl = settings.migrationDatabaseUrl;
-  return {
-    db,
-    steps: [
-      {
-        name: "database",
-        run: async (signal) => {
-          await connect(db, { warnCollapsed: logger.warnCollapsed, timers }, signal);
-        },
-      },
-      {
-        name: "migrations",
-        run: async (signal) => {
-          await migrate(db, { url: migrationUrl, packages: [CORE_MIGRATIONS], log: logger.log }, signal);
-        },
-      },
-    ],
-  };
-};
-
-// The URL users open: given by the settings, or in test mode known once the port is bound. The origin check and the
-// cookie ask for it at each request, so a request that comes before it is known is a bug.
-const createPublicUrl = (initial: string | undefined): { get: () => string; set: (url: string) => void } => {
-  let url = initial;
-  return {
-    get: () => {
-      if (url === undefined) {
-        throw new HubStateError("The public URL is known once the hub listens");
-      }
-      return url;
-    },
-    set: (value) => {
-      url = value;
-    },
-  };
-};
-
-// The readiness step that makes the setup token; test mode seeds its owner instead, so no token exists there
-const setupTokenSteps = (parts: {
-  settings: Settings;
-  db: Database;
-  log: Logger;
-  publicUrl: () => string;
-}): ReadinessStep[] =>
-  parts.settings.testMode
-    ? []
-    : [
-        {
-          name: "setup-token",
-          run: async () => {
-            await ensureSetupToken({
-              db: parts.db,
-              log: parts.log,
-              publicUrl: parts.publicUrl,
-              configuredToken: parts.settings.setupToken,
-            });
-          },
-        },
-      ];
 
 // One stop however often it is called; a second call returns the first one's result
 const createStop = (parts: {
@@ -239,9 +166,15 @@ const accessOptionsOf = (parts: {
   options: HubOptions;
   clock: Clock;
   publicUrl: () => string;
+  featureParts: FeatureParts;
 }): AccessOptions => ({
   db: parts.db,
-  features: parts.options.features,
+  features: parts.featureParts.registry.features.map(({ feature }) => feature.name),
+  entitlements: parts.featureParts.entitlements,
+  addFeatureRoutes: (scope, authorization) => {
+    const { registry, gate } = parts.featureParts;
+    addFeatureRoutes(scope, { registry, authorization, gate });
+  },
   publicUrl: parts.publicUrl,
   now: parts.clock.now,
   ...(parts.options.actorResolver === undefined ? {} : { resolveActor: parts.options.actorResolver }),
@@ -253,35 +186,32 @@ export const createHub = (options: HubOptions): Hub => {
   const clock = options.clock ?? createSystemClock();
   const logger = loggerOf(settings, options, clock);
   const app = createApp({ ...appSettingsOf(settings), logger: logger.log, version: options.version });
-  const { db, steps } = openDatabase(settings, logger, { pgliteSeed: options.pgliteSeed, timers: clock });
+  const featureParts = createFeatureParts(options, clock);
+  const { db, steps } = openDatabase(settings, logger, {
+    pgliteSeed: options.pgliteSeed,
+    timers: clock,
+    registry: featureParts.registry,
+  });
   const publicUrl = createPublicUrl(settings.publicUrl);
   steps.push(...setupTokenSteps({ settings, db, log: logger.log, publicUrl: publicUrl.get }));
   let phase: Phase = "starting";
-  const registry = createRegistry(() => phase, steps);
+  const lifecycle = createRegistry(() => phase, steps);
   const aborter = new AbortController();
   registerHealth(app, () => phase);
-  addAccess(app, accessOptionsOf({ db, options, clock, publicUrl: publicUrl.get }));
+  addAccess(app, accessOptionsOf({ db, options, clock, publicUrl: publicUrl.get, featureParts }));
 
   const becomeReady = async (url: string): Promise<void> => {
-    await runReadinessSteps(registry.steps, aborter.signal);
+    await runReadinessSteps(lifecycle.steps, aborter.signal);
     aborter.signal.throwIfAborted();
     phase = "ready";
     announceStarted(logger.log, options, { ...settings, publicUrl: url });
   };
 
-  const start: Hub["start"] = async () => {
-    registry.sealSteps();
-    const url = await listen(app, settings);
-    publicUrl.set(url);
-    const ready = becomeReady(url);
-    // A caller that never awaits `ready` must not turn a failed step into an unhandled rejection
-    ready.catch(() => undefined);
-    return { url, ready };
-  };
+  const start = createStart({ app, settings, publicUrl, sealSteps: lifecycle.sealSteps, becomeReady });
 
   const stop = createStop({
     app,
-    hooks: () => registry.hooks,
+    hooks: () => lifecycle.hooks,
     db,
     logger,
     clock,
@@ -294,9 +224,11 @@ export const createHub = (options: HubOptions): Hub => {
   return {
     log: logger.log,
     db,
+    registry: featureParts.registry,
+    gate: featureParts.gate,
     warnCollapsed: logger.warnCollapsed,
-    addReadinessStep: registry.addReadinessStep,
-    addStopHook: registry.addStopHook,
+    addReadinessStep: lifecycle.addReadinessStep,
+    addStopHook: lifecycle.addStopHook,
     start,
     stop,
   };

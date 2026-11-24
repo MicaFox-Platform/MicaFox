@@ -1,6 +1,7 @@
 import net from "node:net";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { emptyFeature } from "../../../../test/feature/fixtures.js";
 import { envOf, TEST_MODE_LINES } from "../../../../test/server/env.js";
 import { get, openSlowRequest } from "../../../../test/server/http.js";
 import { captureLog } from "../../../../test/server/log-capture.js";
@@ -106,6 +107,24 @@ describe("runHub", () => {
     expect(log.text()).toBe("");
   });
 
+  it("prints every conflict of the features, exits with 1 and starts nothing", async () => {
+    const { proc, exits, stderr, log } = createProcess(TEST_MODE_LINES);
+
+    await runHub(
+      {
+        version: "1",
+        build: "hub",
+        features: [emptyFeature("debugger"), emptyFeature("debugger"), emptyFeature("Probes")],
+      },
+      proc,
+    );
+
+    expect(exits).toEqual([1]);
+    expect(stderr()).toContain('Two features are named "debugger"');
+    expect(stderr()).toContain('The feature name "Probes" is not lowercase letters');
+    expect(log.text()).toBe("");
+  });
+
   it("stops on SIGTERM: /readyz turns 503, a running request is answered, the hooks run in order, exit 0", async () => {
     const { proc, signal, exited, log } = createProcess(TEST_MODE_LINES);
     const hold = createGate();
@@ -114,7 +133,7 @@ describe("runHub", () => {
       {
         version: "1",
         build: "hub",
-        features: ["debugger"],
+        features: [emptyFeature("debugger")],
         configure: (hub) => {
           hub.addStopHook(
             "streams",

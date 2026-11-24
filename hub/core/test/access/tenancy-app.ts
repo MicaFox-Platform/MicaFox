@@ -1,9 +1,11 @@
 import { sql } from "kysely";
 
-import { addAccess } from "../../src/server/access/index.js";
+import { addAccess, createEntitlements } from "../../src/server/access/index.js";
 import type { Access, Actor, ActorResolver } from "../../src/server/access/index.js";
 import type { HubApp } from "../../src/server/app/index.js";
 import { CORE_MIGRATIONS, migrate } from "../../src/server/db/index.js";
+import { addFeatureRoutes, createFeatureRegistry, createGate } from "../../src/server/feature/index.js";
+import type { Extension, Feature } from "../../src/server/feature/index.js";
 import { openTestDatabase, ORG_A, ORG_B } from "../db/test-database.js";
 import type { TestDatabase } from "../db/test-database.js";
 import { createTestApp } from "../server/app.js";
@@ -61,7 +63,9 @@ const resolveTestActor: ActorResolver = async (request) => {
 };
 
 /** Opens the test database, migrates it, adds the two organizations and the access plugin to an app. */
-export const openTenancyApp = async (options: { publicUrl?: string } = {}): Promise<TenancyApp> => {
+export const openTenancyApp = async (
+  options: { publicUrl?: string; features?: readonly Feature[]; extension?: Extension } = {},
+): Promise<TenancyApp> => {
   const test = await openTestDatabase();
   await migrate(
     test.db,
@@ -72,10 +76,17 @@ export const openTenancyApp = async (options: { publicUrl?: string } = {}): Prom
     await sql`insert into orgs (id, name) values (${ORG_A}, 'Acme'), (${ORG_B}, 'Globex')`.execute(trx);
   });
   const { app, log } = createTestApp();
+  const registry = createFeatureRegistry(options.features ?? [], options.extension);
+  const entitlements = createEntitlements({ sources: options.extension?.sources ?? [], now: Date.now });
+  const gate = createGate(registry, entitlements);
   const access = addAccess(app, {
     db: test.db,
     resolveActor: resolveTestActor,
-    features: ["debugger"],
+    features: registry.features.map(({ feature }) => feature.name),
+    entitlements,
+    addFeatureRoutes: (scope, authorization) => {
+      addFeatureRoutes(scope, { registry, authorization, gate });
+    },
     publicUrl: () => options.publicUrl ?? "https://hub.example.com",
   });
   await app.ready();

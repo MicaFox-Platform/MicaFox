@@ -1,5 +1,7 @@
 import { createCan } from "./authorization/index.js";
-import type { ActorResolver } from "./authorization/index.js";
+import type { ActorResolver, Authorization } from "./authorization/index.js";
+import { addEntitlementRoutes } from "./entitlements/index.js";
+import type { Entitlements } from "./entitlements/index.js";
 import { addKeyRoutes, createKeyLookup, createRevokeHooks } from "./keys/index.js";
 import type { KeyRevokedListener, KeyScope } from "./keys/index.js";
 import { createPasswordHasher } from "./password/index.js";
@@ -12,7 +14,10 @@ import { HttpProblem } from "../app/index.js";
 import type { HubApp } from "../app/index.js";
 import type { Database } from "../db/index.js";
 
-export type { Actor, ActorResolver } from "./authorization/index.js";
+export { inOrganization, inOwningOrg, requireCan } from "./authorization/index.js";
+export type { Actor, ActorResolver, Authorization, OrgContext } from "./authorization/index.js";
+export { createEntitlements } from "./entitlements/index.js";
+export type { EntitlementSource, Entitlements, OrgEntitlements } from "./entitlements/index.js";
 export type { KeyRevokedListener, KeyScope } from "./keys/index.js";
 export { ensureSetupToken } from "./setup/index.js";
 export type { SetupTokenOptions } from "./setup/index.js";
@@ -22,8 +27,11 @@ export interface AccessOptions {
   db: Database;
   /** Finds the actor of a request; the hub's own reads the session cookie, and tests give theirs. */
   resolveActor?: ActorResolver;
-  /** The features the hub runs: their `<feature>.<action>` are every member's. */
+  /** The names of the features the hub runs: their `<feature>.<action>` are every member's. */
   features: readonly string[];
+  entitlements: Entitlements;
+  /** Adds the features' routes inside the scope that has the actor, after the core's. */
+  addFeatureRoutes?: (scope: HubApp, authorization: Authorization) => void;
   /** The URL users open, asked at each request: in test mode it is known only once the port is bound. */
   publicUrl: () => string;
   /** The clock in milliseconds; `Date.now` by default. */
@@ -77,6 +85,8 @@ export const addAccess = (app: HubApp, options: AccessOptions): Access => {
       addSessionRoutes(actorScope, deps);
       addTenancyRoutes(actorScope, authorization);
       addKeyRoutes(actorScope, { authorization, publicUrl: options.publicUrl, hooks: keyHooks });
+      addEntitlementRoutes(actorScope, authorization, options.entitlements);
+      options.addFeatureRoutes?.(actorScope, authorization);
       actorDone();
     });
     done();

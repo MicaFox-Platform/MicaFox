@@ -131,6 +131,8 @@ export interface PgliteSeedOptions {
   file: string;
   /** Silent without it. */
   log?: Logger;
+  /** The migrations of the features and the extension, in the app's order; hub-core's own always run first. */
+  packages?: readonly MigrationPackage[];
 }
 
 /**
@@ -148,7 +150,11 @@ export const buildPgliteSeed = async (options: PgliteSeedOptions): Promise<void>
   const dialect = pgliteDialectOf("memory", { log }, onOpen);
   const db = createScopes(new Kysely<HubTables>({ dialect }), log);
   try {
-    await migrate(db, { url, packages: [CORE_MIGRATIONS], log }, new AbortController().signal);
+    await migrate(
+      db,
+      { url, packages: [CORE_MIGRATIONS, ...(options.packages ?? [])], log },
+      new AbortController().signal,
+    );
     await writeSeed(await opened, options.file);
   } finally {
     await db.close();

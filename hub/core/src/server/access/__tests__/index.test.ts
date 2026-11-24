@@ -4,7 +4,7 @@ import { openTestDatabase } from "../../../../test/db/test-database.js";
 import type { TestDatabase } from "../../../../test/db/test-database.js";
 import { createTestApp } from "../../../../test/server/app.js";
 import type { HubApp } from "../../app/index.js";
-import { addAccess } from "../index.js";
+import { addAccess, createEntitlements } from "../index.js";
 import type { ActorResolver } from "../index.js";
 
 const apps: HubApp[] = [];
@@ -19,7 +19,13 @@ const create = async (resolveActor: ActorResolver): Promise<HubApp> => {
   const test = await openTestDatabase();
   databases.push(test);
   const { app } = createTestApp();
-  addAccess(app, { db: test.db, resolveActor, features: [], publicUrl: () => "https://hub.example.com" });
+  addAccess(app, {
+    db: test.db,
+    resolveActor,
+    features: [],
+    entitlements: createEntitlements({ sources: [], now: Date.now }),
+    publicUrl: () => "https://hub.example.com",
+  });
   apps.push(app);
   return app;
 };

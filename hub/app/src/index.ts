@@ -1,8 +1,9 @@
-import { buildPgliteSeed, runHub, runMigrations } from "@micafox/hub-core";
+import { buildPgliteSeed, createFeatureRegistry, runHub, runMigrations } from "@micafox/hub-core";
 import type { RunHubProcess } from "@micafox/hub-core";
 import { fileURLToPath } from "node:url";
 
 import type { HubBuild } from "./conditions.js";
+import { EXTENSION, FEATURES } from "./features.js";
 
 // Replaced by esbuild in the build and by Vitest in tests, from package.json and EE (buildDefines in conditions.ts)
 declare const MICAFOX_HUB_VERSION: string;
@@ -22,15 +23,18 @@ const PGLITE_SEED = fileURLToPath(new URL("../pglite-seed.tar.gz", import.meta.u
 
 /** `micafox-hub start`: migrates the database, then serves the hub until SIGTERM or SIGINT. */
 export const startHub = async (proc: RunHubProcess): Promise<void> => {
-  await runHub({ ...HUB_INFO, features: [], pgliteSeed: PGLITE_SEED }, proc);
+  await runHub({ ...HUB_INFO, features: FEATURES, extension: EXTENSION, pgliteSeed: PGLITE_SEED }, proc);
 };
 
 /** `micafox-hub migrate`: runs the missing migrations and exits. */
 export const migrateHub = async (proc: RunHubProcess): Promise<void> => {
-  await runMigrations({ pgliteSeed: PGLITE_SEED }, proc);
+  await runMigrations({ features: FEATURES, extension: EXTENSION, pgliteSeed: PGLITE_SEED }, proc);
 };
 
 /** Writes the PGlite seed with every migration of this build applied; the build runs it from the bundle. */
 export const buildSeed = async (file: string): Promise<void> => {
-  await buildPgliteSeed({ file });
+  await buildPgliteSeed({
+    file,
+    packages: createFeatureRegistry(FEATURES, EXTENSION).migrations,
+  });
 };
