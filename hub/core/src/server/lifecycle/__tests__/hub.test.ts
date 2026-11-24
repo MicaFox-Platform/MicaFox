@@ -92,6 +92,35 @@ describe("createHub", () => {
     await expect(get(running.url, "/api/v1/anything")).resolves.toMatchObject({ status: 404 });
   });
 
+  it("answers 401 on the organization routes until an actor resolver is given", async () => {
+    const { hub } = create();
+    const running = await hub.start();
+    await running.ready;
+
+    const reply = await get(running.url, "/api/v1/orgs/0b6f3a52-6a3e-4e55-9d0c-6f1c1d2b8a01/projects");
+
+    expect(reply).toMatchObject({ status: 401 });
+    expect(JSON.parse(reply.body)).toMatchObject({ type: "urn:micafox:problem:unauthenticated" });
+  });
+
+  it("asks the actor resolver it was given, and answers 404 to an actor outside the organization", async () => {
+    const hub = createHub({
+      env: envOf(TEST_MODE_LINES),
+      version: "1.2.3",
+      build: "basic-hub",
+      features: [],
+      logStream: captureLog().stream,
+      actorResolver: async () => await Promise.resolve({ userId: "u1", memberships: [] }),
+    });
+    hubs.push(hub);
+    const running = await hub.start();
+    await running.ready;
+
+    const reply = await get(running.url, "/api/v1/orgs/0b6f3a52-6a3e-4e55-9d0c-6f1c1d2b8a01/projects");
+
+    expect(reply.status).toBe(404);
+  });
+
   it("answers the 503 gate with the request id and the security headers", async () => {
     const { hub } = create();
     hub.addReadinessStep("migrations", controlledStep().run);

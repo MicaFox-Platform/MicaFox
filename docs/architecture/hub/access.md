@@ -45,15 +45,26 @@ run, logging in, invites, password resets, project keys and entitlements, with t
   - **owner** — one per organization, every right; S2 cannot remove or demote the owner;
   - **admin** — members, invites, projects, environments and keys;
   - **member** — uses the features and reads the settings.
+- Names are stored in Unicode NFC and trimmed, 1 to 64 characters, without control or invisible characters (format
+  characters such as a zero-width space, line and paragraph separators), and unique within their parent whatever
+  their case: a unique index on `lower(name)`, so a taken name is 409 `conflict`.
 - Every check goes through `can(actor, action, resource)`. In S2 it knows only "admin or owner" and "member";
-  features name their actions `<feature>.<action>`, which every member may do.
+  features name their actions `<feature>.<action>`, which every member may do for the features the hub runs. Any other
+  action, such as a core action it does not list or a feature the hub does not run, is refused.
 
 ## Layout
 
 ```text
 hub/core/src/server/access/
-├── index.ts          the access plugin and can()
+├── index.ts          the access plugin: the actor of each request, 401 without one, and the routes that need it
+├── authorization/    who may do what
+│   ├── can.ts        can(actor, action, resource) for the features the hub runs, and the roles
+│   └── request-context.ts  the actor resolver, and what a route gets for an organization
 ├── tenancy/          organizations, projects, environments, memberships
+│   ├── index.ts      adds the project and environment routes
+│   ├── project-routes.ts, environment-routes.ts
+│   ├── queries.ts    the Kysely queries, paging and the 409 on a taken name
+│   └── names.ts, schemas.ts, tables.ts
 ├── setup/            the setup token and the first owner
 ├── sessions/         login, logout, the cookie, the origin check, rate limits, scrypt
 ├── invites/          invites and reset links
@@ -62,6 +73,19 @@ hub/core/src/server/access/
 ```
 
 ## Key flows
+
+### Finding the actor
+
+1. The hub is given an `ActorResolver`, which reads a request and answers the actor, a user with their memberships, or
+   nobody. Nobody is 401 `unauthenticated` before the request's schema is checked. Until [sessions](#logging-in)
+   exist the default answers nobody; tests pass a resolver of their own, never one the hub would use.
+2. A route under `/orgs/{orgId}` takes the actor's membership of that organization, or answers 404 so nothing says the
+   organization exists, and gets `db.forOrg` of it. Then `can()` decides: a member on an admin action is 403
+   `forbidden`.
+3. A route with only an id in its path, such as `/projects/{projectId}`, has no organization to look in. It tries each
+   of the actor's organizations through `db.forOrg`, in order; the first that holds the id answers, and when none does
+   it is 404. A member who may not do the action gets 403, and a bad body 400, only from the organization that holds
+   the id.
 
 ### Creating the first owner
 

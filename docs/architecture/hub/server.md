@@ -105,12 +105,13 @@ hub/core/src/server/
    `form-action 'self'` and `frame-ancestors 'none'`, so no inline scripts; `nosniff`; `Referrer-Policy: same-origin`;
    and `Strict-Transport-Security: max-age=31536000` when `MICAFOX_PUBLIC_URL` is HTTPS. `MICAFOX_TRUST_PROXY`
    decides which proxies' forwarded headers it believes.
-2. [Access](access.md#logging-in) finds the actor from the session cookie, and rejects a changing request whose
-   `Origin` is not the hub's.
+2. [Access](access.md#finding-the-actor) finds the actor through the resolver the hub is given, which reads the session
+   cookie once sessions exist, and [rejects](access.md#logging-in) a changing request whose `Origin` is not the hub's.
 3. TypeBox schemas check the path, query and body, at most 1 MiB; a failure is a 400 problem of type `validation`
    that names the first field to fail, and a bigger body is a 413 `payload-too-large`.
 4. A route under an organization checks the actor's membership, answering 404 to a non-member so nothing leaks
-   that it exists, and gets [`db.forOrg(orgId, run)`](database.md#scoping-a-query).
+   that it exists, and gets [`db.forOrg(orgId, run)`](database.md#scoping-a-query); a route with only an id in its
+   path looks in each of the actor's organizations ([finding the actor](access.md#finding-the-actor)).
 5. The response goes through its schema, which drops any field it does not list. Errors become
    `application/problem+json`; an unexpected one is a 500 of type `internal` with the request id, logged with its
    stack, never with its message in the response. A client's error, such as malformed JSON, a malformed URL or an
