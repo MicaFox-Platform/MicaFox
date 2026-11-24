@@ -62,12 +62,12 @@ Run checks only through `package.json` scripts, never retyped tool commands, so 
 - Hand-over: at most 6 lines (what changed, the changeset or why none, checks and coverage, review result, what is
   left for the user), then the ship command in one `bash` code block, and as the very last line the question
   `Ship it? Answer "yes" and I run the command above and print the PR link.`
-- The ship command is one copyable command, its steps joined with `&&` so it stops at the first failure: one
-  `git add <paths> && git commit -m "<subject>" -m "<body>"` per commit (several when the work splits into
-  logical commits), then `git push -u origin <branch>`, then
-  `gh pr create --base staging --title "<subject>" --body "<card link, what changed, how it was tested>"`. A fix to
-  an open PR ends with the push.
-- Ship only after the user's explicit OK: run exactly that command, then print the PR link.
+- The ship command is one copyable block, one command per line, each line but the last ending with `&&` so it stops
+  at the first failure: one `git add <paths> &&` and one `git commit -m "<subject>" -m "<body>" &&` per commit
+  (several when the work splits into logical commits), then `git push -u origin <branch> &&`, then
+  `gh pr create --base staging --title "<subject>" --body "<card link, what changed, how it was tested>"`, which
+  prints the PR link last. A fix to an open PR ends with the push.
+- Ship only after the user's explicit OK: run exactly that command, then print the PR link as a clickable link.
 - Never merge PRs, push to `main`/`staging` or edit `pnpm-lock.yaml` by hand.
 
 Hooks format every edited file, block git commands that break this flow and run `pnpm verify:brief` before you
