@@ -1,7 +1,7 @@
 import type { Logger } from "pino";
 
 import type { ReadinessStep } from "./readiness.js";
-import type { Clock } from "./shutdown.js";
+import type { Clock, StopHook } from "./shutdown.js";
 import { createEntitlements, ensureSetupToken } from "../access/index.js";
 import type { Entitlements } from "../access/index.js";
 import type { HubApp } from "../app/index.js";
@@ -10,6 +10,8 @@ import { connect, CORE_MIGRATIONS, createDatabase, migrate } from "../db/index.j
 import type { Database, MigrationPackage } from "../db/index.js";
 import { createFeatureRegistry, createGate } from "../feature/index.js";
 import type { Extension, Feature, FeatureRegistry, Gate } from "../feature/index.js";
+import { createJobs } from "../jobs/index.js";
+import type { Jobs } from "../jobs/index.js";
 import type { HubLogger } from "../observability/index.js";
 
 /** A step or hook was added when the hub's phase no longer allows it. */
@@ -112,6 +114,36 @@ export const createFeatureParts = (
   const registry = createFeatureRegistry(options.features, options.extension);
   const entitlements = createEntitlements({ sources: options.extension?.sources ?? [], now: clock.now });
   return { registry, entitlements, gate: createGate(registry, entitlements) };
+};
+
+/**
+ * Builds the hub's jobs and adds their stop hooks, which the hub adds first: before the drain no new run starts, and
+ * after it the running ones are aborted and end before anything they write to closes. The hub starts them once it is
+ * ready.
+ */
+export const addJobs = (
+  parts: { settings: Settings; db: Database; featureParts: FeatureParts; log: Logger; clock: Clock },
+  addStopHook: (name: string, run: () => Promise<void>, options?: { phase?: StopHook["phase"] }) => void,
+): Jobs => {
+  const jobs = createJobs({
+    db: parts.db,
+    databaseUrl: parts.settings.databaseUrl,
+    registry: parts.featureParts.registry,
+    gate: parts.featureParts.gate,
+    retentionDays: parts.settings.retentionDays,
+    log: parts.log,
+    clock: parts.clock,
+  });
+  addStopHook(
+    "jobs-halt",
+    async () => {
+      jobs.halt();
+      await Promise.resolve();
+    },
+    { phase: "before-drain" },
+  );
+  addStopHook("jobs", jobs.stop);
+  return jobs;
 };
 
 // Binds the port and returns the URL users open; in test mode it is the bound port, which may be a free one

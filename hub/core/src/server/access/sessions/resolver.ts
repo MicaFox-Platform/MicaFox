@@ -1,8 +1,9 @@
 import { cookieSettings, readSessionToken, SESSION_MAX_AGE_MS } from "./cookie.js";
 import type { SessionDependencies } from "./dependencies.js";
-import { findSession, touchSession } from "./queries.js";
+import { deleteSessionsOlderThan, findSession, touchSession } from "./queries.js";
 import type { SessionRecord } from "./queries.js";
 import { HttpProblem } from "../../app/index.js";
+import type { Database } from "../../db/index.js";
 import type { ActorResolver } from "../authorization/index.js";
 import { globalTables } from "../global-tables/index.js";
 import { hashToken } from "../tokens/index.js";
@@ -12,6 +13,13 @@ const WRITE_LAST_USE_EVERY_MS = 60_000;
 
 const isExpired = (session: SessionRecord, time: number): boolean =>
   time - session.lastUsedAt.getTime() > IDLE_LIMIT_MS || time - session.createdAt.getTime() > SESSION_MAX_AGE_MS;
+
+/** Deletes the sessions the resolver would refuse as expired; returns how many. A core job runs it every hour. */
+export const deleteExpiredSessions = async (db: Database, now: number): Promise<number> =>
+  await deleteSessionsOlderThan(globalTables(db.global), {
+    lastUsedBefore: new Date(now - IDLE_LIMIT_MS),
+    createdBefore: new Date(now - SESSION_MAX_AGE_MS),
+  });
 
 /**
  * Finds the actor of a request by its session cookie: 401 `unauthenticated` for no cookie or one the hub does not

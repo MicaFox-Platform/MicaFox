@@ -8,6 +8,7 @@ import { createShutdown } from "./shutdown.js";
 import type { Clock, StopHook, StopResult } from "./shutdown.js";
 import type { FeatureParts } from "./startup.js";
 import {
+  addJobs,
   createFeatureParts,
   createPublicUrl,
   createStart,
@@ -197,6 +198,7 @@ export const createHub = (options: HubOptions): Hub => {
   let phase: Phase = "starting";
   const lifecycle = createRegistry(() => phase, steps);
   const aborter = new AbortController();
+  const jobs = addJobs({ settings, db, featureParts, log: logger.log, clock }, lifecycle.addStopHook);
   registerHealth(app, () => phase);
   addAccess(app, accessOptionsOf({ db, options, clock, publicUrl: publicUrl.get, featureParts }));
 
@@ -204,6 +206,7 @@ export const createHub = (options: HubOptions): Hub => {
     await runReadinessSteps(lifecycle.steps, aborter.signal);
     aborter.signal.throwIfAborted();
     phase = "ready";
+    jobs.start();
     announceStarted(logger.log, options, { ...settings, publicUrl: url });
   };
 

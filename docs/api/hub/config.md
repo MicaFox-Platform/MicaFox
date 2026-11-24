@@ -29,7 +29,7 @@ final newline. A setting given both directly and as `_FILE` is a problem, and an
 | `MICAFOX_SDK_MAX_CONNECTIONS_PER_KEY`      | `500`                 | SDK connections per project key                                                               |
 | `MICAFOX_SDK_MAX_MESSAGES_PER_SECOND`      | `1000`                | messages a second per SDK connection, over 10 s                                               |
 | `MICAFOX_WRITE_QUEUE_MAX_BYTES`            | `10485760`            | rows waiting to be written; more are dropped and counted                                      |
-| `MICAFOX_RETENTION_<NAME>_DAYS`            | set by each feature   | how long a feature keeps its data, such as `MICAFOX_RETENTION_SNAPSHOTS_DAYS` (30)            |
+| `MICAFOX_RETENTION_<NAME>_DAYS`            | set by each feature   | days a feature keeps its data, e.g. `MICAFOX_RETENTION_SNAPSHOTS_DAYS` (30); `-` is `_`       |
 | `MICAFOX_DEBUGGER_SNAPSHOTS_PER_SECOND`    | `100`                 | snapshots the hub takes in per environment a second, over 10 s; more are dropped and counted  |
 | `MICAFOX_DEBUGGER_MAX_SNAPSHOTS`           | `100000`              | snapshots kept per environment; the oldest are deleted every minute                           |
 | `MICAFOX_TEST_MODE`                        | `false`               | `true` starts [test mode](#test-mode); only with a `pglite:` database                         |

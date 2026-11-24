@@ -9,7 +9,7 @@
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck && tsc -p .",
     "test": "vitest run",
-    "test:db": "vitest run hub/core/src/server/db hub/core/src/server/access/keys hub/core/src/server/lifecycle/__tests__/hub-database.test.ts",
+    "test:db": "vitest run hub/core/src/server/db hub/core/src/server/access/keys hub/core/src/server/jobs hub/core/src/server/lifecycle/__tests__/hub-database.test.ts",
     "test:build": "pnpm -r test:build",
     "test:open-core": "pnpm --filter @micafox/hub test:open-core",
     "test:pack": "bash .github/scripts/check-packs.sh",

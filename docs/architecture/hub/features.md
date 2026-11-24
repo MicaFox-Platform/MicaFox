@@ -47,8 +47,8 @@ export const debuggerFeature = defineFeature({
   server: routes, // a Fastify plugin, registered encapsulated under /api/v1/<name>
   internal: uiRoutes, // optional; UI-only routes under /api/internal/<name>, not public API
   migrations: [m0001], // migration modules in order, forward-only
-  jobs: [{ name: "expire-breakpoints", everyMs: 60_000, run: expire }],
-  retention: [{ name: "snapshots", maxAgeDays: 30, run: deleteSnapshots }],
+  jobs: [{ name: "expire-breakpoints", everyMs: 60_000, run: expire }], // run({ orgId, signal, log, forOrg })
+  retention: [{ name: "snapshots", maxAgeDays: 30, run: deleteSnapshots }], // run({ orgId, olderThan, limit, db })
   protocol: { module: "debugger", state, onMessage }, // the SDK module this feature serves
 });
 ```
@@ -60,10 +60,15 @@ export const debuggerFeature = defineFeature({
 - A feature's name is lowercase letters, digits and dashes, and not one the core uses (`projects`, `keys`, `core`, ...),
   since its routes, its `<name>.<action>` grants and its migrations package take it.
 - Jobs and retention `run` per organization: the scheduler calls them for each organization the gate lets through.
-  Their exact context comes with [jobs](server.md#jobs).
+  A job's `run({ orgId, signal, log, forOrg })` gets `forOrg(run)`, which is `db.forOrg(orgId, run)`, a `log` with the
+  job and the organization bound, and a `signal` that aborts at the run's time limit or when the hub stops: end the
+  work at the next safe point. `everyMs` is a whole number of milliseconds up to 2³¹ − 1.
 - `jobs` run under an advisory lock, one run at a time across replicas: [jobs](server.md#jobs).
 - `retention` declares how long the feature keeps its data; hub-core runs each policy as a job, and an operator
-  overrides the defaults with `MICAFOX_RETENTION_<NAME>_DAYS`.
+  overrides the defaults with `MICAFOX_RETENTION_<NAME>_DAYS`. A policy's `run({ orgId, olderThan, limit, db })`
+  deletes at most `limit` rows of the organization older than `olderThan` through `db`, a `db.system` transaction
+  that sees every organization's rows, so it filters by `orgId`, and returns how many it deleted; the runner calls it
+  again while a batch deletes `limit` rows: [keeping data within bounds](database.md#keeping-data-within-bounds).
 - `protocol` is how the feature serves its SDK module: `state(session)` returns the messages that bring an
   instance up to date, sent after `welcome` and on every resend; `onMessage(session, message)` handles a message of
   the module: [SDK endpoint](sdk-endpoint.md#routing-a-message).

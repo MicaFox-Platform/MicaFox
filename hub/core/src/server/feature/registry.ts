@@ -137,11 +137,16 @@ const checkFeatureName = (checker: Checker, name: string): void => {
 
 const isPositiveInteger = (value: number): boolean => Number.isInteger(value) && value > 0;
 
+// A timer fires at once for a longer delay, which would run the job in a loop
+const MAX_TIMER_MS = 2_147_483_647;
+
 const checkJobs = (checker: Checker, feature: Feature): void => {
   for (const job of feature.jobs ?? []) {
     claimName(checker, { kind: "job", name: job.name }, feature.name);
-    if (!isPositiveInteger(job.everyMs)) {
-      checker.problems.push(`The job "${job.name}" of "${feature.name}" needs a whole number of milliseconds above 0`);
+    if (!isPositiveInteger(job.everyMs) || job.everyMs > MAX_TIMER_MS) {
+      checker.problems.push(
+        `The job "${job.name}" of "${feature.name}" needs a whole number of milliseconds from 1 to ${String(MAX_TIMER_MS)}`,
+      );
     }
   }
 };

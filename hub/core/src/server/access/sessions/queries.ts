@@ -74,6 +74,20 @@ export const deleteSession = async (db: Db, tokenHash: string): Promise<void> =>
   await db.deleteFrom("sessions").where("tokenHash", "=", tokenHash).execute();
 };
 
+/** Deletes the sessions last used before `lastUsedBefore` or begun before `createdBefore`; returns how many. */
+export const deleteSessionsOlderThan = async (
+  db: Db,
+  limits: { lastUsedBefore: Date; createdBefore: Date },
+): Promise<number> => {
+  const result = await db
+    .deleteFrom("sessions")
+    .where((where) =>
+      where.or([where("lastUsedAt", "<", limits.lastUsedBefore), where("createdAt", "<", limits.createdBefore)]),
+    )
+    .executeTakeFirst();
+  return Number(result.numDeletedRows);
+};
+
 /** Ends the user's sessions, except the one with `keepTokenHash`. */
 export const deleteSessionsOf = async (db: Db, userId: string, keepTokenHash?: string): Promise<void> => {
   let query = db.deleteFrom("sessions").where("userId", "=", userId);
