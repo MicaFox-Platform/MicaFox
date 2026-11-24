@@ -15,8 +15,15 @@ export interface Database {
   forOrg: <T>(orgId: string, run: (db: Transaction<HubTables>) => Promise<T>) => Promise<T>;
   /** The global tables, without an organization; only `access/` and `db/` use it (ESLint). */
   global: Kysely<HubTables>;
-  /** Runs `run` in a transaction that sees every organization's rows, and logs `reason`; for jobs such as retention. */
-  system: <T>(reason: string, run: (db: Transaction<HubTables>) => Promise<T>) => Promise<T>;
+  /**
+   * Runs `run` in a transaction that sees every organization's rows, and logs `reason`, at `info` unless `logLevel`
+   * says `debug` for work that repeats often and logs its own summary; for jobs such as retention.
+   */
+  system: <T>(
+    reason: string,
+    run: (db: Transaction<HubTables>) => Promise<T>,
+    options?: { logLevel?: "info" | "debug" },
+  ) => Promise<T>;
   /** Closes the pool, or PGlite; the hub calls it last when it stops. */
   close: () => Promise<void>;
 }
@@ -83,8 +90,8 @@ export const createScopes = (kysely: Kysely<HubTables>, log: Logger): Database =
       return await runScoped({ "micafox.org_id": orgId }, run);
     },
     global: kysely.withPlugin(rejectInsideScope(scopes)),
-    system: async (reason, run) => {
-      log.info({ reason }, "db.system");
+    system: async (reason, run, options = {}) => {
+      log[options.logLevel ?? "info"]({ reason }, "db.system");
       return await runScoped({ "micafox.system": "on" }, run);
     },
     close: async () => {

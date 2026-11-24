@@ -53,9 +53,9 @@ hub/core/src/server/
 ├── config/           the settings' schema, *_FILE values, the start-up report of problems
 ├── observability/    the pino logger with redaction, Prometheus metrics
 ├── events/           the event bus and the SSE events stream
-├── jobs/             the scheduler, advisory locks, the retention runner
+├── jobs/             the scheduler, advisory locks, run counts, core jobs, feature jobs per organization, retention
 ├── lifecycle/        createHub(), readiness steps, the start-up parts it wires (database, public URL, setup token,
-│                     features, listening), /healthz and /readyz, stop hooks, shutdown, runHub(),
+│                     features, jobs, listening), /healthz and /readyz, stop hooks, shutdown, runHub(),
 │                     runMigrations() for micafox-hub migrate
 ├── feature/          the feature contract, its registry, routes and entitlement gate: features.md
 ├── sdk-endpoint/     the SDK's WebSocket: sdk-endpoint.md
@@ -151,13 +151,26 @@ Paths, errors and pagination: [HTTP API](../../api/hub/http.md). Why:
 
 ### Jobs
 
-1. Each job of hub-core or a feature runs every `everyMs`. At each tick the scheduler takes
-   `pg_try_advisory_lock` for the job on a connection of its own and skips the run when another holds it.
-2. A run is limited to its interval, 10 minutes at most; the next one starts after it ends. Failures are logged and
-   counted.
-3. Core jobs: delete expired sessions, invites and reset links every hour; write the last use of project keys and
-   the last seen time of online [instances](sdk-endpoint.md#keeping-instances) every minute; delete instances
-   offline for 7 days every hour; run each feature's retention policy every hour, per organization, in batches.
+1. Each job of hub-core or a feature runs every `everyMs`, first when the hub is ready. At each tick the scheduler
+   takes `pg_try_advisory_lock(hashtextextended('micafox.job.<name>', 0))` for the job on a connection of its own and
+   skips the run when another holds it. The lock lives with that connection, which keepalives on both ends watch, so
+   a replica that crashes or is lost frees it within about a minute, and a connection that is lost aborts the run. On PGlite, which has one session and no other replica, there
+   is nothing to lock against.
+2. A run is limited to its interval, 10 minutes at most: at the limit its `signal` aborts and the run is counted as
+   a timeout; the next one starts after it ends, at once when it ran past its interval. A run that fails is logged
+   with the job and counted, and the scheduler keeps running. The counts, by job and result (`ok`, `failed`,
+   `skipped`, `timeout`), are the jobs metric.
+3. A feature's job runs once for each organization the [gate](features.md#extension) lets through, one at
+   a time; an organization that fails is logged with its id, the next one still runs, and the run is counted as
+   failed.
+4. Core jobs: delete expired sessions every hour (7 days without use, 30 days at most); delete invites and reset
+   links every hour; write the last use of project keys and the last seen time of online
+   [instances](sdk-endpoint.md#keeping-instances) every minute; delete instances offline for 7 days every hour; run
+   each feature's retention policy every hour, per organization, in batches. Core jobs are named `core.<name>`, and
+   a retention policy's job `retention.<name>`. The jobs of keys, instances and the debugger come with their own
+   components.
+5. When the stop begins, before the drain, no new run starts; after the drain the running ones are aborted
+   through their `signal` and get up to 10 s to end: see [stopping](#stopping).
 
 ### Logging
 

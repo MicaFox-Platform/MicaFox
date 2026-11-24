@@ -5,7 +5,8 @@ import type { PageRequest } from "./schemas.js";
 import type { EnvironmentsTable, ProjectsTable, TenancyTables } from "./tables.js";
 import { DEFAULT_PAGE_LIMIT } from "../../../schema/index.js";
 import { HttpProblem } from "../../app/index.js";
-import type { HubTables } from "../../db/index.js";
+import type { Database, HubTables } from "../../db/index.js";
+import { globalTables } from "../global-tables/index.js";
 
 /** A project as the API answers it. */
 export interface Project {
@@ -186,3 +187,9 @@ export const renameEnvironment = async (trx: Transaction<HubTables>, id: string,
       .returningAll()
       .executeTakeFirstOrThrow(),
   );
+
+/** The id of every organization, for the jobs that run once per organization. */
+export const listOrgIds = async (db: Database): Promise<string[]> => {
+  const rows = await globalTables(db.global).selectFrom("orgs").select("id").orderBy("id").execute();
+  return rows.map((row) => row.id);
+};

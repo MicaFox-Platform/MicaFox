@@ -145,8 +145,14 @@ Why Kysely and per-package migrations:
 ### Keeping data within bounds
 
 Every feature declares its [retention](features.md#server-part); hub-core runs each policy every hour, per
-organization, and operators change the defaults with `MICAFOX_RETENTION_<NAME>_DAYS`. Expired sessions, invites
-and links are deleted by a core job.
+organization, and operators change the defaults with `MICAFOX_RETENTION_<NAME>_DAYS` (a dash in the policy's name is
+an underscore there). Expired sessions, invites and links are deleted by a core job.
+
+1. The runner calls the policy with `olderThan` (now minus the days), `limit` (1000 rows) and a `db.system`
+   transaction, one transaction per batch, so locks are held only briefly and the rows go away a batch at a time.
+2. It calls again while a batch deleted `limit` rows, and stops between two batches when the hub stops or the run
+   reaches its limit; what is left goes at the next hour.
+3. A setting that no policy reads is logged as a warning at start.
 
 ## Decisions
 

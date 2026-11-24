@@ -152,6 +152,14 @@ describe("db.system", () => {
     expect(seen).toEqual(["a1", "b1"]);
     expect(log.lines()).toContainEqual(expect.objectContaining({ level: 30, msg: "db.system", reason: "retention" }));
   });
+
+  it("logs its reason at debug when asked, for work that repeats often", async () => {
+    const { db, log } = await withNotesOfTwoOrgs();
+
+    await db.system("retention", async (trx) => await bodiesSeenBy(trx), { logLevel: "debug" });
+
+    expect(log.lines()).toContainEqual(expect.objectContaining({ level: 20, msg: "db.system", reason: "retention" }));
+  });
 });
 
 describe("a call to db inside a scoped callback", () => {

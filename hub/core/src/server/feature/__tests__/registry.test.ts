@@ -19,12 +19,10 @@ const job = (name: string): { name: string; everyMs: number; run: () => Promise<
     await Promise.resolve();
   },
 });
-const retention = (name: string): { name: string; maxAgeDays: number; run: () => Promise<void> } => ({
+const retention = (name: string): { name: string; maxAgeDays: number; run: () => Promise<number> } => ({
   name,
   maxAgeDays: 30,
-  run: async () => {
-    await Promise.resolve();
-  },
+  run: async () => await Promise.resolve(0),
 });
 const protocol = (module: string): { module: string; state: () => Promise<[]>; onMessage: () => Promise<void> } => ({
   module,
@@ -124,9 +122,20 @@ describe("createFeatureRegistry", () => {
       ),
     ).toThrow(
       withProblems([
-        'The job "expire" of "debugger" needs a whole number of milliseconds above 0',
+        'The job "expire" of "debugger" needs a whole number of milliseconds from 1 to 2147483647',
         'The retention policy "snapshots" of "debugger" needs a whole number of days above 0',
       ]),
+    );
+  });
+
+  it("refuses a job whose interval no timer can wait", () => {
+    expect(() =>
+      createFeatureRegistry(
+        [emptyFeature("debugger", { jobs: [{ ...job("expire"), everyMs: 2_147_483_648 }] })],
+        undefined,
+      ),
+    ).toThrow(
+      withProblems(['The job "expire" of "debugger" needs a whole number of milliseconds from 1 to 2147483647']),
     );
   });
 

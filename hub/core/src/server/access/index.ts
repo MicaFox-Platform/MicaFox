@@ -19,8 +19,10 @@ export type { Actor, ActorResolver, Authorization, OrgContext } from "./authoriz
 export { createEntitlements } from "./entitlements/index.js";
 export type { EntitlementSource, Entitlements, OrgEntitlements } from "./entitlements/index.js";
 export type { KeyRevokedListener, KeyScope } from "./keys/index.js";
+export { deleteExpiredSessions } from "./sessions/index.js";
 export { ensureSetupToken } from "./setup/index.js";
 export type { SetupTokenOptions } from "./setup/index.js";
+export { listOrgIds } from "./tenancy/index.js";
 
 /** What access needs from the hub. */
 export interface AccessOptions {

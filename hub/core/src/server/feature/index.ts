@@ -7,7 +7,9 @@ export type {
   FeatureAccess,
   FeatureJob,
   FeatureRoutes,
+  JobContext,
   ProtocolModule,
+  RetentionContext,
   RetentionPolicy,
   SdkSession,
 } from "./contract.js";
