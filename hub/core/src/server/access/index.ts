@@ -1,5 +1,7 @@
 import { createCan } from "./authorization/index.js";
 import type { ActorResolver } from "./authorization/index.js";
+import { addKeyRoutes, createKeyLookup, createRevokeHooks } from "./keys/index.js";
+import type { KeyRevokedListener, KeyScope } from "./keys/index.js";
 import { createPasswordHasher } from "./password/index.js";
 import { addLoginRoute, addOriginCheck, addSessionRoutes, createSessionResolver } from "./sessions/index.js";
 import type { SessionDependencies } from "./sessions/index.js";
@@ -11,6 +13,7 @@ import type { HubApp } from "../app/index.js";
 import type { Database } from "../db/index.js";
 
 export type { Actor, ActorResolver } from "./authorization/index.js";
+export type { KeyRevokedListener, KeyScope } from "./keys/index.js";
 export { ensureSetupToken } from "./setup/index.js";
 export type { SetupTokenOptions } from "./setup/index.js";
 
@@ -27,13 +30,21 @@ export interface AccessOptions {
   now?: () => number;
 }
 
+/** What the rest of the hub uses of access. */
+export interface Access {
+  /** Finds the active project key `token` is, by its hash only; a revoked or unknown token gives `undefined`. */
+  lookupKey: (token: string) => Promise<KeyScope | undefined>;
+  /** Runs `listener` after each key revoke commits, as the SDK endpoint closes the key's sessions. */
+  onKeyRevoked: (listener: KeyRevokedListener) => void;
+}
+
 /**
  * Adds the routes of access. The origin check covers all of them; the setup and the login are open to a caller
  * who is not logged in, and every other route gets its actor first: without one a request is 401 before its schema
  * is checked, so a caller who is not logged in learns nothing from a 400. They come in plugins so the hooks cover
  * them alone: `/healthz`, `/readyz` and the OpenAPI document need no actor.
  */
-export const addAccess = (app: HubApp, options: AccessOptions): void => {
+export const addAccess = (app: HubApp, options: AccessOptions): Access => {
   const now = options.now ?? Date.now;
   const deps: SessionDependencies = {
     db: options.db,
@@ -44,6 +55,7 @@ export const addAccess = (app: HubApp, options: AccessOptions): void => {
   };
   const resolveActor = options.resolveActor ?? createSessionResolver(deps);
   const authorization = { db: options.db, can: createCan(options.features) };
+  const keyHooks = createRevokeHooks();
 
   void app.register((scope: HubApp, _options, done) => {
     addPerIpLimit(scope);
@@ -64,8 +76,10 @@ export const addAccess = (app: HubApp, options: AccessOptions): void => {
       });
       addSessionRoutes(actorScope, deps);
       addTenancyRoutes(actorScope, authorization);
+      addKeyRoutes(actorScope, { authorization, publicUrl: options.publicUrl, hooks: keyHooks });
       actorDone();
     });
     done();
   });
+  return { lookupKey: createKeyLookup(options.db), onKeyRevoked: keyHooks.add };
 };

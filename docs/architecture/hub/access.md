@@ -81,7 +81,11 @@ hub/core/src/server/access/
 ├── tokens/           createToken and hashToken: opaque prefixed tokens (ADR 0030)
 ├── global-tables/    the Kysely types of the tables without an organization: users, sessions, credentials
 ├── invites/          invites and reset links
-├── keys/             project keys: create, list, revoke, look up, last use
+├── keys/             project keys: create, list, revoke, look up
+│   ├── index.ts      the key lookup, and what the access plugin uses
+│   ├── key-routes.ts  list, create and revoke
+│   ├── revoke-hooks.ts  the listeners that run after a revoke
+│   └── queries.ts, schemas.ts, tables.ts
 └── entitlements/     the gate entitlements(orgId), over the sources ee/hub registers
 ```
 
@@ -158,9 +162,13 @@ hub/core/src/server/access/
    The hub stores its SHA-256, its first 12 characters to show, a name, who created it, when, and its last use.
 2. An environment has up to 5 active keys, so a key is rotated by adding the new one, deploying it and revoking the
    old one ([ADR 0006](../../adr/sdk/connector/0006-authenticate-to-the-hub-with-a-bearer-token.md)).
-3. Revoking a key drops it from every cache and closes its SDK sessions with 1008.
-4. The SDK endpoint finds a key only by its hash, which gives the organization, project and environment. Token
-   formats: [ADR 0030](../../adr/hub/access/0030-use-opaque-prefixed-tokens-stored-as-hashes.md).
+3. Revoking a key drops it from every cache and closes its SDK sessions with 1008: access runs the listeners added
+   with `onKeyRevoked` once the revoke is committed, and the SDK endpoint adds the one that closes the sessions. A
+   listener that fails is logged and never fails the request. Creating and revoking are `info` security events,
+   `key.created` and `key.revoked`, with the key's prefix and never its token.
+4. The SDK endpoint finds a key only by its hash, with `lookupKey(token)`, which gives its organization, project and
+   environment, and nothing for a revoked or unknown token. The ids sit on the key's row, so the lookup needs no
+   organization scope. Token formats: [ADR 0030](../../adr/hub/access/0030-use-opaque-prefixed-tokens-stored-as-hashes.md).
 
 ### Checking entitlements
 

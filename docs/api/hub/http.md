@@ -82,11 +82,17 @@ the caller does not belong to is 404, as if it did not exist; a member who tries
 
 ### Project keys
 
-- `GET /api/v1/environments/{environmentId}/keys` — `{ id, name, prefix, createdBy, createdAt, lastUsedAt }`
-  for each active key (admins).
-- `POST /api/v1/environments/{environmentId}/keys` — `{ name }` answers the key once, as `token`, with `hubUrl`;
-  409 `conflict` at 5 active keys (admins).
-- `DELETE /api/v1/keys/{keyId}` — revokes the key and closes its SDK connections (admins).
+- `GET /api/v1/environments/{environmentId}/keys` — one page, oldest first and without `limit` or `cursor`, of
+  `{ id, name, prefix, createdBy, createdAt, lastUsedAt }` for each active key (admins); never the token.
+- `POST /api/v1/environments/{environmentId}/keys` — `{ name }` answers 201 with the key and, once, its `token`
+  (`mfx_pk_` and 43 characters) for `MICAFOX_TOKEN` and the `hubUrl` for `MICAFOX_HUB_URL`: `wss://<hub>/sdk`, or
+  `ws://` when the hub runs on plain HTTP; 409 `conflict` at 5 active keys (admins).
+- `DELETE /api/v1/keys/{keyId}` — revokes the key and closes its SDK connections; answers 204 (admins).
+
+`name` follows the rules of project names. `prefix` is the first 12 characters of the token, `createdBy` the id of the
+user who made the key, or `null` once that user is gone, and `lastUsedAt` is `null` until an app connects. A revoked
+key is gone from the list, and revoking it again is 404, as is a key or environment of an organization the caller
+does not belong to; a member gets 403 `forbidden` on all three routes.
 
 ### Members and invites
 

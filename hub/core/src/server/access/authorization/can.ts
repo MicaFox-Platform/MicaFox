@@ -31,6 +31,9 @@ const CORE_ACTIONS: ReadonlyMap<string, Level> = new Map<string, Level>([
   ["environment.read", "member"],
   ["environment.create", "admin"],
   ["environment.update", "admin"],
+  ["key.read", "admin"],
+  ["key.create", "admin"],
+  ["key.revoke", "admin"],
 ]);
 
 const FEATURE_ACTION = /^([a-z][a-z0-9-]*)\.[a-z][a-z0-9.-]*$/;

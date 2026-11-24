@@ -10,3 +10,5 @@ export const addTenancyRoutes = (app: HubApp, authorization: Authorization): voi
 };
 
 export { normalizeName } from "./names.js";
+
+export { environmentParams, nameBody } from "./schemas.js";
