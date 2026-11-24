@@ -7,6 +7,7 @@ import { globalTables } from "../global-tables/index.js";
 import { cookieSettings, insertSession, requireUser, sessionReply, setSessionCookie } from "../sessions/index.js";
 import type { SessionDependencies } from "../sessions/index.js";
 import { normalizeName } from "../tenancy/index.js";
+import { PER_IP_LIMIT } from "../throttle/index.js";
 import { hashToken } from "../tokens/index.js";
 
 const setupBody = Type.Object({
@@ -24,16 +25,12 @@ const setupBody = Type.Object({
 export const addSetupRoute = (app: HubApp, deps: SessionDependencies): void => {
   app.post(
     "/api/v1/setup",
-    { schema: { body: setupBody, response: { 201: sessionReply } } },
+    // The token is guessed at like a password, so the route has the same limit per IP as the login
+    { schema: { body: setupBody, response: { 201: sessionReply } }, config: { rateLimit: PER_IP_LIMIT } },
     async (request, reply) => {
       const db = globalTables(deps.db.global);
       if (await hasOwner(db)) {
         throw new HttpProblem("not-found");
-      }
-      // Wrong tokens count with logins: the setup is guessed at like a password
-      const waitSeconds = deps.throttle.countAttempt(request.ip);
-      if (waitSeconds !== undefined) {
-        throw new HttpProblem("rate-limited", {}, waitSeconds);
       }
       const { body } = request;
       const tokenHash = hashToken(body.token);

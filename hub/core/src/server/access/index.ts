@@ -5,7 +5,7 @@ import { addLoginRoute, addOriginCheck, addSessionRoutes, createSessionResolver 
 import type { SessionDependencies } from "./sessions/index.js";
 import { addSetupRoute } from "./setup/index.js";
 import { addTenancyRoutes } from "./tenancy/index.js";
-import { createLoginThrottle } from "./throttle/index.js";
+import { addPerIpLimit, createEmailBackoff } from "./throttle/index.js";
 import { HttpProblem } from "../app/index.js";
 import type { HubApp } from "../app/index.js";
 import type { Database } from "../db/index.js";
@@ -38,7 +38,7 @@ export const addAccess = (app: HubApp, options: AccessOptions): void => {
   const deps: SessionDependencies = {
     db: options.db,
     passwords: createPasswordHasher(),
-    throttle: createLoginThrottle(now),
+    emailBackoff: createEmailBackoff(now),
     publicUrl: options.publicUrl,
     now,
   };
@@ -46,6 +46,7 @@ export const addAccess = (app: HubApp, options: AccessOptions): void => {
   const authorization = { db: options.db, can: createCan(options.features) };
 
   void app.register((scope: HubApp, _options, done) => {
+    addPerIpLimit(scope);
     addOriginCheck(scope, deps);
     void scope.register((open: HubApp, _openOptions, openDone) => {
       addSetupRoute(open, deps);

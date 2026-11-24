@@ -16,6 +16,7 @@ import { loginBody, noContent, passwordBody, sessionReply } from "./schemas.js";
 import { HttpProblem } from "../../app/index.js";
 import type { HubApp } from "../../app/index.js";
 import { globalTables } from "../global-tables/index.js";
+import { PER_IP_LIMIT } from "../throttle/index.js";
 import { hashToken } from "../tokens/index.js";
 
 // A session whose user is gone, such as a test's actor, has nothing to show: it is as good as logged out
@@ -37,7 +38,7 @@ const currentTokenHash = (deps: SessionDependencies, request: FastifyRequest): s
 export const addLoginRoute = (app: HubApp, deps: SessionDependencies): void => {
   app.post(
     "/api/v1/session",
-    { schema: { body: loginBody, response: { 200: sessionReply } } },
+    { schema: { body: loginBody, response: { 200: sessionReply } }, config: { rateLimit: PER_IP_LIMIT } },
     async (request, reply) => {
       const user = await authenticate(deps, { ...request.body, ip: request.ip, log: request.log });
       const token = await insertSession(globalTables(deps.db.global), user.id);
@@ -51,7 +52,7 @@ export const addLoginRoute = (app: HubApp, deps: SessionDependencies): void => {
 const addPasswordRoute = (app: HubApp, deps: SessionDependencies): void => {
   app.put(
     "/api/v1/me/password",
-    { schema: { body: passwordBody, response: { 204: noContent } } },
+    { schema: { body: passwordBody, response: { 204: noContent } }, config: { rateLimit: PER_IP_LIMIT } },
     async (request, reply) => {
       const { userId } = request.actor;
       const { currentPassword, newPassword } = request.body;
@@ -60,14 +61,14 @@ const addPasswordRoute = (app: HubApp, deps: SessionDependencies): void => {
       if (user === undefined) {
         throw new HttpProblem("unauthenticated");
       }
-      refuseWhenThrottled(deps, request.ip, user.email);
+      refuseWhenThrottled(deps, user.email);
       // A failure until the check says otherwise, as at login
-      deps.throttle.recordFailure(user.email);
+      deps.emailBackoff.recordFailure(user.email);
       const check = await deps.passwords.check(currentPassword, user.passwordHash);
       if (!check.matches) {
         throw new HttpProblem("invalid-credentials");
       }
-      deps.throttle.recordSuccess(user.email);
+      deps.emailBackoff.recordSuccess(user.email);
       const passwordHash = await deps.passwords.hash(newPassword);
       await db.transaction().execute(async (trx) => {
         await setPasswordHash(trx, userId, passwordHash);

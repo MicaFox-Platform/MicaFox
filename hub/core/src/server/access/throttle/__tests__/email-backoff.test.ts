@@ -1,67 +1,30 @@
 import { describe, expect, it } from "vitest";
 
-import { createLoginThrottle } from "../index.js";
+import { createEmailBackoff } from "../email-backoff.js";
 
 const MINUTE = 60_000;
 
-const create = (): { throttle: ReturnType<typeof createLoginThrottle>; advance: (ms: number) => void } => {
+const create = (): { throttle: ReturnType<typeof createEmailBackoff>; advance: (ms: number) => void } => {
   let time = 1_000_000;
   return {
-    throttle: createLoginThrottle(() => time),
+    throttle: createEmailBackoff(() => time),
     advance: (ms) => {
       time += ms;
     },
   };
 };
 
-const failTimes = (throttle: ReturnType<typeof createLoginThrottle>, email: string, times: number): void => {
+const failTimes = (throttle: ReturnType<typeof createEmailBackoff>, email: string, times: number): void => {
   for (let count = 0; count < times; count += 1) {
     throttle.recordFailure(email);
   }
 };
 
-describe("countAttempt", () => {
-  it("lets 100 attempts of an IP through in 10 minutes and refuses the 101st with the time left", () => {
-    const { throttle, advance } = create();
-    for (let count = 0; count < 100; count += 1) {
-      throttle.countAttempt("203.0.113.5");
-    }
-    advance(4 * MINUTE);
-
-    expect(throttle.countAttempt("203.0.113.5")).toBe(6 * 60);
-  });
-
-  it("counts each IP on its own", () => {
-    const { throttle } = create();
-    for (let count = 0; count < 101; count += 1) {
-      throttle.countAttempt("203.0.113.5");
-    }
-
-    expect(throttle.countAttempt("203.0.113.6")).toBeUndefined();
-  });
-
-  it("starts a new window once the 10 minutes are over", () => {
-    const { throttle, advance } = create();
-    for (let count = 0; count < 101; count += 1) {
-      throttle.countAttempt("203.0.113.5");
-    }
-    advance(10 * MINUTE);
-
-    expect(throttle.countAttempt("203.0.113.5")).toBeUndefined();
-  });
-
-  it("forgets the least recently used IP when it holds 10000", () => {
-    const { throttle } = create();
-    for (let count = 0; count < 101; count += 1) {
-      throttle.countAttempt("first");
-    }
-    for (let ip = 0; ip < 10_000; ip += 1) {
-      throttle.countAttempt(`ip-${String(ip)}`);
-    }
-
-    expect(throttle.countAttempt("first")).toBeUndefined();
-  });
-});
+const failOnceEach = (throttle: ReturnType<typeof createEmailBackoff>, emails: number): void => {
+  for (let index = 0; index < emails; index += 1) {
+    throttle.recordFailure(`user${String(index)}@acme.dev`);
+  }
+};
 
 describe("waitFor", () => {
   it("does not wait for an email with fewer than 5 failures", () => {
@@ -101,6 +64,14 @@ describe("waitFor", () => {
     failTimes(throttle, "Ann@Acme.dev ", 5);
 
     expect(throttle.waitFor("ann@acme.dev")).toBe(1);
+  });
+
+  it("forgets the least recently failed email when it holds 10000", () => {
+    const { throttle } = create();
+    failTimes(throttle, "first@acme.dev", 5);
+    failOnceEach(throttle, 10_000);
+
+    expect(throttle.waitFor("first@acme.dev")).toBeUndefined();
   });
 
   it("clears the failures of an email after a success", () => {

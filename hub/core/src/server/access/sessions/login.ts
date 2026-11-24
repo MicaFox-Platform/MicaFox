@@ -14,9 +14,9 @@ export interface LoginAttempt {
   log: FastifyBaseLogger;
 }
 
-/** 429 `rate-limited` with `Retry-After` when the IP made too many attempts or the email too many failures. */
-export const refuseWhenThrottled = (deps: Pick<SessionDependencies, "throttle">, ip: string, email: string): void => {
-  const waitSeconds = deps.throttle.countAttempt(ip) ?? deps.throttle.waitFor(email);
+/** 429 `rate-limited` with `Retry-After` while the email waits after too many failures; the IP's limit is the route's. */
+export const refuseWhenThrottled = (deps: Pick<SessionDependencies, "emailBackoff">, email: string): void => {
+  const waitSeconds = deps.emailBackoff.waitFor(email);
   if (waitSeconds !== undefined) {
     throw new HttpProblem("rate-limited", {}, waitSeconds);
   }
@@ -28,10 +28,10 @@ export const refuseWhenThrottled = (deps: Pick<SessionDependencies, "throttle">,
  */
 export const authenticate = async (deps: SessionDependencies, attempt: LoginAttempt): Promise<UserRecord> => {
   const { ip, email, password, log } = attempt;
-  refuseWhenThrottled(deps, ip, email);
+  refuseWhenThrottled(deps, email);
   // Counted as a failure before the check and cleared on success: parallel guesses must not all pass the throttle
   // while the first ones wait for scrypt
-  deps.throttle.recordFailure(email);
+  deps.emailBackoff.recordFailure(email);
   const db = globalTables(deps.db.global);
   const user = await findUserByEmail(db, email);
   const check = await deps.passwords.check(password, user?.passwordHash);
@@ -39,7 +39,7 @@ export const authenticate = async (deps: SessionDependencies, attempt: LoginAtte
     log.info({ event: "auth.login-failed", ip, userId: user?.id }, "A login failed");
     throw new HttpProblem("invalid-credentials");
   }
-  deps.throttle.recordSuccess(email);
+  deps.emailBackoff.recordSuccess(email);
   if (check.needsRehash) {
     await setPasswordHash(db, user.id, await deps.passwords.hash(password));
   }

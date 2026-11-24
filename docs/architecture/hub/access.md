@@ -56,7 +56,7 @@ run, logging in, invites, password resets, project keys and entitlements, with t
 
 ```text
 hub/core/src/server/access/
-├── index.ts          the access plugin: the origin check, the open setup and login, and the actor of every other route
+├── index.ts          the access plugin: the origin check, the open setup and login, the actor of other routes
 ├── authorization/    who may do what
 │   ├── can.ts        can(actor, action, resource) for the features the hub runs, and the roles
 │   └── request-context.ts  the actor resolver, and what a route gets for an organization
@@ -77,7 +77,7 @@ hub/core/src/server/access/
 │   ├── login.ts      the throttle, scrypt, the same 401 for every failure
 │   └── session-routes.ts, schemas.ts, queries.ts, dependencies.ts
 ├── password/         scrypt hashes, at most 4 at once, and the hash that replaces a weaker one
-├── throttle/         attempts per IP and failures per email, in memory
+├── throttle/         the limit per IP of the routes that check a secret, and the backoff per email
 ├── tokens/           createToken and hashToken: opaque prefixed tokens (ADR 0030)
 ├── global-tables/    the Kysely types of the tables without an organization: users, sessions, credentials
 ├── invites/          invites and reset links
@@ -106,7 +106,8 @@ hub/core/src/server/access/
 1. While no owner exists, each start creates a setup token, `mfx_setup_…`, stores its hash and prints it once with
    the URL of `/setup`; `MICAFOX_SETUP_TOKEN` gives one instead, for automation.
 2. `/setup` asks for the token, the organization's name and the owner's name, email and password. A wrong token is
-   403 and counts toward the login rate limit. A token the operator gave in `MICAFOX_SETUP_TOKEN` is never printed.
+   403, and the route has the same limit per IP as the login. A token the operator gave in `MICAFOX_SETUP_TOKEN` is
+   never printed.
 3. Setup creates the organization, the owner and a session, deletes the token, and `/api/v1/setup` answers 404 from
    then on. Nobody else can claim a fresh hub, because the token is only in its log.
 4. In [test mode](server.md#running-in-test-mode) the owner and a project are seeded instead, and no setup token
@@ -114,11 +115,16 @@ hub/core/src/server/access/
 
 ### Logging in
 
-1. `POST /api/v1/session` with email and password. Each IP gets 100 attempts in 10 minutes, setup attempts included;
-   after 5 failures for one email, an attempt that comes before the wait is over is refused at once with 429 and
-   `Retry-After`: 1 s after the 5th failure, doubling with each one, up to a minute. An unknown email is counted like
-   a known one, and a failure is forgotten after an hour without another. The counters live in each replica's memory,
-   at most 10,000 IPs and 10,000 emails each, the least recently used dropped first.
+1. `POST /api/v1/session` with email and password. Each route that checks a secret (setup, login, password change)
+   lets an IP make 100 attempts in 10 minutes, each route on its own, through `@fastify/rate-limit`
+   ([ADR 0040](../../adr/hub/access/0040-limit-attempts-per-ip-with-fastify-rate-limit.md)); it counts every
+   request to the route, a malformed one too, after the origin check and, for the password change, after the actor.
+   An IPv6 address counts with its /64. After 5 failures for one email, an attempt that comes before the wait is
+   over is refused at once with 429 and `Retry-After`: 1 s after the 5th failure, doubling with each one, up to a
+   minute. An attempt counts as a failure until its password is checked, so parallel guesses cannot all pass; an
+   unknown email is counted like a known one, and a failure is forgotten after an hour without another. The counters
+   live in each replica's memory, at most 10,000 IPs per route and 10,000 emails, the least recently used dropped
+   first.
 2. scrypt checks the password (N = 2¹⁵, r = 8, p = 3, at most 4 at once); an unknown email costs the same time, and
    both answer 401 `invalid-credentials`. A hash with weaker parameters is replaced on success.
 3. A session is 32 random bytes in the cookie and their SHA-256 in `sessions`, valid for 7 days without use and 30
@@ -187,4 +193,5 @@ Snapshots hold app data, so the hub guards who reads them and who can claim the 
 - [0024. Gate paid features by entitlements on the server](../../adr/hub/access/0024-gate-paid-features-by-entitlements-on-the-server.md)
 - [0029. Keep UI sessions in Postgres behind a cookie](../../adr/hub/access/0029-keep-ui-sessions-in-postgres-behind-a-cookie.md)
 - [0030. Use opaque prefixed tokens stored as hashes](../../adr/hub/access/0030-use-opaque-prefixed-tokens-stored-as-hashes.md)
+- [0040. Limit attempts per IP with @fastify/rate-limit](../../adr/hub/access/0040-limit-attempts-per-ip-with-fastify-rate-limit.md)
 - [0028. Isolate organizations with row-level security](../../adr/hub/database/0028-isolate-organizations-with-row-level-security.md)
