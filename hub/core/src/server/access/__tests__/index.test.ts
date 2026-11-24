@@ -4,18 +4,22 @@ import { openTestDatabase } from "../../../../test/db/test-database.js";
 import type { TestDatabase } from "../../../../test/db/test-database.js";
 import { createTestApp } from "../../../../test/server/app.js";
 import type { HubApp } from "../../app/index.js";
-import { addAccess, resolveNobody } from "../index.js";
+import { addAccess } from "../index.js";
 import type { ActorResolver } from "../index.js";
 
 const apps: HubApp[] = [];
 const databases: TestDatabase[] = [];
 
 // The database connects on its first query, which these routes never make: they stop at the actor
+const resolveNobody: ActorResolver = async () => {
+  await Promise.resolve();
+};
+
 const create = async (resolveActor: ActorResolver): Promise<HubApp> => {
   const test = await openTestDatabase();
   databases.push(test);
   const { app } = createTestApp();
-  addAccess(app, { db: test.db, resolveActor, features: [] });
+  addAccess(app, { db: test.db, resolveActor, features: [], publicUrl: () => "https://hub.example.com" });
   apps.push(app);
   return app;
 };

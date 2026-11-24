@@ -22,7 +22,7 @@ final newline. A setting given both directly and as `_FILE` is a problem, and an
 | `MICAFOX_LOG_LEVEL`                        | `info`                | `debug`, `info`, `warn` or `error`                                                            |
 | `MICAFOX_LOG_FORMAT`                       | `json`                | `json`, or `pretty` for development                                                           |
 | `MICAFOX_METRICS_PORT`                     | off                   | a port for Prometheus metrics, apart from the API                                             |
-| `MICAFOX_SETUP_TOKEN` (`_FILE`)            | a random one, logged  | the setup token for the first owner, for automation                                           |
+| `MICAFOX_SETUP_TOKEN` (`_FILE`)            | a random one, logged  | the setup token for the first owner, for automation; one given here is never logged           |
 | `MICAFOX_SOURCE_URL`                       | this version's source | where the UI's Source link points; set it when you run a modified hub                         |
 | `MICAFOX_SDK_MAX_FRAME_BYTES`              | `1048576`             | largest frame from the SDK; raise it with the SDK's `buffer.maxBytes`                         |
 | `MICAFOX_SDK_MAX_CONNECTIONS`              | `1000`                | SDK connections per hub                                                                       |

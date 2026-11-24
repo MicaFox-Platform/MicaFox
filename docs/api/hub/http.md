@@ -46,15 +46,22 @@ Conventions:
 ### Setup
 
 `POST /api/v1/setup` — `{ token, orgName, name, email, password }` creates the organization, its owner and a
-session. 403 `forbidden` for a wrong token; 404 once an owner exists. Passwords are 12 to 256 characters.
+session: 201 with the body of `GET /api/v1/session` and the session cookie. 403 `forbidden` for a wrong token, which
+counts toward the login rate limit; 404 once an owner exists. Passwords are 12 to 256 characters.
 
 ### Session
 
-- `POST /api/v1/session` — `{ email, password }` logs in and sets the cookie; 401 `invalid-credentials`, 429
-  `rate-limited`.
+- `POST /api/v1/session` — `{ email, password }` logs in, sets the cookie and answers 200 with the body of
+  `GET /api/v1/session`; 401 `invalid-credentials`, 429 `rate-limited` with `Retry-After` in seconds: 100 attempts per
+  IP in 10 minutes, and a wait of 1 s doubling to 60 s after 5 failures for one email.
 - `GET /api/v1/session` — `{ user: { id, name, email }, memberships: [{ orgId, orgName, role }] }`.
-- `DELETE /api/v1/session` — logs out; `DELETE /api/v1/sessions` — logs out everywhere.
-- `PUT /api/v1/me/password` — `{ currentPassword, newPassword }`; ends every other session.
+- `DELETE /api/v1/session` — logs out; `DELETE /api/v1/sessions` — logs out everywhere. Both answer 204 and clear
+  the cookie.
+- `PUT /api/v1/me/password` — `{ currentPassword, newPassword }`; answers 204 and ends every other session; 401
+  `invalid-credentials` for a wrong current password.
+
+The cookie is `__Host-micafox_session`, or `micafox_session` without `Secure` on `http://localhost`; a session ends
+after 7 days without use or 30 days in all, and an expired one is 401 `session-expired`.
 
 ### Projects and environments
 

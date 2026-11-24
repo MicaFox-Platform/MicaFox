@@ -9,6 +9,8 @@ export class HttpProblem extends Error {
   constructor(
     readonly problem: ProblemName,
     readonly details: ProblemDetails = {},
+    /** Seconds for the `Retry-After` header of a `rate-limited` answer. */
+    readonly retryAfterSeconds?: number,
   ) {
     super(details.detail ?? PROBLEMS[problem].title);
     this.name = "HttpProblem";

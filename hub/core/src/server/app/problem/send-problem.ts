@@ -3,6 +3,7 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import { createProblem, PROBLEMS } from "./catalog.js";
 import type { ProblemDetails, ProblemName } from "./catalog.js";
 import { classifyError } from "./classify-error.js";
+import { HttpProblem } from "./http-problem.js";
 
 /** Answers the request with the problem `name`, its status and the request id. */
 export const sendProblem = (reply: FastifyReply, name: ProblemName, details?: ProblemDetails): FastifyReply =>
@@ -19,6 +20,9 @@ export const handleError = (error: unknown, request: FastifyRequest, reply: Fast
   const answer = classifyError(error);
   if (answer.name === "internal") {
     request.log.error({ err: error }, "request.failed");
+  }
+  if (error instanceof HttpProblem && error.retryAfterSeconds !== undefined) {
+    void reply.header("retry-after", String(error.retryAfterSeconds));
   }
   return sendProblem(reply, answer.name, answer.details);
 };

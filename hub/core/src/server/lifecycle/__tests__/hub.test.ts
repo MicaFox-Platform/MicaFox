@@ -1,9 +1,11 @@
+import { sql } from "kysely";
 import net from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { envOf, TEST_MODE_LINES } from "../../../../test/server/env.js";
 import { get } from "../../../../test/server/http.js";
 import { captureLog } from "../../../../test/server/log-capture.js";
+import { hashToken } from "../../access/tokens/index.js";
 import { ConfigError } from "../../config/index.js";
 import { createHub, HubStateError, ReadinessError } from "../index.js";
 import type { Hub } from "../index.js";
@@ -92,7 +94,7 @@ describe("createHub", () => {
     await expect(get(running.url, "/api/v1/anything")).resolves.toMatchObject({ status: 404 });
   });
 
-  it("answers 401 on the organization routes until an actor resolver is given", async () => {
+  it("answers 401 on the organization routes to a request without a session cookie", async () => {
     const { hub } = create();
     const running = await hub.start();
     await running.ready;
@@ -101,6 +103,62 @@ describe("createHub", () => {
 
     expect(reply).toMatchObject({ status: 401 });
     expect(JSON.parse(reply.body)).toMatchObject({ type: "urn:micafox:problem:unauthenticated" });
+  });
+
+  describe("the setup token", () => {
+    const FRESH_HUB = [
+      "MICAFOX_DATABASE_URL=pglite:memory",
+      "MICAFOX_HOST=127.0.0.1",
+      "MICAFOX_PORT=0",
+      "MICAFOX_PUBLIC_URL=http://localhost:8080",
+    ];
+
+    const storedHashes = async (hub: Hub): Promise<string[]> => {
+      const result = await hub.db.system("test: read the setup token", async (trx) => {
+        return await sql<{ hash: string }>`select token_hash as hash from credentials where kind = 'setup'`.execute(
+          trx,
+        );
+      });
+      return result.rows.map((row) => row.hash);
+    };
+
+    it("is made before the hub is ready on a hub with no owner, and logged once with the setup URL", async () => {
+      const { hub, log } = create(FRESH_HUB);
+
+      await (
+        await hub.start()
+      ).ready;
+
+      const token = /mfx_setup_[\w-]{43}/.exec(log.text())?.[0] ?? "";
+      expect([
+        await storedHashes(hub),
+        log.text().split(token).length - 1,
+        log.text().includes("http://localhost:8080/setup"),
+      ]).toEqual([[hashToken(token)], 1, true]);
+    });
+
+    it("is MICAFOX_SETUP_TOKEN when it is set, and that is never logged", async () => {
+      const { hub, log } = create([...FRESH_HUB, "MICAFOX_SETUP_TOKEN=automation-token"]);
+
+      await (
+        await hub.start()
+      ).ready;
+
+      expect([await storedHashes(hub), log.text().includes("automation-token")]).toEqual([
+        [hashToken("automation-token")],
+        false,
+      ]);
+    });
+
+    it("is not made in test mode", async () => {
+      const { hub, log } = create();
+
+      await (
+        await hub.start()
+      ).ready;
+
+      expect([await storedHashes(hub), log.text().includes("mfx_setup_")]).toEqual([[], false]);
+    });
   });
 
   it("asks the actor resolver it was given, and answers 404 to an actor outside the organization", async () => {

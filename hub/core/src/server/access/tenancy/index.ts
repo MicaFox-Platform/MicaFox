@@ -8,3 +8,5 @@ export const addTenancyRoutes = (app: HubApp, authorization: Authorization): voi
   addProjectRoutes(app, authorization);
   addEnvironmentRoutes(app, authorization);
 };
+
+export { normalizeName } from "./names.js";

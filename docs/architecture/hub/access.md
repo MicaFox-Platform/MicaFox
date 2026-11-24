@@ -56,7 +56,7 @@ run, logging in, invites, password resets, project keys and entitlements, with t
 
 ```text
 hub/core/src/server/access/
-├── index.ts          the access plugin: the actor of each request, 401 without one, and the routes that need it
+├── index.ts          the access plugin: the origin check, the open setup and login, and the actor of every other route
 ├── authorization/    who may do what
 │   ├── can.ts        can(actor, action, resource) for the features the hub runs, and the roles
 │   └── request-context.ts  the actor resolver, and what a route gets for an organization
@@ -66,7 +66,20 @@ hub/core/src/server/access/
 │   ├── queries.ts    the Kysely queries, paging and the 409 on a taken name
 │   └── names.ts, schemas.ts, tables.ts
 ├── setup/            the setup token and the first owner
-├── sessions/         login, logout, the cookie, the origin check, rate limits, scrypt
+│   ├── index.ts      exports the start-up step and the route
+│   ├── setup-token.ts  makes the token of a start, stores its hash and logs it once
+│   ├── setup-route.ts  POST /api/v1/setup
+│   └── queries.ts    the owner check, the token's hash and claiming the hub in one transaction
+├── sessions/         login, logout, the cookie, the origin check
+│   ├── index.ts      what the access plugin and setup use
+│   ├── cookie.ts     the cookie's name and attributes, reading it, and the origin check
+│   ├── resolver.ts   the actor of a request from its cookie: 7 and 30 days, the last use
+│   ├── login.ts      the throttle, scrypt, the same 401 for every failure
+│   └── session-routes.ts, schemas.ts, queries.ts, dependencies.ts
+├── password/         scrypt hashes, at most 4 at once, and the hash that replaces a weaker one
+├── throttle/         attempts per IP and failures per email, in memory
+├── tokens/           createToken and hashToken: opaque prefixed tokens (ADR 0030)
+├── global-tables/    the Kysely types of the tables without an organization: users, sessions, credentials
 ├── invites/          invites and reset links
 ├── keys/             project keys: create, list, revoke, look up, last use
 └── entitlements/     the gate entitlements(orgId), over the sources ee/hub registers
@@ -77,8 +90,9 @@ hub/core/src/server/access/
 ### Finding the actor
 
 1. The hub is given an `ActorResolver`, which reads a request and answers the actor, a user with their memberships, or
-   nobody. Nobody is 401 `unauthenticated` before the request's schema is checked. Until [sessions](#logging-in)
-   exist the default answers nobody; tests pass a resolver of their own, never one the hub would use.
+   nobody. Nobody is 401 `unauthenticated` before the request's schema is checked. The hub's own reads the
+   [session cookie](#logging-in); tests pass a resolver of their own, never one the hub would use. Only the setup
+   and the login are open to nobody.
 2. A route under `/orgs/{orgId}` takes the actor's membership of that organization, or answers 404 so nothing says the
    organization exists, and gets `db.forOrg` of it. Then `can()` decides: a member on an admin action is 403
    `forbidden`.
@@ -92,7 +106,7 @@ hub/core/src/server/access/
 1. While no owner exists, each start creates a setup token, `mfx_setup_…`, stores its hash and prints it once with
    the URL of `/setup`; `MICAFOX_SETUP_TOKEN` gives one instead, for automation.
 2. `/setup` asks for the token, the organization's name and the owner's name, email and password. A wrong token is
-   403 and counts toward the login rate limit.
+   403 and counts toward the login rate limit. A token the operator gave in `MICAFOX_SETUP_TOKEN` is never printed.
 3. Setup creates the organization, the owner and a session, deletes the token, and `/api/v1/setup` answers 404 from
    then on. Nobody else can claim a fresh hub, because the token is only in its log.
 4. In [test mode](server.md#running-in-test-mode) the owner and a project are seeded instead, and no setup token
@@ -100,8 +114,11 @@ hub/core/src/server/access/
 
 ### Logging in
 
-1. `POST /api/v1/session` with email and password. Each IP gets 100 attempts in 10 minutes; after 5 failures for one
-   email, each next attempt waits longer, up to a minute. The counters live in each replica's memory.
+1. `POST /api/v1/session` with email and password. Each IP gets 100 attempts in 10 minutes, setup attempts included;
+   after 5 failures for one email, an attempt that comes before the wait is over is refused at once with 429 and
+   `Retry-After`: 1 s after the 5th failure, doubling with each one, up to a minute. An unknown email is counted like
+   a known one, and a failure is forgotten after an hour without another. The counters live in each replica's memory,
+   at most 10,000 IPs and 10,000 emails each, the least recently used dropped first.
 2. scrypt checks the password (N = 2¹⁵, r = 8, p = 3, at most 4 at once); an unknown email costs the same time, and
    both answer 401 `invalid-credentials`. A hash with weaker parameters is replaced on success.
 3. A session is 32 random bytes in the cookie and their SHA-256 in `sessions`, valid for 7 days without use and 30
