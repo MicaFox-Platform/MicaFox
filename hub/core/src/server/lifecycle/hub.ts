@@ -6,8 +6,8 @@ import { runReadinessSteps } from "./readiness.js";
 import type { ReadinessStep } from "./readiness.js";
 import { createShutdown } from "./shutdown.js";
 import type { Clock, StopHook, StopResult } from "./shutdown.js";
-import { addAccess, resolveNobody } from "../access/index.js";
-import type { ActorResolver } from "../access/index.js";
+import { addAccess, ensureSetupToken } from "../access/index.js";
+import type { AccessOptions, ActorResolver } from "../access/index.js";
 import { createApp } from "../app/index.js";
 import type { AppOptions, HubApp } from "../app/index.js";
 import type { Settings } from "../config/index.js";
@@ -26,7 +26,7 @@ export interface HubOptions {
   /** The migrated `.tar.gz` a `pglite:memory` or a new `pglite:<folder>` starts from. */
   pgliteSeed?: string;
   logStream: NodeJS.WritableStream;
-  /** Finds who makes a request; without it nobody is logged in, until sessions exist. */
+  /** Finds who makes a request; without it the actor comes from the session cookie. Tests give their own. */
   actorResolver?: ActorResolver;
   /** Reads a `*_FILE` setting's file; the default refuses a file over 64 KiB. */
   readFile?: (path: string) => string;
@@ -161,6 +161,46 @@ export const openDatabase = (
   };
 };
 
+// The URL users open: given by the settings, or in test mode known once the port is bound. The origin check and the
+// cookie ask for it at each request, so a request that comes before it is known is a bug.
+const createPublicUrl = (initial: string | undefined): { get: () => string; set: (url: string) => void } => {
+  let url = initial;
+  return {
+    get: () => {
+      if (url === undefined) {
+        throw new HubStateError("The public URL is known once the hub listens");
+      }
+      return url;
+    },
+    set: (value) => {
+      url = value;
+    },
+  };
+};
+
+// The readiness step that makes the setup token; test mode seeds its owner instead, so no token exists there
+const setupTokenSteps = (parts: {
+  settings: Settings;
+  db: Database;
+  log: Logger;
+  publicUrl: () => string;
+}): ReadinessStep[] =>
+  parts.settings.testMode
+    ? []
+    : [
+        {
+          name: "setup-token",
+          run: async () => {
+            await ensureSetupToken({
+              db: parts.db,
+              log: parts.log,
+              publicUrl: parts.publicUrl,
+              configuredToken: parts.settings.setupToken,
+            });
+          },
+        },
+      ];
+
 // One stop however often it is called; a second call returns the first one's result
 const createStop = (parts: {
   app: HubApp;
@@ -190,23 +230,37 @@ const appSettingsOf = (settings: Settings): Pick<AppOptions, "trustProxy" | "pub
   publicUrl: settings.publicUrl,
 });
 
+const loggerOf = (settings: Settings, options: HubOptions, clock: Clock): HubLogger =>
+  createLogger({ level: settings.logLevel, format: settings.logFormat, stream: options.logStream, timers: clock });
+
+// A resolver the app gives replaces the session cookie's
+const accessOptionsOf = (parts: {
+  db: Database;
+  options: HubOptions;
+  clock: Clock;
+  publicUrl: () => string;
+}): AccessOptions => ({
+  db: parts.db,
+  features: parts.options.features,
+  publicUrl: parts.publicUrl,
+  now: parts.clock.now,
+  ...(parts.options.actorResolver === undefined ? {} : { resolveActor: parts.options.actorResolver }),
+});
+
 /** Checks every setting and builds the hub; throws a `ConfigError` with all problems when any is not valid. */
 export const createHub = (options: HubOptions): Hub => {
   const settings = loadSettings({ env: options.env, readFile: options.readFile ?? readSecretFile });
   const clock = options.clock ?? createSystemClock();
-  const logger = createLogger({
-    level: settings.logLevel,
-    format: settings.logFormat,
-    stream: options.logStream,
-    timers: clock,
-  });
+  const logger = loggerOf(settings, options, clock);
   const app = createApp({ ...appSettingsOf(settings), logger: logger.log, version: options.version });
   const { db, steps } = openDatabase(settings, logger, { pgliteSeed: options.pgliteSeed, timers: clock });
+  const publicUrl = createPublicUrl(settings.publicUrl);
+  steps.push(...setupTokenSteps({ settings, db, log: logger.log, publicUrl: publicUrl.get }));
   let phase: Phase = "starting";
   const registry = createRegistry(() => phase, steps);
   const aborter = new AbortController();
   registerHealth(app, () => phase);
-  addAccess(app, { db, resolveActor: options.actorResolver ?? resolveNobody, features: options.features });
+  addAccess(app, accessOptionsOf({ db, options, clock, publicUrl: publicUrl.get }));
 
   const becomeReady = async (url: string): Promise<void> => {
     await runReadinessSteps(registry.steps, aborter.signal);
@@ -218,6 +272,7 @@ export const createHub = (options: HubOptions): Hub => {
   const start: Hub["start"] = async () => {
     registry.sealSteps();
     const url = await listen(app, settings);
+    publicUrl.set(url);
     const ready = becomeReady(url);
     // A caller that never awaits `ready` must not turn a failed step into an unhandled rejection
     ready.catch(() => undefined);

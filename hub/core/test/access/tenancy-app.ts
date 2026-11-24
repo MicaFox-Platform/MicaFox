@@ -66,7 +66,12 @@ export const openTenancyApp = async (): Promise<TenancyApp> => {
     await sql`insert into orgs (id, name) values (${ORG_A}, 'Acme'), (${ORG_B}, 'Globex')`.execute(trx);
   });
   const { app } = createTestApp();
-  addAccess(app, { db: test.db, resolveActor: resolveTestActor, features: ["debugger"] });
+  addAccess(app, {
+    db: test.db,
+    resolveActor: resolveTestActor,
+    features: ["debugger"],
+    publicUrl: () => "https://hub.example.com",
+  });
   await app.ready();
 
   const send = async (

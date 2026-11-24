@@ -95,6 +95,7 @@ writing one: [`.claude/rules/adr.md`](../../.claude/rules/adr.md).
 - [0024. Gate paid features by entitlements on the server](hub/access/0024-gate-paid-features-by-entitlements-on-the-server.md)
 - [0029. Keep UI sessions in Postgres behind a cookie](hub/access/0029-keep-ui-sessions-in-postgres-behind-a-cookie.md)
 - [0030. Use opaque prefixed tokens stored as hashes](hub/access/0030-use-opaque-prefixed-tokens-stored-as-hashes.md)
+- [0040. Limit attempts per IP with @fastify/rate-limit](hub/access/0040-limit-attempts-per-ip-with-fastify-rate-limit.md)
 
 ## Hub: web
 
