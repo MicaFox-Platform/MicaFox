@@ -1,12 +1,13 @@
 import { sql } from "kysely";
 
 import { addAccess } from "../../src/server/access/index.js";
-import type { Actor, ActorResolver } from "../../src/server/access/index.js";
+import type { Access, Actor, ActorResolver } from "../../src/server/access/index.js";
 import type { HubApp } from "../../src/server/app/index.js";
 import { CORE_MIGRATIONS, migrate } from "../../src/server/db/index.js";
 import { openTestDatabase, ORG_A, ORG_B } from "../db/test-database.js";
 import type { TestDatabase } from "../db/test-database.js";
 import { createTestApp } from "../server/app.js";
+import type { LogCapture } from "../server/log-capture.js";
 
 /** Who the tests act as: each is a user of the organizations named. */
 export const ACTORS = {
@@ -37,10 +38,15 @@ export interface Reply {
 export interface TenancyApp {
   app: HubApp;
   test: TestDatabase;
+  /** What the hub uses of access: the key lookup and the revoke hooks. */
+  access: Access;
+  log: LogCapture;
   /** A request as `name`, or as nobody logged in; the body is JSON. */
   get: (name: ActorName | undefined, url: string) => Promise<Reply>;
   post: (name: ActorName | undefined, url: string, body: Record<string, unknown>) => Promise<Reply>;
   patch: (name: ActorName | undefined, url: string, body: Record<string, unknown>) => Promise<Reply>;
+  /** A `DELETE`; an answer without a body has an empty `body`. */
+  delete: (name: ActorName | undefined, url: string) => Promise<Reply>;
   close: () => Promise<void>;
 }
 
@@ -55,7 +61,7 @@ const resolveTestActor: ActorResolver = async (request) => {
 };
 
 /** Opens the test database, migrates it, adds the two organizations and the access plugin to an app. */
-export const openTenancyApp = async (): Promise<TenancyApp> => {
+export const openTenancyApp = async (options: { publicUrl?: string } = {}): Promise<TenancyApp> => {
   const test = await openTestDatabase();
   await migrate(
     test.db,
@@ -65,28 +71,31 @@ export const openTenancyApp = async (): Promise<TenancyApp> => {
   await test.db.system("test: add the organizations", async (trx) => {
     await sql`insert into orgs (id, name) values (${ORG_A}, 'Acme'), (${ORG_B}, 'Globex')`.execute(trx);
   });
-  const { app } = createTestApp();
-  addAccess(app, {
+  const { app, log } = createTestApp();
+  const access = addAccess(app, {
     db: test.db,
     resolveActor: resolveTestActor,
     features: ["debugger"],
-    publicUrl: () => "https://hub.example.com",
+    publicUrl: () => options.publicUrl ?? "https://hub.example.com",
   });
   await app.ready();
 
   const send = async (
     name: ActorName | undefined,
-    request: { method: "GET" | "POST" | "PATCH"; url: string; payload?: Record<string, unknown> },
+    request: { method: "GET" | "POST" | "PATCH" | "DELETE"; url: string; payload?: Record<string, unknown> },
   ): Promise<Reply> => {
     const response = await app.inject({ ...request, headers: name === undefined ? {} : { [ACTOR_HEADER]: name } });
-    return { status: response.statusCode, body: response.json<Record<string, unknown>>() };
+    return { status: response.statusCode, body: response.body === "" ? {} : response.json<Record<string, unknown>>() };
   };
   return {
     app,
     test,
+    access,
+    log,
     get: async (name, url) => await send(name, { method: "GET", url }),
     post: async (name, url, payload) => await send(name, { method: "POST", url, payload }),
     patch: async (name, url, payload) => await send(name, { method: "PATCH", url, payload }),
+    delete: async (name, url) => await send(name, { method: "DELETE", url }),
     close: async () => {
       await app.close();
       await test.close();

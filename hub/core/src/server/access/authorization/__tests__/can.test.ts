@@ -35,7 +35,7 @@ describe("can", () => {
     expect(can(actorWith("owner"), "debugger.breakpoint.create", { orgId: OTHER_ORG })).toBe(false);
   });
 
-  it.each(["project.delete", "projects.create", "key.create", "member.invite"])(
+  it.each(["project.delete", "projects.create", "key.delete", "member.invite"])(
     "refuses %s to a member: it is neither a core action nor of a feature the hub runs",
     (action) => {
       expect(can(actorWith("member"), action, { orgId: ORG })).toBe(false);
