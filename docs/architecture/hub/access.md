@@ -87,6 +87,9 @@ hub/core/src/server/access/
 │   ├── revoke-hooks.ts  the listeners that run after a revoke
 │   └── queries.ts, schemas.ts, tables.ts
 └── entitlements/     the gate entitlements(orgId), over the sources ee/hub registers
+    ├── index.ts      what the hub and the feature gate use
+    ├── entitlements.ts  the union of the sources, cached 60 s per organization, at most 10,000
+    └── entitlement-routes.ts  GET /api/v1/orgs/{orgId}/entitlements
 ```
 
 ## Key flows
@@ -172,11 +175,12 @@ hub/core/src/server/access/
 
 ### Checking entitlements
 
-1. `entitlements(orgId).has(name)` answers from the sources the hub runs with, cached for 60 s. S2 has none, so it
-   answers no; Cloud subscriptions (S5) and offline licence keys (S7) add sources. Core features never ask.
+1. `entitlements(orgId).has(name)` answers from the sources the extension registers, cached for 60 s per
+   organization, the oldest dropped past 10,000; a failing source is not cached and fails the question. S2 has none,
+   so it answers no; Cloud subscriptions (S5) and offline licence keys (S7) add sources. Core features never ask.
 2. A licence key is a JSON payload with `kid`, features, seats and `expiresAt`, signed with ed25519 and checked
    offline against public keys built into the image. When it expires, its features turn off and their data stays.
-3. `GET /api/v1/orgs/{orgId}/entitlements` tells the web app what to show. A change publishes
+3. `GET /api/v1/orgs/{orgId}/entitlements` (any member; `entitlement.read`) tells the web app what to show. A change publishes
    `entitlements.changed` and closes the organization's SDK sessions with 1001. Why:
    [ADR 0024](../../adr/hub/access/0024-gate-paid-features-by-entitlements-on-the-server.md).
 

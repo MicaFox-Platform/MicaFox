@@ -1,7 +1,7 @@
 import type { InjectOptions, LightMyRequestResponse } from "fastify";
 import { sql } from "kysely";
 
-import { addAccess } from "../../src/server/access/index.js";
+import { addAccess, createEntitlements } from "../../src/server/access/index.js";
 import { createPasswordHasher } from "../../src/server/access/password/index.js";
 import type { HubApp } from "../../src/server/app/index.js";
 import { CORE_MIGRATIONS, migrate } from "../../src/server/db/index.js";
@@ -76,7 +76,12 @@ export const openSessionApp = async (options: SessionAppOptions = {}): Promise<S
     await seed(test);
   }
   const { app, log } = createTestApp({ publicUrl });
-  addAccess(app, { db: test.db, features: ["debugger"], publicUrl: () => publicUrl });
+  addAccess(app, {
+    db: test.db,
+    features: ["debugger"],
+    entitlements: createEntitlements({ sources: [], now: Date.now }),
+    publicUrl: () => publicUrl,
+  });
   await app.ready();
 
   const send: SessionApp["send"] = async (request) =>

@@ -53,8 +53,14 @@ export const debuggerFeature = defineFeature({
 });
 ```
 
-- `server` and `internal` get a request context with the actor, the organization and a
-  [scoped database](database.md#scoping-a-query), and publish [events](server.md#events).
+- `server` and `internal` are plugins `(app, access)` registered inside the scope that has the actor, so a request
+  is 401 before it reaches them. `access` is `inOrganization(request, orgId)`, `inOwningOrg(request, run)` and
+  `requireCan(context, action)`, the core's own helpers: the context they give holds the actor, the membership and a
+  [scoped database](database.md#scoping-a-query). Features publish [events](server.md#events).
+- A feature's name is lowercase letters, digits and dashes, and not one the core uses (`projects`, `keys`, `core`, ...),
+  since its routes, its `<name>.<action>` grants and its migrations package take it.
+- Jobs and retention `run` per organization: the scheduler calls them for each organization the gate lets through.
+  Their exact context comes with [jobs](server.md#jobs).
 - `jobs` run under an advisory lock, one run at a time across replicas: [jobs](server.md#jobs).
 - `retention` declares how long the feature keeps its data; hub-core runs each policy as a job, and an operator
   overrides the defaults with `MICAFOX_RETENTION_<NAME>_DAYS`.
@@ -83,19 +89,32 @@ export const debuggerWeb = defineWebFeature({
 
 ### Extension
 
-`defineExtension({ features })` and `defineWebExtension({ features })` take features of the same shape, each with an
-`entitlement`. hub-core checks `entitlements(orgId).has(entitlement)` in front of every part of them: routes answer
-403 with the problem type `entitlement-required`, jobs skip organizations without it, the SDK module is left out of
-`welcome`, and the web part is hidden or shows an "Upgrade" placeholder. Core features have no entitlement and are
-always on. Why the server decides:
+`defineExtension({ features, sources? })` and `defineWebExtension({ features })` take features of the same shape,
+each with an `entitlement`. `sources` are the extension's entitlement sources, `(orgId) => Promise<ReadonlySet<string>>`;
+S2 has none, so every answer is no. hub-core checks `entitlements(orgId).has(entitlement)` in front of every part of
+them, through the gate (`gate.isEntitled(orgId, feature)`, `gate.isModuleEntitled(orgId, module)`):
+
+- routes answer 403 with the problem type `entitlement-required`: a route with `orgId` in its path is refused before
+  its body is read, and any other asks inside `access.inOrganization` and `access.inOwningOrg`; a non-member is 404
+  first, so nothing says the organization exists. `inOwningOrg` asks for each of the actor's organizations before
+  any transaction, and refuses inside the transaction of the organization that holds the id, which rolls back what
+  the route did there; a route must not act outside that transaction before it returns;
+- jobs and retention skip organizations without it, and the SDK module is left out of `welcome`: the scheduler and
+  the SDK endpoint ask the gate, with the registry's jobs and modules tagged by feature;
+- the web part is hidden or shows an "Upgrade" placeholder.
+
+Core features have no entitlement and are always on: the gate answers yes without asking a source. A source that
+fails fails the question, so a request is 500 and a job fails; a paid part never runs on a doubt. Why the server decides:
 [ADR 0024](../../adr/hub/access/0024-gate-paid-features-by-entitlements-on-the-server.md).
 
 ## Layout
 
 ```text
 hub/core/src/server/feature/
-├── index.ts          defineFeature, defineExtension and their types
+├── index.ts          the entry: what the rest of the server imports
+├── contract.ts       defineFeature, defineExtension and their types
 ├── registry.ts       checks the features at start and orders their parts
+├── routes.ts         registers each feature's server and internal routes, encapsulated, behind the gate
 └── gate.ts           the entitlement gate for extension parts
 hub/core/src/web/feature/
 ├── index.ts          defineWebFeature, defineWebExtension and their types
@@ -121,11 +140,14 @@ ee/
 ### Registering features
 
 1. `createHub()` gets the server features in their order and the extension, from [the app](app.md).
-2. The registry checks them: unique names, each SDK module served by one feature, unique migration, job and retention names.
-   A failed check stops the start with exit code 1 and names the parts in conflict.
+2. The registry checks them: unique names that are valid and not the core's, each SDK module served by one feature,
+   unique job and retention names, no migration name twice in a feature, and an entitlement on each extension
+   feature and on no other. A failed check stops the start, and `micafox-hub migrate`, with exit code 1 and one line
+   per problem naming the parts in conflict.
 3. It hands the migrations to the [migrator](database.md#migrating) in order (core, the features, the extension),
-   registers each feature's routes as an encapsulated Fastify plugin, the jobs and retention policies with the
-   scheduler, and the protocol modules with the [SDK endpoint](sdk-endpoint.md).
+   each feature as its own package named after it, registers each feature's routes as an encapsulated Fastify
+   plugin, and lists the jobs, retention policies and protocol modules, tagged with their feature, for the
+   scheduler and the [SDK endpoint](sdk-endpoint.md): the hub hands them out as `hub.registry`, with `hub.gate`.
 4. In the browser, `compose.ts` builds the navigation, the route tree and the slots from the web features and the
    web extension.
 
