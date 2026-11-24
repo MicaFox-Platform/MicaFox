@@ -171,16 +171,17 @@ describe("db.global", { timeout: 60_000 }, () => {
     "hub/core/src/server/db/index.ts",
     "hub/core/src/server/db/__tests__/scope.test.ts",
     "hub/core/test/db/test-database.ts",
+    "hub/core/src/server/access/index.ts",
   ])("is allowed in %s", async (file) => {
     const messages = await lintCode(file, READ_GLOBAL, "no-restricted-syntax");
 
     expect(messages).toEqual([]);
   });
 
-  // Files that do not exist yet: access/ and ee/ are designed, not written
+  // Files the resolved config covers by folder, whether or not they exist yet
   it.each([
     "hub/core/src/server/db/migrator/index.ts",
-    "hub/core/src/server/access/index.ts",
+    "hub/core/src/server/access/sessions/index.ts",
     "hub/core/test/db/fixture.ts",
   ])("is allowed in %s by the resolved config", async (file) => {
     await expect(syntaxBansOf(file)).resolves.not.toContain(GLOBAL_SELECTOR);

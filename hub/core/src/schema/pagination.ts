@@ -1,7 +1,8 @@
 import { Type } from "typebox";
 import type { TArray, TInteger, TObject, TOptional, TSchema, TString } from "typebox";
 
-const DEFAULT_PAGE_LIMIT = 50;
+/** The `limit` of a list that names none. */
+export const DEFAULT_PAGE_LIMIT = 50;
 const MAX_PAGE_LIMIT = 200;
 // Cursors are opaque to clients; this bounds what one can make the hub parse
 const MAX_CURSOR_LENGTH = 512;

@@ -6,6 +6,8 @@ import { runReadinessSteps } from "./readiness.js";
 import type { ReadinessStep } from "./readiness.js";
 import { createShutdown } from "./shutdown.js";
 import type { Clock, StopHook, StopResult } from "./shutdown.js";
+import { addAccess, resolveNobody } from "../access/index.js";
+import type { ActorResolver } from "../access/index.js";
 import { createApp } from "../app/index.js";
 import type { AppOptions, HubApp } from "../app/index.js";
 import type { Settings } from "../config/index.js";
@@ -24,6 +26,8 @@ export interface HubOptions {
   /** The migrated `.tar.gz` a `pglite:memory` or a new `pglite:<folder>` starts from. */
   pgliteSeed?: string;
   logStream: NodeJS.WritableStream;
+  /** Finds who makes a request; without it nobody is logged in, until sessions exist. */
+  actorResolver?: ActorResolver;
   /** Reads a `*_FILE` setting's file; the default refuses a file over 64 KiB. */
   readFile?: (path: string) => string;
   clock?: Clock;
@@ -202,6 +206,7 @@ export const createHub = (options: HubOptions): Hub => {
   const registry = createRegistry(() => phase, steps);
   const aborter = new AbortController();
   registerHealth(app, () => phase);
+  addAccess(app, { db, resolveActor: options.actorResolver ?? resolveNobody, features: options.features });
 
   const becomeReady = async (url: string): Promise<void> => {
     await runReadinessSteps(registry.steps, aborter.signal);

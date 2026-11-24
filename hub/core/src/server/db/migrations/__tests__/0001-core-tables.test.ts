@@ -3,7 +3,12 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { openTestDatabase } from "../../../../../test/db/test-database.js";
 import type { TestDatabase } from "../../../../../test/db/test-database.js";
-import { CORE_MIGRATIONS, migrate } from "../../index.js";
+import { migrate } from "../../index.js";
+import type { MigrationPackage } from "../../index.js";
+import * as m0001 from "../0001-core-tables.js";
+
+// Only this migration, so what later ones add does not change what it is tested for
+const FIRST_MIGRATION: MigrationPackage = { name: "core", migrations: [m0001] };
 
 const opened: TestDatabase[] = [];
 
@@ -20,7 +25,7 @@ const migrated = async (): Promise<TestDatabase> => {
   opened.push(test);
   await migrate(
     test.db,
-    { url: test.ownerUrl ?? test.url, packages: [CORE_MIGRATIONS], log: test.logger },
+    { url: test.ownerUrl ?? test.url, packages: [FIRST_MIGRATION], log: test.logger },
     new AbortController().signal,
   );
   return test;

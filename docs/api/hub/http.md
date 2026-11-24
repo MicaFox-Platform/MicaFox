@@ -63,7 +63,12 @@ session. 403 `forbidden` for a wrong token; 404 once an owner exists. Passwords 
 - `GET`, `POST /api/v1/projects/{projectId}/environments` — list; create `{ name }` (admins).
 - `PATCH /api/v1/environments/{environmentId}` — rename `{ name }` (admins).
 
-Names are unique within their parent; a taken one is 409 `conflict`.
+A project is `{ id, orgId, name, createdAt }` and an environment `{ id, projectId, name, createdAt }`; a create answers
+201 and a rename 200 with it, and lists are pages ordered by name. Names are stored in Unicode NFC and trimmed, 1 to
+64 characters, without control or invisible characters, and unique within their parent whatever their case; a taken
+one is 409 `conflict`. A `cursor` the hub did not give is 400 `validation`. An organization, project or environment
+the caller does not belong to is 404, as if it did not exist; a member who tries an admin action on one of theirs gets
+403 `forbidden`; without a login, every route is 401 `unauthenticated`.
 
 ### Project keys
 

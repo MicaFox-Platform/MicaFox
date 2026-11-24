@@ -1,2 +1,2 @@
 // The TypeBox schemas the server and the web entries share ("./schema")
-export { pageOf, pageQueryProperties } from "./pagination.js";
+export { DEFAULT_PAGE_LIMIT, pageOf, pageQueryProperties } from "./pagination.js";
