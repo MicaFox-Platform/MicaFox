@@ -1,6 +1,8 @@
+import pino from "pino";
 import { describe, expect, it, vi } from "vitest";
 
-import { createEntitlements, ENTITLEMENT_TTL_MS } from "../entitlements.js";
+import { createEvents } from "../../../events/index.js";
+import { createEntitlements, ENTITLEMENT_TTL_MS, forgetOnChange } from "../entitlements.js";
 import type { EntitlementSource } from "../entitlements.js";
 
 const ORG = "0b6f3a52-6a3e-4e55-9d0c-6f1c1d2b8a01";
@@ -78,5 +80,38 @@ describe("createEntitlements", () => {
     await entitlements("org-10000").has("logs");
 
     expect(source.mock.calls.map(([orgId]) => orgId)).toEqual(["org-0"]);
+  });
+});
+
+describe("forgetOnChange", () => {
+  const setup = () => {
+    const source = vi.fn(granting("logs"));
+    const entitlements = createEntitlements({ sources: [source], now: () => 0 });
+    const { bus } = createEvents({ log: pino({ level: "silent" }), timers: { setTimeout, clearTimeout } });
+    forgetOnChange(bus, entitlements);
+    return { source, entitlements, bus };
+  };
+  const changed = (orgId: string) => ({ type: "entitlements.changed", orgId, actor: { userId: "system" }, data: {} });
+
+  it("asks the sources again for an organization whose entitlements changed, and for no other", async () => {
+    const { source, entitlements, bus } = setup();
+    await entitlements(ORG).has("logs");
+    await entitlements(OTHER_ORG).has("logs");
+
+    bus.publish(changed(ORG));
+    await entitlements(ORG).has("logs");
+    await entitlements(OTHER_ORG).has("logs");
+
+    expect(source.mock.calls.map(([orgId]) => orgId)).toEqual([ORG, OTHER_ORG, ORG]);
+  });
+
+  it("ignores other events", async () => {
+    const { source, entitlements, bus } = setup();
+    await entitlements(ORG).has("logs");
+
+    bus.publish({ ...changed(ORG), type: "key.revoked" });
+    await entitlements(ORG).has("logs");
+
+    expect(source).toHaveBeenCalledTimes(1);
   });
 });

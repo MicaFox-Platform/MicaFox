@@ -8,6 +8,7 @@ import { createRunCounts } from "./run-counts.js";
 import type { RunCount } from "./run-counts.js";
 import { createScheduler } from "./scheduler.js";
 import type { JobClock } from "./scheduler.js";
+import type { KeyUses } from "../access/index.js";
 import type { Database } from "../db/index.js";
 import type { FeatureRegistry, Gate } from "../feature/index.js";
 
@@ -25,6 +26,8 @@ export interface JobsOptions {
   retentionDays: Readonly<Record<string, number>>;
   log: Logger;
   clock: JobClock;
+  /** The last use of project keys the SDK endpoint notes; a core job writes it. */
+  keyUses: KeyUses;
 }
 
 /** The hub's jobs: hub-core's, the features', and a job per retention policy. */
@@ -50,7 +53,7 @@ export const createJobs = (options: JobsOptions): Jobs => {
   const counts = createRunCounts();
   const scheduler = createScheduler({
     jobs: [
-      ...createCoreJobs({ db, now: clock.now }),
+      ...createCoreJobs({ db, now: clock.now, keyUses: options.keyUses }),
       ...registry.jobs.map((job) => scheduleFeatureJob(job, parts)),
       ...registry.retention.map((policy) => scheduleRetention(policy, { ...parts, retentionDays, now: clock.now })),
     ],

@@ -2,7 +2,7 @@ import { sql } from "kysely";
 import { Type } from "typebox";
 
 import { defineExtension, defineFeature } from "../../src/server/feature/index.js";
-import type { ExtensionFeature, Feature, FeatureRoutes } from "../../src/server/feature/index.js";
+import type { ExtensionFeature, Feature, FeatureRoutes, ProtocolModule } from "../../src/server/feature/index.js";
 
 /** A feature with no routes, as the hub tests need to name features the hub runs. */
 export const emptyFeature = (name: string, overrides: Partial<Feature> = {}): Feature =>
@@ -60,3 +60,12 @@ export const paidFeature = (name: string, overrides: Partial<ExtensionFeature> =
 export const fixtureExtension = (
   feature: ExtensionFeature = paidFeature("fixture"),
 ): ReturnType<typeof defineExtension> => defineExtension({ features: [feature] });
+
+/** The SDK module of a feature that keeps no state and ignores every message. */
+export const protocolModule = (module: string): ProtocolModule => ({
+  module,
+  state: async () => await Promise.resolve([]),
+  onMessage: async () => {
+    await Promise.resolve();
+  },
+});
