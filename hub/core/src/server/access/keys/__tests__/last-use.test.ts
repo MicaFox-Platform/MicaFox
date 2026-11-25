@@ -1,4 +1,4 @@
-import { sql } from "kysely";
+import type { KyselyPlugin } from "kysely";
 import { randomUUID } from "node:crypto";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -28,11 +28,23 @@ const open = async (): Promise<TestDatabase> => {
   return test;
 };
 
-// Hides the keys' table, so a write fails as it does while Postgres is down
-const renameCredentials = async (db: Database, from: string, to: string): Promise<void> => {
-  await db.system("test: rename the credentials", async (trx) => {
-    await sql`alter table ${sql.id(from)} rename to ${sql.id(to)}`.execute(trx);
-  });
+// Fails every query before it reaches the database, as while Postgres is down; the app role may not alter tables
+const failEveryQuery: KyselyPlugin = {
+  transformQuery: () => {
+    throw new Error("connection refused");
+  },
+  transformResult: async (args) => await Promise.resolve(args.result),
+};
+
+// The test database, down until `isDown` is set to false
+const flakyDatabase = (db: Database, state: { isDown: boolean }): Database => {
+  const down = db.global.withPlugin(failEveryQuery);
+  return {
+    ...db,
+    get global() {
+      return state.isDown ? down : db.global;
+    },
+  };
 };
 
 // Notes `count` keys no row has, as the uses of many keys within a minute
@@ -78,11 +90,11 @@ describe("createKeyUses", () => {
   it("keeps the uses of a failed write for the next one", async () => {
     const test = await open();
     const keyId = await addProjectKey(test.db, { orgId: ORG_A });
-    const uses = createKeyUses({ db: test.db, now: () => T0 });
+    const state = { isDown: true };
+    const uses = createKeyUses({ db: flakyDatabase(test.db, state), now: () => T0 });
     uses.note(keyId);
-    await renameCredentials(test.db, "credentials", "credentials_away");
-    await expect(uses.write()).rejects.toThrow(/credentials/);
-    await renameCredentials(test.db, "credentials_away", "credentials");
+    await expect(uses.write()).rejects.toThrow("connection refused");
+    state.isDown = false;
 
     await uses.write();
 
