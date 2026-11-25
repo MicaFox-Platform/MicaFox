@@ -35,6 +35,7 @@
     "@electric-sql/pglite": "^0.5.17",
     "@fastify/rate-limit": "^11.3.0",
     "@fastify/swagger": "^9.9.5",
+    "@fastify/websocket": "^11.3.7",
     "@micafox/protocol": "workspace:*",
     "@micafox/ui": "workspace:*",
     "fastify": "^5.12.7",
@@ -46,6 +47,8 @@
   },
   "devDependencies": {
     "@micafox/configs": "workspace:*",
-    "@types/pg": "^8.23.1"
+    "@types/pg": "^8.23.1",
+    "@types/ws": "^8.18.2",
+    "ws": "^8.22.1"
   }
 }

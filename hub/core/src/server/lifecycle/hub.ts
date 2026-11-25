@@ -10,6 +10,7 @@ import type { FeatureParts } from "./startup.js";
 import {
   addEvents,
   addJobs,
+  addSdk,
   createFeatureParts,
   createPublicUrl,
   createStart,
@@ -17,7 +18,7 @@ import {
   openDatabase,
   setupTokenSteps,
 } from "./startup.js";
-import { addAccess } from "../access/index.js";
+import { addAccess, createKeyUses } from "../access/index.js";
 import type { AccessOptions, ActorResolver } from "../access/index.js";
 import { createApp } from "../app/index.js";
 import type { AppOptions, HubApp } from "../app/index.js";
@@ -217,9 +218,14 @@ export const createHub = (options: HubOptions): Hub => {
   steps.push(...setupTokenSteps({ settings, db, log: logger.log, publicUrl: publicUrl.get }));
   const lifecycle = createRegistry(steps);
   const events = addEvents({ log: logger.log, clock }, lifecycle.addStopHook);
-  const jobs = addJobs({ settings, db, featureParts, log: logger.log, clock }, lifecycle.addStopHook);
+  const keyUses = createKeyUses({ db, now: clock.now });
+  const jobs = addJobs({ settings, db, featureParts, keyUses, log: logger.log, clock }, lifecycle.addStopHook);
   registerHealth(app, lifecycle.getPhase);
-  addAccess(app, accessOptionsOf({ db, options, clock, publicUrl: publicUrl.get, featureParts, events }));
+  const access = addAccess(
+    app,
+    accessOptionsOf({ db, options, clock, publicUrl: publicUrl.get, featureParts, events }),
+  );
+  addSdk({ app, settings, access, keyUses, featureParts, events, logger, clock }, lifecycle.addStopHook);
 
   const becomeReady = async (url: string): Promise<void> => {
     await runReadinessSteps(lifecycle.steps, lifecycle.signal);
@@ -231,14 +237,7 @@ export const createHub = (options: HubOptions): Hub => {
 
   const start = createStart({ app, settings, publicUrl, sealSteps: lifecycle.sealSteps, becomeReady });
 
-  const stop = createStop({
-    app,
-    hooks: () => lifecycle.hooks,
-    db,
-    logger,
-    clock,
-    beginStop: lifecycle.beginStop,
-  });
+  const stop = createStop({ app, hooks: () => lifecycle.hooks, db, logger, clock, beginStop: lifecycle.beginStop });
 
   return {
     log: logger.log,

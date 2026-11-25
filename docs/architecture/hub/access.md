@@ -85,6 +85,7 @@ hub/core/src/server/access/
 │   ├── index.ts      the key lookup, and what the access plugin uses
 │   ├── key-routes.ts  list, create and revoke
 │   ├── revoke-hooks.ts  the listeners that run after a revoke
+│   ├── last-use.ts   the last use of keys, noted in memory and written by a core job every minute
 │   └── queries.ts, schemas.ts, tables.ts
 └── entitlements/     the gate entitlements(orgId), over the sources ee/hub registers
     ├── index.ts      what the hub and the feature gate use
@@ -181,7 +182,8 @@ hub/core/src/server/access/
 2. A licence key is a JSON payload with `kid`, features, seats and `expiresAt`, signed with ed25519 and checked
    offline against public keys built into the image. When it expires, its features turn off and their data stays.
 3. `GET /api/v1/orgs/{orgId}/entitlements` (any member; `entitlement.read`) tells the web app what to show. A change publishes
-   `entitlements.changed` and closes the organization's SDK sessions with 1001. Why:
+   `entitlements.changed` and closes the organization's SDK sessions with 1001; the source that publishes it drops the
+   organization's cached answer first, so the reconnect agrees on the new modules. Why:
    [ADR 0024](../../adr/hub/access/0024-gate-paid-features-by-entitlements-on-the-server.md).
 
 ### Threat model

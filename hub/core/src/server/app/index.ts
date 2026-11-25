@@ -10,6 +10,7 @@ import { addRequestLog } from "./request-log.js";
 import { createResponseHeaders } from "./response-headers.js";
 
 export { HttpProblem, sendProblem } from "./problem/index.js";
+export type { ProblemName } from "./problem/index.js";
 export type { HubApp } from "./hub-app.js";
 
 /** What the app takes from the settings and the build. */

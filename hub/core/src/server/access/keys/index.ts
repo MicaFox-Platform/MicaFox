@@ -4,6 +4,8 @@ import type { Database } from "../../db/index.js";
 import { hashToken } from "../tokens/index.js";
 
 export { addKeyRoutes } from "./key-routes.js";
+export { createKeyUses } from "./last-use.js";
+export type { KeyUses } from "./last-use.js";
 export { createRevokeHooks } from "./revoke-hooks.js";
 export type { KeyRevokedListener } from "./revoke-hooks.js";
 export type { KeyScope } from "./queries.js";

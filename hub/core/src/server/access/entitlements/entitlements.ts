@@ -1,3 +1,5 @@
+import type { EventBus } from "../../events/index.js";
+
 /** Says which entitlements an organization has; the extension registers them, and the hub unions the answers. */
 export type EntitlementSource = (orgId: string) => Promise<ReadonlySet<string>>;
 
@@ -6,6 +8,8 @@ export interface OrgEntitlements {
   has: (name: string) => Promise<boolean>;
   /** Every entitlement, sorted. */
   list: () => Promise<readonly string[]>;
+  /** Drops the cached answer, so the next question asks the sources again: for a change of the entitlements. */
+  forget: () => void;
 }
 
 /** The entitlements of an organization: docs/architecture/hub/access.md#checking-entitlements. */
@@ -70,5 +74,20 @@ export const createEntitlements = (options: EntitlementsOptions): Entitlements =
   return (orgId) => ({
     has: async (name) => (await namesOf(orgId)).has(name),
     list: async () => [...(await namesOf(orgId))].sort(),
+    forget: () => {
+      cache.delete(orgId);
+    },
+  });
+};
+
+/**
+ * Drops an organization's cached entitlements when `entitlements.changed` is published, so the SDK sessions the
+ * endpoint closes for it agree on the new modules when they reconnect.
+ */
+export const forgetOnChange = (bus: EventBus, entitlements: Entitlements): void => {
+  bus.subscribe((event) => {
+    if (event.type === "entitlements.changed") {
+      entitlements(event.orgId).forget();
+    }
   });
 };

@@ -3,7 +3,7 @@ import type { Logger } from "pino";
 import type { ReadinessStep } from "./readiness.js";
 import type { Clock, StopHook } from "./shutdown.js";
 import { createEntitlements, ensureSetupToken } from "../access/index.js";
-import type { Entitlements } from "../access/index.js";
+import type { Access, Entitlements, KeyUses } from "../access/index.js";
 import type { HubApp } from "../app/index.js";
 import type { Settings } from "../config/index.js";
 import { connect, CORE_MIGRATIONS, createDatabase, migrate } from "../db/index.js";
@@ -15,6 +15,7 @@ import type { Extension, Feature, FeatureRegistry, Gate } from "../feature/index
 import { createJobs } from "../jobs/index.js";
 import type { Jobs } from "../jobs/index.js";
 import type { HubLogger } from "../observability/index.js";
+import { addSdkEndpoint } from "../sdk-endpoint/index.js";
 
 /** A step or hook was added when the hub's phase no longer allows it. */
 export class HubStateError extends Error {
@@ -144,7 +145,7 @@ export const addEvents = (
  * ready.
  */
 export const addJobs = (
-  parts: { settings: Settings; db: Database; featureParts: FeatureParts; log: Logger; clock: Clock },
+  parts: { settings: Settings; db: Database; featureParts: FeatureParts; keyUses: KeyUses; log: Logger; clock: Clock },
   addStopHook: (name: string, run: () => Promise<void>, options?: { phase?: StopHook["phase"] }) => void,
 ): Jobs => {
   const jobs = createJobs({
@@ -155,6 +156,7 @@ export const addJobs = (
     retentionDays: parts.settings.retentionDays,
     log: parts.log,
     clock: parts.clock,
+    keyUses: parts.keyUses,
   });
   addStopHook(
     "jobs-halt",
@@ -166,6 +168,36 @@ export const addJobs = (
   );
   addStopHook("jobs", jobs.stop);
   return jobs;
+};
+
+/**
+ * Adds the SDK endpoint and the stop hook that closes its sessions with 1001 before the drain: an open WebSocket
+ * would hold the drain until its peer closes.
+ */
+export const addSdk = (
+  parts: {
+    app: HubApp;
+    settings: Settings;
+    access: Access;
+    keyUses: KeyUses;
+    featureParts: FeatureParts;
+    events: Events;
+    logger: HubLogger;
+    clock: Clock;
+  },
+  addStopHook: (name: string, run: () => Promise<void>, options?: { phase?: StopHook["phase"] }) => void,
+): void => {
+  const endpoint = addSdkEndpoint(parts.app, {
+    settings: parts.settings,
+    access: parts.access,
+    keyUses: parts.keyUses,
+    gate: parts.featureParts.gate,
+    bus: parts.events.bus,
+    log: parts.logger.log,
+    warnCollapsed: parts.logger.warnCollapsed,
+    clock: parts.clock,
+  });
+  addStopHook("sdk-endpoint", endpoint.closeAll, { phase: "before-drain" });
 };
 
 // Binds the port and returns the URL users open; in test mode it is the bound port, which may be a free one

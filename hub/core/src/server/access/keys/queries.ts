@@ -174,3 +174,17 @@ export const findKeyByHash = async (db: Kysely<HubTables>, tokenHash: string): P
     .executeTakeFirst();
   return row === undefined ? undefined : toScope(row);
 };
+
+/**
+ * Writes when keys were last used, in one statement; a time never moves a key's last use back, so two replicas may
+ * write in any order.
+ */
+export const writeKeysLastUse = async (db: Kysely<HubTables>, uses: ReadonlyMap<string, number>): Promise<void> => {
+  const ids = [...uses.keys()];
+  const times = [...uses.values()].map((ms) => new Date(ms).toISOString());
+  await sql`
+    update credentials set last_used_at = greatest(credentials.last_used_at, used.at)
+    from unnest(${ids}::uuid[], ${times}::timestamptz[]) as used (id, at)
+    where credentials.kind = 'project-key' and credentials.id = used.id
+  `.execute(db);
+};

@@ -1,6 +1,6 @@
 import { createCan } from "./authorization/index.js";
 import type { ActorResolver, Authorization } from "./authorization/index.js";
-import { addEntitlementRoutes } from "./entitlements/index.js";
+import { addEntitlementRoutes, forgetOnChange } from "./entitlements/index.js";
 import type { Entitlements } from "./entitlements/index.js";
 import { addKeyRoutes, createKeyLookup, createRevokeHooks } from "./keys/index.js";
 import type { KeyRevokedListener, KeyScope } from "./keys/index.js";
@@ -20,11 +20,13 @@ export { inOrganization, inOwningOrg, requireCan } from "./authorization/index.j
 export type { Actor, ActorResolver, Authorization, OrgContext } from "./authorization/index.js";
 export { createEntitlements } from "./entitlements/index.js";
 export type { EntitlementSource, Entitlements, OrgEntitlements } from "./entitlements/index.js";
-export type { KeyRevokedListener, KeyScope } from "./keys/index.js";
+export { createKeyUses } from "./keys/index.js";
+export type { KeyRevokedListener, KeyScope, KeyUses } from "./keys/index.js";
 export { deleteExpiredSessions } from "./sessions/index.js";
 export { ensureSetupToken } from "./setup/index.js";
 export type { SetupTokenOptions } from "./setup/index.js";
 export { listOrgIds } from "./tenancy/index.js";
+export { hashToken } from "./tokens/index.js";
 
 /** What access needs from the hub. */
 export interface AccessOptions {
@@ -71,6 +73,7 @@ export const addAccess = (app: HubApp, options: AccessOptions): Access => {
   const resolveActor = options.resolveActor ?? createSessionResolver(deps);
   const authorization = { db: options.db, can: createCan(options.features) };
   const keyHooks = createRevokeHooks();
+  forgetOnChange(options.events.bus, options.entitlements);
 
   void app.register((scope: HubApp, _options, done) => {
     addPerIpLimit(scope);
