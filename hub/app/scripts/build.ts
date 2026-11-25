@@ -37,8 +37,8 @@ const bundleServer = async (hubBuild: HubBuild, version: string): Promise<void> 
     conditions: conditionsOf(hubBuild),
     define: buildDefines(hubBuild, version),
     // PGlite ships WebAssembly and data files it loads beside its own modules; pg-native is pg's optional binding,
-    // never installed
-    external: ["@electric-sql/pglite", "pg-native"],
+    // and bufferutil and utf-8-validate are ws's optional native speedups: never installed, each has a fallback
+    external: ["@electric-sql/pglite", "pg-native", "bufferutil", "utf-8-validate"],
     banner: { js: REQUIRE_BANNER },
     metafile: true,
     logLevel: "warning",

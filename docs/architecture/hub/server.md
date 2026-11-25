@@ -176,7 +176,7 @@ Paths, errors and pagination: [HTTP API](../../api/hub/http.md). Why:
    a time; an organization that fails is logged with its id, the next one still runs, and the run is counted as
    failed.
 4. Core jobs: delete expired sessions every hour (7 days without use, 30 days at most); delete invites and reset
-   links every hour; write the last use of project keys and the last seen time of online
+   links every hour; write the last use of project keys (`core.write-key-last-use`) and the last seen time of online
    [instances](sdk-endpoint.md#keeping-instances) every minute; delete instances offline for 7 days every hour; run
    each feature's retention policy every hour, per organization, in batches. Core jobs are named `core.<name>`, and
    a retention policy's job `retention.<name>`. The jobs of keys, instances and the debugger come with their own

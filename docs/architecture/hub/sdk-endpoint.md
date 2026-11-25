@@ -48,7 +48,7 @@ hub/core/src/server/sdk-endpoint/
 ├── sessions.ts      open sessions by environment, replacing and closing them
 ├── routing.ts       frames and batches to features, by module, then type; depth and string checks
 ├── instances.ts     the instances table, online state, last seen and the instances API
-└── liveness.ts      the idle timer and the per-session rate limit
+└── liveness.ts      the idle sweep and the per-session rate limit
 ```
 
 ## Key flows
@@ -57,17 +57,26 @@ hub/core/src/server/sdk-endpoint/
 
 1. The connector sends `GET /sdk` with `Authorization: Bearer <project key>`; the app's `MICAFOX_HUB_URL` is
    `wss://<hub>/sdk`, shown in the UI next to a new key.
-2. The endpoint looks the key up by its SHA-256 hash ([access](access.md#managing-project-keys)) and caches the
-   result, with the organization's entitlements, for 60 s. Before any upgrade it answers, with a problem body:
+2. The endpoint looks the key up by its SHA-256 hash ([access](access.md#managing-project-keys)) and caches a key
+   it finds for 60 s, at most 10,000; the organization's entitlements have their own 60 s cache. A token without the
+   key's format is refused without a lookup. A revoke drops the key from the cache, and for 60 s neither caches nor
+   accepts it, even from a lookup that was running. Before any upgrade it answers, with a problem body and a
+   `detail`:
    - 401 without a bearer token, except in [test mode](server.md#running-in-test-mode), where a connection
      without one joins the seeded environment; 403 for an unknown or revoked key; the SDK then waits its longest
      delay;
    - 429 over `MICAFOX_SDK_MAX_CONNECTIONS` (1000 per replica) or `MICAFOX_SDK_MAX_CONNECTIONS_PER_KEY` (500);
    - 503 while the hub is not ready, or when Postgres is down and the key is not cached; the SDK backs off as usual.
-3. After the upgrade the endpoint waits 10 s for `hello`. Another first frame or an invalid `hello` closes with
-   `protocolError`; a `version` the hub has no types for closes with `incompatibleVersion`. A frame larger than
-   `MICAFOX_SDK_MAX_FRAME_BYTES`, 1 MiB by default and raised when apps raise the SDK's `buffer.maxBytes`, closes
-   with 1009.
+
+   A connection counts toward the limits from this check until its socket closes. An upgrade to any other route is
+   answered over HTTP, 404 or the readiness gate's 503, and its socket closed
+   ([ADR 0041](../../adr/hub/sdk-endpoint/0041-accept-sdk-websockets-with-fastify-websocket.md)).
+
+3. After the upgrade the endpoint waits 10 s for `hello`. No `hello` in that time, another first frame or an invalid
+   `hello` closes with `protocolError`; `hello` is checked by its structure, so fields a later v1 SDK adds pass. A
+   `welcome` the hub cannot send within those 10 s, or when the entitlements cannot be read, closes with 1011; a
+   `version` the hub has no types for closes with `incompatibleVersion`. A frame larger than
+   `MICAFOX_SDK_MAX_FRAME_BYTES`, 1 MiB by default and raised when apps raise the SDK's `buffer.maxBytes`, closes with 1009.
 4. It answers `welcome` at once with the modules of `hello` that a registered feature serves, without extension
    modules the organization is not entitled to.
 5. It registers the session: instance, organization, project, environment, key and modules, with the rest of
@@ -75,7 +84,8 @@ hub/core/src/server/sdk-endpoint/
    environment is closed with 1001; an `instanceId` from another environment never replaces one. An `instanceId`
    longer than 64 characters makes the `hello` invalid.
 6. For each agreed module it sends what the feature's `state(session)` returns, such as the full breakpoint list.
-   It notes the key's last use; a job writes it every minute.
+   It notes the key's last use, at connect and at every ping; the job `core.write-key-last-use` writes the noted
+   uses every minute and keeps them for the next run when the write fails.
 
 ### Routing a message
 
@@ -118,10 +128,13 @@ hub/core/src/server/sdk-endpoint/
 
 ### Keeping a session alive
 
-1. The endpoint answers the SDK's pings. A session that sends nothing, not even a ping, for 45 s is terminated.
+1. The endpoint answers the SDK's pings. A session that sends nothing, not even a ping, for 45 s is terminated; one
+   sweep every 5 s checks them all, so no timer is reset per frame.
 2. A revoked key closes its sessions with 1008, and the reconnect gets 403.
 3. A change of the organization's entitlements closes its sessions with 1001, so modules are agreed again.
 4. When the hub stops, every session closes with 1001 ([stopping](server.md#stopping)).
+5. A peer that does not answer a close the hub sends within 2 s is cut off, so it holds no slot and no stop waits on
+   it; a connection the hub closes before its upgrade completes closes as soon as it does.
 
 ### Losing Postgres
 
@@ -140,3 +153,4 @@ hub/core/src/server/sdk-endpoint/
 - [0030. Use opaque prefixed tokens stored as hashes](../../adr/hub/access/0030-use-opaque-prefixed-tokens-stored-as-hashes.md)
 - [0036. Keep connected instances in hub-core](../../adr/hub/sdk-endpoint/0036-keep-connected-instances-in-hub-core.md)
 - [0037. Start a seeded test mode on PGlite](../../adr/hub/server/0037-start-a-seeded-test-mode-on-pglite.md)
+- [0041. Accept SDK WebSockets with @fastify/websocket](../../adr/hub/sdk-endpoint/0041-accept-sdk-websockets-with-fastify-websocket.md)

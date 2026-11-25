@@ -119,6 +119,20 @@ sdk: { name, version }, runtime: { name, version }, modules, commit, protocolVer
 lastSeenAt }`. `id` is the SDK's `instanceId`; the other fields come from its last
 [`hello`](../protocol.md#hello), cut to the hub's limits. `?online=true` and `?service=` filter it.
 
+### SDK endpoint
+
+`GET /sdk` — the WebSocket an SDK opens (`MICAFOX_HUB_URL`) with `Authorization: Bearer <project key>`; after the
+upgrade it speaks the [protocol](../protocol.md). Before the upgrade it answers with a problem: 401 `unauthenticated`
+without a bearer token; 403 `forbidden` for a key that is unknown, revoked or not a project key; 429 `rate-limited`
+over `MICAFOX_SDK_MAX_CONNECTIONS` or `MICAFOX_SDK_MAX_CONNECTIONS_PER_KEY` ([settings](config.md)); 503 `not-ready`
+while the hub is not ready or cannot check the key. An upgrade to any other path is 404, or 503 `not-ready` while the hub is not ready.
+
+After the upgrade the hub closes with `protocolError` (4400) when the first frame is not a valid `hello` or none comes
+within 10 s, `incompatibleVersion` (4426) for a protocol version it does not know, 1009 for a frame over
+`MICAFOX_SDK_MAX_FRAME_BYTES`, 1011 when it cannot answer `welcome`, 1008 when the key is revoked, and 1001 when the
+same instance connects again in its environment, the organization's entitlements change, or the hub stops. A
+connection that sends nothing, not even a ping, for 45 s is dropped.
+
 Feature endpoints live under `/api/v1/<feature>/…` and are documented with each feature: [debugger](debugger.md).
 
 ## Usage

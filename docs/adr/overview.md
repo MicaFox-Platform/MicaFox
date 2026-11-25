@@ -79,6 +79,7 @@ writing one: [`.claude/rules/adr.md`](../../.claude/rules/adr.md).
 `hub/sdk-endpoint/` — The WebSocket the SDK connects to, its sessions and connected instances.
 
 - [0036. Keep connected instances in hub-core](hub/sdk-endpoint/0036-keep-connected-instances-in-hub-core.md)
+- [0041. Accept SDK WebSockets with @fastify/websocket](hub/sdk-endpoint/0041-accept-sdk-websockets-with-fastify-websocket.md)
 
 ## Hub: database
 

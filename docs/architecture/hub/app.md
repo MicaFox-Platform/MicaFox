@@ -75,12 +75,13 @@ hub/app/
 
 ### Building
 
-1. `pnpm build` builds the hub: esbuild bundles `src/index.ts` and `src/bin.ts` into `dist/server/` as ES modules
-   with source maps, sharing one chunk of hub-core and its dependencies, and writes its metafile to
-   `dist/metafile.json`; Vite builds `src/web/` into `dist/web/` with hashed assets and source maps. The built bundle
-   then runs every migration into PGlite and saves the data folder as `dist/pglite-seed.tar.gz`, so the seed holds
-   exactly that build's migrations. Only PGlite, which ships WebAssembly, and pg's optional `pg-native`, which is
-   never installed, stay outside the bundle. `bin.ts` is `micafox-hub` and the `./cli` export; tsc only checks types.
+1. `pnpm build` builds the hub: esbuild bundles `src/index.ts` and `src/bin.ts` into `dist/server/` as ES modules with
+   source maps, sharing one chunk of hub-core and its dependencies, and writes its metafile to `dist/metafile.json`;
+   Vite builds `src/web/` into `dist/web/` with hashed assets and source maps. The built bundle then runs every
+   migration into PGlite and saves the data folder as `dist/pglite-seed.tar.gz`, so the seed holds exactly that build's
+   migrations. Only PGlite, which ships WebAssembly, pg's optional `pg-native` and ws's optional `bufferutil` and
+   `utf-8-validate`, which are never installed and have fallbacks, stay outside the bundle. `bin.ts` is `micafox-hub`
+   and the `./cli` export; tsc only checks types.
 2. `EE=false` adds the condition `micafox-open-core`, so `#ee` and `#ee/web` resolve to the stubs; any `EE` other
    than unset, `true` or `false` fails the build. `conditions.ts` is the one source of the condition for esbuild `conditions`, Vite `resolve.conditions` (spread after Vite's
    defaults, which it otherwise replaces), Vitest and `node --conditions` in development. `pnpm typecheck` checks

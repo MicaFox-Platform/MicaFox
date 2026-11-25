@@ -19,14 +19,14 @@ describe("the hub bundle", () => {
     expect(bundles.map((bundle) => existsSync(path.join(HUB, `${bundle}.map`)))).not.toContain(false);
   });
 
-  it("leaves only PGlite and pg's optional pg-native outside the bundle", () => {
+  it("leaves only PGlite and the optional native bindings of pg and ws outside the bundle", () => {
     const externals = new Set(
       Object.values(readMetafile().outputs).flatMap((output) =>
         output.imports.filter((entry) => entry.external === true && !isBuiltin(entry.path)).map((entry) => entry.path),
       ),
     );
 
-    expect([...externals].sort()).toEqual(["@electric-sql/pglite", "pg-native"]);
+    expect([...externals].sort()).toEqual(["@electric-sql/pglite", "bufferutil", "pg-native", "utf-8-validate"]);
   });
 
   it("logs stack traces that point at the sources", () => {
