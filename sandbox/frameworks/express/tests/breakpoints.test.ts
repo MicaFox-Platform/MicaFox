@@ -41,10 +41,9 @@ describe("the Express app", { timeout: E2E_TEST_TIMEOUT_MS }, () => {
       // The handler's own file and line, as the hub set the breakpoint
       file: expect.stringMatching(toQuoteFilePattern(EXPRESS_APP)) as unknown,
       line: findQuoteLine(EXPRESS_APP),
+      // Only the handler's primitives: a pause may reach its time limit before it reads `request` and `response`, which
+      // come as `unavailable` then; the SDK's own tests check object content on a stopped clock
       variables: expect.arrayContaining([
-        // Large and read after the handler's own variables: still there, whole or cut
-        { name: "request", value: expect.objectContaining({ type: "object" }) as unknown },
-        { name: "response", value: expect.objectContaining({ type: "object" }) as unknown },
         { name: "sku", value: { type: "string", value: "SKU-2", length: 5 } },
         { name: "quantity", value: { type: "number", value: 3 } },
         { name: "unitPrice", value: { type: "number", value: 4.5 } },
