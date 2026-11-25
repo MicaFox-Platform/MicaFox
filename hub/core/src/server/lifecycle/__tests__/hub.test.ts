@@ -1,4 +1,5 @@
 import { sql } from "kysely";
+import http from "node:http";
 import net from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -402,6 +403,38 @@ describe("createHub", () => {
     await expect(get(running.url, "/healthz")).resolves.toMatchObject({ status: 200 });
     hold.finish();
     await expect(stopping).resolves.toEqual({ clean: true });
+  });
+
+  it("ends the events streams when the stop begins, so the drain does not wait for them", async () => {
+    const hub = createHub({
+      env: envOf(TEST_MODE_LINES),
+      version: "1.2.3",
+      build: "basic-hub",
+      features: [],
+      logStream: captureLog().stream,
+      actorResolver: async () =>
+        await Promise.resolve({ userId: "u1", memberships: [{ orgId: ORG_A, role: "owner" }] }),
+    });
+    hubs.push(hub);
+    const running = await hub.start();
+    await running.ready;
+    const { hasEnded } = await new Promise<{ hasEnded: Promise<void> }>((resolve, reject) => {
+      http
+        .get({ host: "127.0.0.1", port: new URL(running.url).port, path: "/api/internal/events" }, (response) => {
+          const hasEnded = new Promise<void>((done) => response.on("close", done));
+          response.once("data", () => {
+            // Not the promise itself, which `resolve` would wait for
+            resolve({ hasEnded });
+          });
+          response.resume();
+        })
+        .on("error", reject);
+    });
+
+    const result = await hub.stop();
+
+    await hasEnded;
+    expect(result).toEqual({ clean: true });
   });
 
   it("returns the first result when stopped twice", async () => {

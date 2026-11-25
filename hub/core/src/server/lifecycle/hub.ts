@@ -8,6 +8,7 @@ import { createShutdown } from "./shutdown.js";
 import type { Clock, StopHook, StopResult } from "./shutdown.js";
 import type { FeatureParts } from "./startup.js";
 import {
+  addEvents,
   addJobs,
   createFeatureParts,
   createPublicUrl,
@@ -23,6 +24,7 @@ import type { AppOptions, HubApp } from "../app/index.js";
 import type { Settings } from "../config/index.js";
 import { loadSettings, readSecretFile, summarizeSettings } from "../config/index.js";
 import type { Database } from "../db/index.js";
+import type { Events } from "../events/index.js";
 import { addFeatureRoutes } from "../feature/index.js";
 import type { Extension, Feature, FeatureRegistry, Gate } from "../feature/index.js";
 import { createLogger } from "../observability/index.js";
@@ -97,31 +99,47 @@ const announceStarted = (log: Logger, options: HubOptions, settings: Settings): 
 
 // What parts of the server register: steps before ready, and hooks for the stop
 const createRegistry = (
-  getPhase: () => Phase,
   firstSteps: readonly ReadinessStep[],
 ): Pick<Hub, "addReadinessStep" | "addStopHook"> & {
   steps: ReadinessStep[];
+  getPhase: () => Phase;
+  /** Aborts when the stop begins, which ends the readiness steps that wait. */
+  signal: AbortSignal;
+  turnReady: () => void;
+  beginStop: () => void;
   /** Refuses further steps: the start has begun, and a step added now could be skipped. */
   sealSteps: () => void;
   hooks: StopHook[];
 } => {
   const steps: ReadinessStep[] = [...firstSteps];
   const hooks: StopHook[] = [];
+  const aborter = new AbortController();
+  let phase: Phase = "starting";
   let isSealed = false;
+  const getPhase = (): Phase => phase;
   return {
     steps,
     hooks,
+    getPhase,
+    signal: aborter.signal,
+    turnReady: () => {
+      phase = "ready";
+    },
+    beginStop: () => {
+      phase = "stopping";
+      aborter.abort();
+    },
     sealSteps: () => {
       isSealed = true;
     },
     addReadinessStep: (name, run) => {
-      if (isSealed || getPhase() !== "starting") {
+      if (isSealed || phase !== "starting") {
         throw new HubStateError("Readiness steps are added before the hub starts");
       }
       steps.push({ name, run });
     },
     addStopHook: (name, run, options = {}) => {
-      if (getPhase() === "stopping") {
+      if (phase === "stopping") {
         throw new HubStateError("Stop hooks are added before the hub stops");
       }
       hooks.push({ name, run, phase: options.phase ?? "after-drain" });
@@ -168,8 +186,10 @@ const accessOptionsOf = (parts: {
   clock: Clock;
   publicUrl: () => string;
   featureParts: FeatureParts;
+  events: Events;
 }): AccessOptions => ({
   db: parts.db,
+  events: parts.events,
   features: parts.featureParts.registry.features.map(({ feature }) => feature.name),
   entitlements: parts.featureParts.entitlements,
   addFeatureRoutes: (scope, authorization) => {
@@ -195,17 +215,16 @@ export const createHub = (options: HubOptions): Hub => {
   });
   const publicUrl = createPublicUrl(settings.publicUrl);
   steps.push(...setupTokenSteps({ settings, db, log: logger.log, publicUrl: publicUrl.get }));
-  let phase: Phase = "starting";
-  const lifecycle = createRegistry(() => phase, steps);
-  const aborter = new AbortController();
+  const lifecycle = createRegistry(steps);
+  const events = addEvents({ log: logger.log, clock }, lifecycle.addStopHook);
   const jobs = addJobs({ settings, db, featureParts, log: logger.log, clock }, lifecycle.addStopHook);
-  registerHealth(app, () => phase);
-  addAccess(app, accessOptionsOf({ db, options, clock, publicUrl: publicUrl.get, featureParts }));
+  registerHealth(app, lifecycle.getPhase);
+  addAccess(app, accessOptionsOf({ db, options, clock, publicUrl: publicUrl.get, featureParts, events }));
 
   const becomeReady = async (url: string): Promise<void> => {
-    await runReadinessSteps(lifecycle.steps, aborter.signal);
-    aborter.signal.throwIfAborted();
-    phase = "ready";
+    await runReadinessSteps(lifecycle.steps, lifecycle.signal);
+    lifecycle.signal.throwIfAborted();
+    lifecycle.turnReady();
     jobs.start();
     announceStarted(logger.log, options, { ...settings, publicUrl: url });
   };
@@ -218,10 +237,7 @@ export const createHub = (options: HubOptions): Hub => {
     db,
     logger,
     clock,
-    beginStop: () => {
-      phase = "stopping";
-      aborter.abort();
-    },
+    beginStop: lifecycle.beginStop,
   });
 
   return {

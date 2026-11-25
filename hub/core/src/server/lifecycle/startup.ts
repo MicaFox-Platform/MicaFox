@@ -8,6 +8,8 @@ import type { HubApp } from "../app/index.js";
 import type { Settings } from "../config/index.js";
 import { connect, CORE_MIGRATIONS, createDatabase, migrate } from "../db/index.js";
 import type { Database, MigrationPackage } from "../db/index.js";
+import { createEvents } from "../events/index.js";
+import type { Events } from "../events/index.js";
 import { createFeatureRegistry, createGate } from "../feature/index.js";
 import type { Extension, Feature, FeatureRegistry, Gate } from "../feature/index.js";
 import { createJobs } from "../jobs/index.js";
@@ -114,6 +116,26 @@ export const createFeatureParts = (
   const registry = createFeatureRegistry(options.features, options.extension);
   const entitlements = createEntitlements({ sources: options.extension?.sources ?? [], now: clock.now });
   return { registry, entitlements, gate: createGate(registry, entitlements) };
+};
+
+/**
+ * Builds the event bus and its streams, and adds the stop hook that ends the streams. A stream never ends by itself,
+ * so the drain of the running requests would wait for it: it ends first.
+ */
+export const addEvents = (
+  parts: { log: Logger; clock: Clock },
+  addStopHook: (name: string, run: () => Promise<void>, options?: { phase?: StopHook["phase"] }) => void,
+): Events => {
+  const events = createEvents({ log: parts.log, timers: parts.clock });
+  addStopHook(
+    "events",
+    async () => {
+      events.streams.endAll();
+      await Promise.resolve();
+    },
+    { phase: "before-drain" },
+  );
+  return events;
 };
 
 /**

@@ -13,6 +13,8 @@ import { addPerIpLimit, createEmailBackoff } from "./throttle/index.js";
 import { HttpProblem } from "../app/index.js";
 import type { HubApp } from "../app/index.js";
 import type { Database } from "../db/index.js";
+import { addEventsRoute } from "../events/index.js";
+import type { Events } from "../events/index.js";
 
 export { inOrganization, inOwningOrg, requireCan } from "./authorization/index.js";
 export type { Actor, ActorResolver, Authorization, OrgContext } from "./authorization/index.js";
@@ -27,6 +29,8 @@ export { listOrgIds } from "./tenancy/index.js";
 /** What access needs from the hub. */
 export interface AccessOptions {
   db: Database;
+  /** The bus the routes publish to once a change commits, and the streams that logging out everywhere ends. */
+  events: Events;
   /** Finds the actor of a request; the hub's own reads the session cookie, and tests give theirs. */
   resolveActor?: ActorResolver;
   /** The names of the features the hub runs: their `<feature>.<action>` are every member's. */
@@ -61,6 +65,7 @@ export const addAccess = (app: HubApp, options: AccessOptions): Access => {
     passwords: createPasswordHasher(),
     emailBackoff: createEmailBackoff(now),
     publicUrl: options.publicUrl,
+    streams: options.events.streams,
     now,
   };
   const resolveActor = options.resolveActor ?? createSessionResolver(deps);
@@ -85,8 +90,14 @@ export const addAccess = (app: HubApp, options: AccessOptions): Access => {
         request.actor = actor;
       });
       addSessionRoutes(actorScope, deps);
-      addTenancyRoutes(actorScope, authorization);
-      addKeyRoutes(actorScope, { authorization, publicUrl: options.publicUrl, hooks: keyHooks });
+      addEventsRoute(actorScope, options.events.streams);
+      addTenancyRoutes(actorScope, authorization, options.events.bus);
+      addKeyRoutes(actorScope, {
+        authorization,
+        publicUrl: options.publicUrl,
+        hooks: keyHooks,
+        bus: options.events.bus,
+      });
       addEntitlementRoutes(actorScope, authorization, options.entitlements);
       options.addFeatureRoutes?.(actorScope, authorization);
       actorDone();

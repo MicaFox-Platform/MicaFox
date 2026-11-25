@@ -1,4 +1,5 @@
 import type { Database } from "../../db/index.js";
+import type { Streams } from "../../events/index.js";
 import type { PasswordHasher } from "../password/index.js";
 import type { EmailBackoff } from "../throttle/index.js";
 
@@ -9,6 +10,8 @@ export interface SessionDependencies {
   emailBackoff: EmailBackoff;
   /** The URL users open; it is known once the hub listens, so each request asks for it. */
   publicUrl: () => string;
+  /** The events streams, which logging out everywhere ends. */
+  streams: Pick<Streams, "endUser">;
   /** The clock, in milliseconds. */
   now: () => number;
 }

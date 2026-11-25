@@ -100,6 +100,7 @@ export const addSessionRoutes = (app: HubApp, deps: SessionDependencies): void =
 
   app.delete("/api/v1/sessions", { schema: { response: { 204: noContent } } }, async (request, reply) => {
     await deleteSessionsOf(globalTables(deps.db.global), request.actor.userId);
+    deps.streams.endUser(request.actor.userId);
     clearSessionCookie(reply, cookieSettings(deps.publicUrl()));
     request.log.info({ event: "auth.logout-everywhere", userId: request.actor.userId }, "A user logged out everywhere");
     return await reply.code(204).send(null);

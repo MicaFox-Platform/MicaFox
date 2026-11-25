@@ -123,7 +123,8 @@ hub/core/src/server/
 The headers, the request log and the error handler are added to the root instance when the app is created, before
 the readiness gate's hook, so they cover every route, the 404 and the 503 of the [readiness gate](#starting). A
 malformed URL fails before routing, without any hook, so its handler sets the headers and logs the request itself.
-A hijacked reply, such as the [events stream](#events), skips the hooks and sets its own headers.
+The [events stream](#events) is a streamed reply, so the hooks cover it too: it gets the headers, and its request
+line is logged when it ends.
 
 `GET /api/v1/openapi.json` is built from the routes' schemas by `@fastify/swagger` and lists only `/api/v1`. The
 plugin sees a route when it is added, so routes, the core's and the features', come in plugins registered after the
@@ -141,13 +142,24 @@ Paths, errors and pagination: [HTTP API](../../api/hub/http.md). Why:
 
 ### Events
 
-1. A part publishes `{ type, orgId, environmentId?, actor, data }` once its transaction commits. Types are
-   `<feature>.<noun>.<verb>`, such as `debugger.snapshot.created`; core ones are `project.*`, `environment.*`,
-   `key.*`, `member.*` and `invite.*`.
+1. A part publishes `{ type, orgId, environmentId?, actor, data }` once its transaction commits, so a change that
+   rolls back publishes nothing and a subscriber that reads the database finds the change. `actor` is `{ userId }`;
+   `data` holds ids, as hints of what to reload, never a secret or a content. Types are `<feature>.<noun>.<verb>`,
+   such as `debugger.snapshot.created`; core ones are `project.*`, `environment.*`, `key.*`, `member.*` and
+   `invite.*`. Today the core publishes `project.created`, `project.updated`, `environment.created`,
+   `environment.updated`, `key.created` and `key.revoked`; a project's first `production` environment comes with
+   `project.created`.
 2. In S2 the bus is in-process. Subscribers are the events streams, which pass on what belongs to their session's
-   organizations, and the [SDK endpoint](sdk-endpoint.md#resending-the-state). With several replicas the same
-   interface carries events through Postgres.
-3. Each stream keeps at most 100 undelivered events; a slower one gets `reset` and its queue is dropped.
+   organizations, and the [SDK endpoint](sdk-endpoint.md#resending-the-state). A subscriber that throws is logged and
+   never fails the publisher. With several replicas the same interface carries events through Postgres.
+3. `GET /api/internal/events` needs a session. It is `text/event-stream`: first `event: reset` with `data: {}`, then
+   for each event `event: <type>` with the event as JSON in `data`, and a `: keepalive` comment every 25 s. The
+   organizations are the user's memberships when the stream opens. A user has at most 10 streams; one more ends
+   their oldest.
+4. Each stream keeps at most 100 undelivered events, those a slow client could not take yet; one more drops the
+   queue, and the client gets `reset` once it catches up.
+5. `DELETE /api/v1/sessions` ends the user's streams, and so does the stop, before the drain: a stream never ends by
+   itself.
 
 ### Jobs
 
