@@ -5,8 +5,10 @@ import { addAccess, createEntitlements } from "../../src/server/access/index.js"
 import { createPasswordHasher } from "../../src/server/access/password/index.js";
 import type { HubApp } from "../../src/server/app/index.js";
 import { CORE_MIGRATIONS, migrate } from "../../src/server/db/index.js";
+import type { Events } from "../../src/server/events/index.js";
 import { openTestDatabase, ORG_A } from "../db/test-database.js";
 import type { TestDatabase } from "../db/test-database.js";
+import { createTestEvents } from "../events/test-events.js";
 import { createTestApp } from "../server/app.js";
 import type { LogCapture } from "../server/log-capture.js";
 
@@ -21,6 +23,8 @@ export const MEMBER_ID = "a0000000-0000-4000-8000-000000000002";
 export interface SessionApp {
   app: HubApp;
   test: TestDatabase;
+  /** The bus and streams the routes use. */
+  events: Events;
   log: LogCapture;
   /** A request as the hub's own origin unless `headers` say otherwise. */
   send: (request: InjectOptions) => Promise<LightMyRequestResponse>;
@@ -76,8 +80,10 @@ export const openSessionApp = async (options: SessionAppOptions = {}): Promise<S
     await seed(test);
   }
   const { app, log } = createTestApp({ publicUrl });
+  const events = createTestEvents();
   addAccess(app, {
     db: test.db,
+    events,
     features: ["debugger"],
     entitlements: createEntitlements({ sources: [], now: Date.now }),
     publicUrl: () => publicUrl,
@@ -89,6 +95,7 @@ export const openSessionApp = async (options: SessionAppOptions = {}): Promise<S
   return {
     app,
     test,
+    events,
     log,
     send,
     login: async (email = OWNER_EMAIL, password = OWNER_PASSWORD) =>

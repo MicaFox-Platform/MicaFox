@@ -13,6 +13,7 @@ import { createdKeyReply, keyParams, keyReply, noContent } from "./schemas.js";
 import { pageOf } from "../../../schema/index.js";
 import { HttpProblem } from "../../app/index.js";
 import type { HubApp } from "../../app/index.js";
+import type { EventBus } from "../../events/index.js";
 import { inOwningOrg, requireCan } from "../authorization/index.js";
 import type { Authorization } from "../authorization/index.js";
 import { environmentParams, nameBody, normalizeName } from "../tenancy/index.js";
@@ -36,6 +37,8 @@ export interface KeyRouteOptions {
   /** The URL users open; the SDK's URL is made from it. */
   publicUrl: () => string;
   hooks: RevokeHooks;
+  /** Where a created or revoked key is announced once it is committed. */
+  bus: EventBus;
 }
 
 /**
@@ -65,7 +68,7 @@ const addListRoute = (app: HubApp, { authorization }: KeyRouteOptions): void => 
 };
 
 const addCreateRoute = (app: HubApp, options: KeyRouteOptions): void => {
-  const { authorization } = options;
+  const { authorization, bus } = options;
   app.post(
     "/api/v1/environments/:environmentId/keys",
     { schema: { params: environmentParams, body: nameBody, response: { 201: createdKeyReply } } },
@@ -103,12 +106,19 @@ const addCreateRoute = (app: HubApp, options: KeyRouteOptions): void => {
         },
         "A project key was created",
       );
+      bus.publish({
+        type: "key.created",
+        orgId: created.environment.orgId,
+        environmentId: created.environment.id,
+        actor: { userId: request.actor.userId },
+        data: { keyId: created.key.id, environmentId: created.environment.id },
+      });
       return await reply.code(201).send({ ...created.key, token, hubUrl: sdkUrlOf(options.publicUrl()) });
     },
   );
 };
 
-const addRevokeRoute = (app: HubApp, { authorization, hooks }: KeyRouteOptions): void => {
+const addRevokeRoute = (app: HubApp, { authorization, hooks, bus }: KeyRouteOptions): void => {
   app.delete(
     "/api/v1/keys/:keyId",
     { schema: { params: keyParams, response: { 204: noContent } } },
@@ -133,6 +143,13 @@ const addRevokeRoute = (app: HubApp, { authorization, hooks }: KeyRouteOptions):
         },
         "A project key was revoked",
       );
+      bus.publish({
+        type: "key.revoked",
+        orgId: revoked.orgId,
+        environmentId: revoked.environmentId,
+        actor: { userId: request.actor.userId },
+        data: { keyId: revoked.keyId, environmentId: revoked.environmentId },
+      });
       await hooks.run(revoked, request.log);
       return await reply.code(204).send(null);
     },
