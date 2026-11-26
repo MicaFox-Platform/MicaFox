@@ -21,7 +21,7 @@ afterEach(async () => {
 });
 
 const migrated = async (): Promise<TestDatabase> => {
-  const test = await openTestDatabase();
+  const test = await openTestDatabase({ migrated: true });
   opened.push(test);
   await migrate(
     test.db,

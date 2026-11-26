@@ -75,7 +75,7 @@ const resolveTestActor: ActorResolver = async (request) => {
 
 // The test database, migrated, with organizations A and B
 const openDatabaseWithOrganizations = async (): Promise<TestDatabase> => {
-  const test = await openTestDatabase();
+  const test = await openTestDatabase({ migrated: true });
   await migrate(
     test.db,
     { url: test.ownerUrl ?? test.url, packages: [CORE_MIGRATIONS], log: test.logger },

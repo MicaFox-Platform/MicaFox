@@ -16,7 +16,7 @@ afterEach(async () => {
 });
 
 const migratedWithEnvironment = async (): Promise<{ test: TestDatabase; projectId: string; environmentId: string }> => {
-  const test = await openTestDatabase();
+  const test = await openTestDatabase({ migrated: true });
   opened.push(test);
   await migrate(
     test.db,
