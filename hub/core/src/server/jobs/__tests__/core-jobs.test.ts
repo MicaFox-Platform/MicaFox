@@ -5,8 +5,17 @@ import { addProjectKey, readLastUse } from "../../../../test/access/project-key.
 import { openJobsDatabase } from "../../../../test/db/jobs-database.js";
 import { ORG_A } from "../../../../test/db/test-database.js";
 import type { TestDatabase } from "../../../../test/db/test-database.js";
+import { createTestEvents } from "../../../../test/events/test-events.js";
+import {
+  addEnvironment,
+  addOfflineInstances,
+  readInstances,
+} from "../../../../test/sdk-endpoint/instances-database.js";
+import { createRecordingInstances } from "../../../../test/sdk-endpoint/recording-instances.js";
+import { helloOf } from "../../../../test/sdk-endpoint/sdk-client.js";
 import { createKeyUses } from "../../access/index.js";
 import type { Database } from "../../db/index.js";
+import { createInstances } from "../../sdk-endpoint/index.js";
 import { createCoreJobs } from "../core-jobs.js";
 
 const NOW = Date.parse("2026-11-25T12:00:00Z");
@@ -17,7 +26,12 @@ const neverAborted = new AbortController().signal;
 const opened: TestDatabase[] = [];
 
 const coreJobsOf = (db: Database) =>
-  createCoreJobs({ db, now: () => NOW, keyUses: createKeyUses({ db, now: () => NOW }) });
+  createCoreJobs({
+    db,
+    now: () => NOW,
+    keyUses: createKeyUses({ db, now: () => NOW }),
+    instances: createRecordingInstances(),
+  });
 
 afterEach(async () => {
   await Promise.all(
@@ -28,7 +42,7 @@ afterEach(async () => {
 });
 
 describe("createCoreJobs", () => {
-  it("expires sessions every hour and writes the last use of keys every minute", async () => {
+  it("expires sessions every hour, writes the last use of keys and the last seen of instances every minute", async () => {
     const test = await openJobsDatabase();
     opened.push(test);
 
@@ -37,6 +51,8 @@ describe("createCoreJobs", () => {
     expect(jobs.map((job) => [job.name, job.everyMs])).toEqual([
       ["core.expire-sessions", 3_600_000],
       ["core.write-key-last-use", 60_000],
+      ["core.write-instances-last-seen", 60_000],
+      ["core.delete-stale-instances", 3_600_000],
     ]);
   });
 
@@ -45,7 +61,7 @@ describe("createCoreJobs", () => {
     opened.push(test);
     const keyId = await addProjectKey(test.db, { orgId: ORG_A });
     const keyUses = createKeyUses({ db: test.db, now: () => NOW });
-    const write = createCoreJobs({ db: test.db, now: () => NOW, keyUses }).find(
+    const write = createCoreJobs({ db: test.db, now: () => NOW, keyUses, instances: createRecordingInstances() }).find(
       (job) => job.name === "core.write-key-last-use",
     );
     keyUses.note(keyId);
@@ -53,6 +69,41 @@ describe("createCoreJobs", () => {
     await write?.run(neverAborted);
 
     expect(await readLastUse(test.db, keyId)).toBe(new Date(NOW).toISOString());
+  });
+
+  it("writes the last seen time of online instances and deletes those not seen for 7 days", async () => {
+    const test = await openJobsDatabase();
+    opened.push(test);
+    const scope = await addEnvironment(test.db, ORG_A);
+    await addOfflineInstances(test.db, scope, { count: 1, firstSeenAt: new Date(NOW - 8 * DAY_MS), prefix: "stale" });
+    let now = NOW;
+    const instances = createInstances({
+      db: test.db,
+      bus: createTestEvents().bus,
+      now: () => now,
+      warnCollapsed: () => undefined,
+    });
+    await instances.track({
+      key: scope,
+      hello: helloOf({ instanceId: "online" }),
+      modules: [],
+      closed: new Promise(() => undefined),
+    });
+    now = NOW + 60_000;
+    const jobs = createCoreJobs({
+      db: test.db,
+      now: () => now,
+      keyUses: createKeyUses({ db: test.db, now: () => now }),
+      instances,
+    });
+
+    for (const name of ["core.write-instances-last-seen", "core.delete-stale-instances"]) {
+      await jobs.find((job) => job.name === name)?.run(neverAborted);
+    }
+
+    expect((await readInstances(test.db, scope.environmentId)).map((row) => [row.instanceId, row.lastSeenAt])).toEqual([
+      ["online", new Date(NOW + 60_000).toISOString()],
+    ]);
   });
 
   it("deletes the sessions unused for over 7 days or begun over 30 days ago, and keeps the others", async () => {

@@ -30,7 +30,8 @@ import { addFeatureRoutes } from "../feature/index.js";
 import type { Extension, Feature, FeatureRegistry, Gate, SdkApi } from "../feature/index.js";
 import { createLogger } from "../observability/index.js";
 import type { HubLogger } from "../observability/index.js";
-import { createSdkResend } from "../sdk-endpoint/index.js";
+import { createInstances, createSdkResend } from "../sdk-endpoint/index.js";
+import type { Instances } from "../sdk-endpoint/index.js";
 
 /** What the app that runs the hub gives it; the settings come from `env`. */
 export interface HubOptions {
@@ -190,6 +191,7 @@ const accessOptionsOf = (parts: {
   featureParts: FeatureParts;
   events: Events;
   sdk: SdkApi;
+  instances: Instances;
 }): AccessOptions => ({
   db: parts.db,
   events: parts.events,
@@ -197,6 +199,7 @@ const accessOptionsOf = (parts: {
   entitlements: parts.featureParts.entitlements,
   addFeatureRoutes: (scope, authorization) => {
     const { registry, gate } = parts.featureParts;
+    parts.instances.addRoutes(scope, authorization);
     addFeatureRoutes(scope, { registry, authorization, gate, sdk: parts.sdk });
   },
   publicUrl: parts.publicUrl,
@@ -222,13 +225,17 @@ export const createHub = (options: HubOptions): Hub => {
   const events = addEvents({ log: logger.log, clock }, lifecycle.addStopHook);
   const keyUses = createKeyUses({ db, now: clock.now });
   const sdk = createSdkResend({ db, bus: events.bus, log: logger.log });
-  const jobs = addJobs({ settings, db, featureParts, keyUses, sdk, log: logger.log, clock }, lifecycle.addStopHook);
+  const instances = createInstances({ db, bus: events.bus, now: clock.now, warnCollapsed: logger.warnCollapsed });
+  const jobs = addJobs(
+    { settings, db, featureParts, keyUses, instances, sdk, log: logger.log, clock },
+    lifecycle.addStopHook,
+  );
   registerHealth(app, lifecycle.getPhase);
   const access = addAccess(
     app,
-    accessOptionsOf({ db, options, clock, publicUrl: publicUrl.get, featureParts, events, sdk }),
+    accessOptionsOf({ db, options, clock, publicUrl: publicUrl.get, featureParts, events, sdk, instances }),
   );
-  addSdk({ app, settings, access, keyUses, featureParts, events, logger, clock }, lifecycle.addStopHook);
+  addSdk({ app, settings, access, keyUses, instances, featureParts, events, logger, clock }, lifecycle.addStopHook);
 
   const becomeReady = async (url: string): Promise<void> => {
     await runReadinessSteps(lifecycle.steps, lifecycle.signal);

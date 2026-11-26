@@ -23,6 +23,10 @@ describe("can", () => {
     expect(can(actorWith(role), "project.read", { orgId: ORG })).toBe(true);
   });
 
+  it.each(["owner", "admin", "member"] as const)("lets an %s read instances", (role) => {
+    expect(can(actorWith(role), "instance.read", { orgId: ORG })).toBe(true);
+  });
+
   it.each(["owner", "admin", "member"] as const)("lets an %s do a feature's action", (role) => {
     expect(can(actorWith(role), "debugger.breakpoint.create", { orgId: ORG })).toBe(true);
   });

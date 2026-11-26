@@ -105,8 +105,8 @@ export interface HandshakeOptions {
   gate: Gate;
   timers: Timers;
   warnCollapsed: (key: string, fields: Record<string, unknown>, message: string) => void;
-  /** Called once `welcome` is sent, with the modules it lists: routing and state start from here. */
-  onWelcomed: (connection: Connection, modules: readonly string[]) => void;
+  /** Called once `welcome` is sent, with the modules it lists and the `hello`: routing and state start from here. */
+  onWelcomed: (connection: Connection, modules: readonly string[], hello: Hello) => void;
 }
 
 const welcomeOf = (hello: Hello, modules: string[]): Welcome => ({ version: hello.version, type: "welcome", modules });
@@ -131,7 +131,7 @@ const acceptHello = async (
   }
   socket.send(JSON.stringify(welcomeOf(hello, modules)));
   connection.log.info({ modules, version: hello.version }, "sdk.connected");
-  parts.onWelcomed(connection, modules);
+  parts.onWelcomed(connection, modules, hello);
   return true;
 };
 

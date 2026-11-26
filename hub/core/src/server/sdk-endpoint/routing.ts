@@ -6,25 +6,17 @@ import type { FrameData } from "./handshake.js";
 import { createRateLimit } from "./liveness.js";
 import { CLOSE } from "./sessions.js";
 import type { Connection, SdkSessions } from "./sessions.js";
+import { hasUnstorable, replaceUnstorable } from "../db/index.js";
 import type { ProtocolModule, SdkSession } from "../feature/index.js";
 
 /** A frame is nested at most this deep, the frame itself being level 1: a batch holds its messages at level 3. */
 const MAX_DEPTH = 64;
 
-// Postgres cannot store NUL in text; a lone surrogate is not text at all. NUL comes in as a variable, which the
-// control-character rule cannot see, so the pattern is not spelt with a control character
-const NUL = String.fromCharCode(0);
-const UNSTORABLE = new RegExp(
-  `${NUL}|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?<![\\uD800-\\uDBFF])[\\uDC00-\\uDFFF]`,
-  "g",
-);
-const REPLACEMENT = "\uFFFD";
-
 // Fails on bytes that are not UTF-8, where `toString` would turn them into U+FFFD unnoticed
 const strictUtf8 = new TextDecoder("utf-8", { fatal: true });
 
 /** What the endpoint counts: what it drops or repairs, for the metrics to report. */
-export type SdkCountName = "sanitized" | "rate-limited" | "handler-failed";
+export type SdkCountName = "sanitized" | "rate-limited" | "handler-failed" | "cut";
 
 /** How often each thing was counted since the hub started. */
 export interface SdkCounts {
@@ -50,11 +42,6 @@ type Json = Record<string, unknown> | unknown[];
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
-
-const hasUnstorable = (text: string): boolean => {
-  UNSTORABLE.lastIndex = 0;
-  return UNSTORABLE.test(text);
-};
 
 // One pass over every value, with a stack instead of recursion since the depth is what is being checked; it never
 // allocates more than the stack. Gives the depth, and whether some string or key holds what Postgres cannot store.
@@ -83,11 +70,7 @@ const measure = (root: Json): { depth: number; hasUnstorable: boolean } => {
 // Rebuilds `value` with U+FFFD for what Postgres cannot store, and counts each one; recursion is safe, as `measure`
 // has bounded the depth. Two keys that become the same keep the later value.
 const scrub = (value: unknown, counter: { replaced: number }): unknown => {
-  const replace = (text: string): string =>
-    text.replace(UNSTORABLE, () => {
-      counter.replaced += 1;
-      return REPLACEMENT;
-    });
+  const replace = (text: string): string => replaceUnstorable(text, counter);
   if (typeof value === "string") {
     return replace(value);
   }

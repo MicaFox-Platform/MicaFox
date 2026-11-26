@@ -5,9 +5,10 @@ import { afterEach, describe, expect, it } from "vitest";
 import { addProjectKey } from "../../../../test/access/project-key.js";
 import { ORG_A } from "../../../../test/db/test-database.js";
 import { emptyFeature, protocolModule } from "../../../../test/feature/fixtures.js";
-import { connectSdk, openSdk } from "../../../../test/sdk-endpoint/sdk-client.js";
+import { connectSdk, helloOf, openSdk } from "../../../../test/sdk-endpoint/sdk-client.js";
 import { envOf, TEST_MODE_LINES } from "../../../../test/server/env.js";
 import { captureLog } from "../../../../test/server/log-capture.js";
+import type { LogCapture } from "../../../../test/server/log-capture.js";
 import type { Actor } from "../../access/index.js";
 import { createHub } from "../index.js";
 import type { Hub } from "../index.js";
@@ -26,16 +27,18 @@ interface Setup {
   /** Ends the readiness step that holds the hub. */
   release: () => void;
   keyId: Promise<string>;
+  log: LogCapture;
 }
 
 // A hub with organization A and its key of TOKEN, held before ready until `release`, every request made by A's admin
 const createHeldHub = (): Setup => {
+  const log = captureLog();
   const hub = createHub({
     env: envOf(TEST_MODE_LINES),
     version: "1.2.3",
     build: "basic-hub",
     features: [emptyFeature("debugger", { protocol: protocolModule("debugger") })],
-    logStream: captureLog().stream,
+    logStream: log.stream,
     actorResolver: async () => await Promise.resolve(ADMIN),
   });
   hubs.push(hub);
@@ -54,15 +57,35 @@ const createHeldHub = (): Setup => {
     resolveKey(await addProjectKey(hub.db, { orgId: ORG_A, token: TOKEN }));
     await held;
   });
-  return { hub, release, keyId };
+  return { hub, release, keyId, log };
 };
 
-const startReady = async (): Promise<{ hub: Hub; url: string; keyId: string }> => {
-  const { hub, release, keyId } = createHeldHub();
+const startReady = async (): Promise<{ hub: Hub; url: string; keyId: string; log: LogCapture }> => {
+  const { hub, release, keyId, log } = createHeldHub();
   release();
   const running = await hub.start();
   await running.ready;
-  return { hub, url: running.url, keyId: await keyId };
+  return { hub, url: running.url, keyId: await keyId, log };
+};
+
+// The environment the key of `keyId` leads to
+const environmentOf = async (hub: Hub, keyId: string): Promise<string> =>
+  await hub.db.system("test: find the environment of a key", async (trx) => {
+    const { rows } = await sql<{
+      id: string;
+    }>`select environment_id as id from credentials where id = ${keyId}`.execute(trx);
+    return rows[0]?.id ?? "";
+  });
+
+interface Listed {
+  id: string;
+  online: boolean;
+  service?: string;
+}
+
+const listInstances = async (url: string, environmentId: string): Promise<Listed[]> => {
+  const response = await fetch(`${url}/api/v1/environments/${environmentId}/instances`);
+  return ((await response.json()) as { items: Listed[] }).items;
 };
 
 // Sends a raw upgrade request to `path` and resolves with what the hub wrote once it closed the socket
@@ -123,6 +146,35 @@ describe("the SDK endpoint in the hub", () => {
     const [closed, stopped] = await Promise.all([client.closed, hub.stop()]);
 
     expect([closed, stopped]).toEqual([{ code: 1001 }, { clean: true }]);
+  });
+
+  it("lists a connected SDK as an online instance, offline once it closes, and cuts what is too long", async () => {
+    const { hub, url, keyId } = await startReady();
+    const environmentId = await environmentOf(hub, keyId);
+    const client = await openSdk(url, TOKEN);
+
+    await client.hello(helloOf({ instanceId: "instance-1", service: "s".repeat(300) }));
+    await expect
+      .poll(async () => await listInstances(url, environmentId))
+      .toMatchObject([{ id: "instance-1", online: true, service: "s".repeat(128) }]);
+    client.socket.close();
+    await client.closed;
+
+    await expect
+      .poll(async () => (await listInstances(url, environmentId)).map((item) => item.online))
+      .toEqual([false]);
+  });
+
+  it("records no failed instance write when it stops with an SDK connected", async () => {
+    const { hub, url, keyId, log } = await startReady();
+    const environmentId = await environmentOf(hub, keyId);
+    const client = await openSdk(url, TOKEN);
+    await client.hello();
+    await expect.poll(async () => (await listInstances(url, environmentId)).length).toBe(1);
+
+    await hub.stop();
+
+    expect(log.lines().filter((line) => String(line.msg).startsWith("instances."))).toEqual([]);
   });
 
   it("answers an upgrade to another route over HTTP and closes its socket", async () => {

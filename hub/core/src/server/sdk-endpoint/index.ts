@@ -5,6 +5,7 @@ import type { IncomingMessage } from "node:http";
 import type { Logger } from "pino";
 
 import { startHandshake } from "./handshake.js";
+import type { Instances, TrackedSession } from "./instances/index.js";
 import { createLiveness } from "./liveness.js";
 import type { Liveness } from "./liveness.js";
 import { createSdkCounts, startRouting } from "./routing.js";
@@ -23,6 +24,8 @@ import type { EventBus } from "../events/index.js";
 import type { Gate, ProtocolModule } from "../feature/index.js";
 import type { Timers } from "../observability/index.js";
 
+export { createInstances } from "./instances/index.js";
+export type { Instances, Tracked, TrackedSession } from "./instances/index.js";
 export { createSdkResend } from "./state.js";
 export type { SdkCounts, SdkCountName } from "./routing.js";
 
@@ -41,6 +44,8 @@ export interface SdkEndpointOptions {
   /** The SDK module of each feature the hub runs. */
   modules: readonly ProtocolModule[];
   bus: EventBus;
+  /** The connected instances each accepted `hello` is recorded in. */
+  instances: Instances;
   log: Logger;
   warnCollapsed: (key: string, fields: Record<string, unknown>, message: string) => void;
   clock: Timers & { now: () => number };
@@ -141,6 +146,31 @@ const watchActivity = (parts: Parts, connection: Connection, socket: WebSocket):
   });
 };
 
+// Records the instance; what the hub had to cut or repair in its `hello` is counted, with a collapsed warning. Nothing
+// it does may reject unheard, which would crash the hub
+const trackInstance = (parts: Parts, session: TrackedSession): void => {
+  const { options, counts } = parts;
+  const { key } = session;
+  const tracking = options.instances.track(session).then(({ cut, replaced }) => {
+    if (replaced > 0) {
+      counts.add("sanitized", replaced);
+    }
+    if (cut > 0) {
+      counts.add("cut", cut);
+    }
+    if (cut > 0 || replaced > 0) {
+      options.warnCollapsed(
+        `sdk.hello-cut:${key.prefix}`,
+        { keyPrefix: key.prefix, environmentId: key.environmentId, cut, replaced },
+        "sdk.hello-cut",
+      );
+    }
+  });
+  tracking.catch((error: unknown) => {
+    options.log.error({ err: error, keyPrefix: key.prefix }, "sdk.instance-track-failed");
+  });
+};
+
 const openSession = (parts: Parts, socket: WebSocket, request: FastifyRequest): void => {
   const connection = parts.connections.get(request.raw);
   if (connection === undefined) {
@@ -155,7 +185,7 @@ const openSession = (parts: Parts, socket: WebSocket, request: FastifyRequest): 
     gate: parts.options.gate,
     timers: parts.options.clock,
     warnCollapsed: parts.options.warnCollapsed,
-    onWelcomed: (welcomed, modules) => {
+    onWelcomed: (welcomed, modules, hello) => {
       startRouting(welcomed, socket, {
         sessions: parts.sessions,
         modules: parts.modules,
@@ -165,6 +195,7 @@ const openSession = (parts: Parts, socket: WebSocket, request: FastifyRequest): 
         warnCollapsed: parts.options.warnCollapsed,
       });
       parts.state.sendAll(welcomed, modules);
+      trackInstance(parts, { key: welcomed.key, hello, modules, closed: welcomed.closed });
     },
   });
 };
@@ -253,6 +284,7 @@ export const addSdkEndpoint = (app: HubApp, options: SdkEndpointOptions): SdkEnd
   return {
     closeAll: async () => {
       await sessions.closeAll(CLOSE.goingAway);
+      await options.instances.idle();
       parts.liveness.stop();
     },
     counts: counts.list,

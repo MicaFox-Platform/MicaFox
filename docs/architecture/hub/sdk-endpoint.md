@@ -48,7 +48,14 @@ hub/core/src/server/sdk-endpoint/
 ├── sessions.ts      open sessions by environment, replacing and closing them
 ├── routing.ts       frames and batches to features, by module; depth and string checks; the counts
 ├── state.ts         a module's state after welcome and on a resend; `sdk.resend`
-├── instances.ts     the instances table, online state, last seen and the instances API
+├── instances/       connected instances
+│   ├── index.ts     `createInstances`: what the endpoint, the jobs and the routes use
+│   ├── fields.ts    cutting the overlong fields of a hello
+│   ├── online.ts    the sessions this replica holds, by environment and instance
+│   ├── queries.ts   the upsert and its cap, last seen, expiry and the list
+│   ├── routes.ts    `GET /api/v1/environments/{environmentId}/instances`
+│   ├── schemas.ts   the route's query and reply
+│   └── tables.ts    the `instances` table for Kysely
 └── liveness.ts      the idle sweep and the per-session rate limit
 ```
 
@@ -124,18 +131,23 @@ hub/core/src/server/sdk-endpoint/
 ### Keeping instances
 
 1. Each `hello` upserts its instance into `instances`, keyed by environment and `instanceId`: service, labels,
-   hostname, pid, SDK, runtime, modules, commit, protocol version, the key's prefix and the connect time. Fields are
-   cut to fit: service at 128 characters, hostname at 255, the first 32 labels with keys of at most 64 and values
-   of at most 256 characters, SDK and runtime names and versions at 64; each cut is counted with a collapsed warning,
-   and the session stays.
+   hostname, pid, SDK, runtime, the modules the session agreed on, commit, protocol version, the key's prefix and the
+   connect time. Fields are cut to fit: service at 128 characters, hostname at 255, the first 32 labels with keys of
+   at most 64 and values of at most 256 characters, SDK and runtime names and versions and the commit at 64, a `pid`
+   that is not a positive 31-bit integer becomes 0. NUL characters and unpaired surrogates become U+FFFD. Each cut
+   and each replacement is counted, with one collapsed warning, and the session stays. A write that fails is
+   logged and the session stays without a row until it reconnects.
 2. An instance is online while this replica holds a session for it; nothing in the table says so, so a crash or a
    lost database never leaves an instance online. A job writes `last_seen_at` of the online ones every minute, and a
-   closed session writes it once more.
-3. A new instance beyond 1000 in an environment deletes the oldest offline one; offline instances not seen for 7
-   days are deleted every hour.
-4. `GET /api/v1/environments/{environmentId}/instances` lists them with `online` and every `hello` field
-   ([HTTP API](../../api/hub/http.md#instances)); `instance.connected` and `instance.disconnected` events keep the
-   screens live. Features read instances through hub-core and keep their own per-instance data. Why:
+   closed session writes it once more. A session that a newer one of the same instance replaced writes nothing and
+   leaves the instance online, and an older `hello` written late never overwrites a newer one.
+3. A new instance beyond 1000 in an environment deletes the oldest offline one, never an online one; offline
+   instances not seen for 7 days are deleted every hour.
+4. `GET /api/v1/environments/{environmentId}/instances` (any member; `instance.read`) lists them with `online` and
+   every `hello` field ([HTTP API](../../api/hub/http.md#instances)). `instance.connected`, once the row is
+   written, and `instance.disconnected`, once the session has closed and the write of its last seen time has
+   settled, keep the screens live; their `data` is `{ environmentId, instanceId }`. Features read instances through hub-core and keep
+   their own per-instance data. Why:
    [ADR 0036](../../adr/hub/sdk-endpoint/0036-keep-connected-instances-in-hub-core.md).
 
 ### Keeping a session alive

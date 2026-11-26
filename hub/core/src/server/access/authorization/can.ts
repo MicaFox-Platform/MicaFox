@@ -32,6 +32,7 @@ const CORE_ACTIONS: ReadonlyMap<string, Level> = new Map<string, Level>([
   ["environment.create", "admin"],
   ["environment.update", "admin"],
   ["entitlement.read", "member"],
+  ["instance.read", "member"],
   ["key.read", "admin"],
   ["key.create", "admin"],
   ["key.revoke", "admin"],

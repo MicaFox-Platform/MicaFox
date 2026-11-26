@@ -16,6 +16,7 @@ import { createJobs } from "../jobs/index.js";
 import type { Jobs } from "../jobs/index.js";
 import type { HubLogger } from "../observability/index.js";
 import { addSdkEndpoint } from "../sdk-endpoint/index.js";
+import type { Instances } from "../sdk-endpoint/index.js";
 
 /** A step or hook was added when the hub's phase no longer allows it. */
 export class HubStateError extends Error {
@@ -150,6 +151,7 @@ export const addJobs = (
     db: Database;
     featureParts: FeatureParts;
     keyUses: KeyUses;
+    instances: Instances;
     sdk: SdkApi;
     log: Logger;
     clock: Clock;
@@ -165,6 +167,7 @@ export const addJobs = (
     log: parts.log,
     clock: parts.clock,
     keyUses: parts.keyUses,
+    instances: parts.instances,
     sdk: parts.sdk,
   });
   addStopHook(
@@ -189,6 +192,7 @@ export const addSdk = (
     settings: Settings;
     access: Access;
     keyUses: KeyUses;
+    instances: Instances;
     featureParts: FeatureParts;
     events: Events;
     logger: HubLogger;
@@ -203,6 +207,7 @@ export const addSdk = (
     gate: parts.featureParts.gate,
     modules: parts.featureParts.registry.modules.map(({ part }) => part),
     bus: parts.events.bus,
+    instances: parts.instances,
     log: parts.logger.log,
     warnCollapsed: parts.logger.warnCollapsed,
     clock: parts.clock,
