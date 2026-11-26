@@ -11,6 +11,7 @@ export type {
   ProtocolModule,
   RetentionContext,
   RetentionPolicy,
+  SdkApi,
   SdkSession,
 } from "./contract.js";
 export { createGate } from "./gate.js";

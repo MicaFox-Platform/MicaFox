@@ -61,6 +61,7 @@ const RESERVED_NAMES: ReadonlySet<string> = new Set([
   "password-resets",
   "project",
   "projects",
+  "sdk",
   "session",
   "sessions",
   "setup",

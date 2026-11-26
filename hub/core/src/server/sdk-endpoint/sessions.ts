@@ -3,6 +3,7 @@ import type { Duplex } from "node:stream";
 import type { Logger } from "pino";
 
 import type { KeyScope } from "../access/index.js";
+import type { SdkSession } from "../feature/index.js";
 import type { Timers } from "../observability/index.js";
 
 /** WebSocket close codes the hub sends besides the protocol's own `CLOSE_CODES`. */
@@ -11,6 +12,9 @@ export const CLOSE = { goingAway: 1001, policyViolation: 1008, internalError: 10
 // A peer that does not answer a close within this time is cut off, so it holds no slot and no stop waits on it.
 // ws would wait 30 s for the closing handshake.
 const CLOSE_GRACE_MS = 2000;
+
+// `readyState` of an open WebSocket, as `ws` names it `WebSocket.OPEN`
+const SOCKET_OPEN = 1;
 
 /** One SDK connection, from the key check before the upgrade until its socket closes. */
 export interface Connection {
@@ -21,11 +25,28 @@ export interface Connection {
   readonly closed: Promise<void>;
   /** When the connection last received anything, a ping included; for the idle check. */
   readonly lastActivityMs: number;
+  /** What a feature sees of the instance; set when its `hello` is accepted. */
+  readonly session: SdkSession | undefined;
+  /** The modules `welcome` listed: the only ones whose messages reach a feature. Empty until the `hello`. */
+  readonly modules: ReadonlySet<string>;
+  /** The protocol version of the `hello`, which every later message must carry: ADR 0016. */
+  readonly version: number | undefined;
+}
+
+/** What a `hello` that is accepted makes of a connection. */
+export interface Registration {
+  instanceId: string;
+  /** The modules of `welcome`. */
+  modules: readonly string[];
+  version: number;
 }
 
 interface Entry extends Connection {
   log: Logger;
   lastActivityMs: number;
+  session: SdkSession | undefined;
+  modules: ReadonlySet<string>;
+  version: number | undefined;
   readonly raw: Duplex;
   socket: WebSocket | undefined;
   instanceId: string | undefined;
@@ -47,6 +68,8 @@ export interface SessionsOptions {
 export class SdkSessions {
   private readonly entries = new Set<Entry>();
   private readonly byKey = new Map<string, Set<Entry>>();
+  // Only the registered ones: those with a `hello` accepted
+  private readonly byEnvironment = new Map<string, Set<Entry>>();
   // `<environmentId> <instanceId>`: ids are UUIDs and `instanceId` is checked, so no space can blur the two
   private readonly byInstance = new Map<string, Entry>();
 
@@ -77,6 +100,9 @@ export class SdkSessions {
       closed,
       raw,
       lastActivityMs: this.options.now(),
+      session: undefined,
+      modules: new Set(),
+      version: undefined,
       socket: undefined,
       instanceId: undefined,
       closeCode: undefined,
@@ -108,10 +134,11 @@ export class SdkSessions {
   }
 
   /**
-   * Makes the connection the session of `instanceId` in its environment; an open session of the same instance there
-   * closes with 1001. Answers false, and keeps nothing, when the connection is closing.
+   * Makes the connection the session of the instance in its environment, with the modules agreed; an open session
+   * of the same instance there closes with 1001. Answers false, and keeps nothing, when the connection is closing.
    */
-  register(connection: Connection, instanceId: string): boolean {
+  register(connection: Connection, registration: Registration): boolean {
+    const { instanceId } = registration;
     const entry = this.entryOf(connection);
     if (this.isClosing(entry)) {
       return false;
@@ -123,7 +150,29 @@ export class SdkSessions {
     }
     entry.instanceId = instanceId;
     entry.log = entry.log.child({ instanceId });
+    entry.modules = new Set(registration.modules);
+    entry.version = registration.version;
+    const { orgId, projectId, environmentId } = entry.key;
+    entry.session = { orgId, projectId, environmentId, instanceId };
     this.byInstance.set(slot, entry);
+    this.addToEnvironment(entry);
+    return true;
+  }
+
+  /** The open sessions of an environment that agreed on `module`, O(sessions of the environment). */
+  inEnvironment(environmentId: string, module: string): Connection[] {
+    return [...(this.byEnvironment.get(environmentId) ?? [])].filter(
+      (entry) => entry.modules.has(module) && !this.isClosing(entry),
+    );
+  }
+
+  /** Sends a text frame; answers false when the connection is closing or its socket is not open. */
+  send(connection: Connection, frame: string): boolean {
+    const { socket } = this.entryOf(connection);
+    if (this.isClosing(connection) || socket?.readyState !== SOCKET_OPEN) {
+      return false;
+    }
+    socket.send(frame);
     return true;
   }
 
@@ -179,6 +228,22 @@ export class SdkSessions {
     );
   }
 
+  private addToEnvironment(entry: Entry): void {
+    const { environmentId } = entry.key;
+    const inEnvironment = this.byEnvironment.get(environmentId) ?? new Set<Entry>();
+    inEnvironment.add(entry);
+    this.byEnvironment.set(environmentId, inEnvironment);
+  }
+
+  private removeFromEnvironment(entry: Entry): void {
+    const { environmentId } = entry.key;
+    const inEnvironment = this.byEnvironment.get(environmentId);
+    inEnvironment?.delete(entry);
+    if (inEnvironment?.size === 0) {
+      this.byEnvironment.delete(environmentId);
+    }
+  }
+
   private release(entry: Entry): void {
     this.entries.delete(entry);
     if (entry.graceTimer !== undefined) {
@@ -190,6 +255,7 @@ export class SdkSessions {
       this.byKey.delete(entry.key.keyId);
     }
     const slot = `${entry.key.environmentId} ${entry.instanceId ?? ""}`;
+    this.removeFromEnvironment(entry);
     // A session that was replaced must not remove its replacement
     if (entry.instanceId !== undefined && this.byInstance.get(slot) === entry) {
       this.byInstance.delete(slot);

@@ -46,7 +46,8 @@ hub/core/src/server/sdk-endpoint/
 ├── upgrade.ts       the key check and limits, and the HTTP answer before the upgrade
 ├── handshake.ts     the hello timer and checks, the welcome modules
 ├── sessions.ts      open sessions by environment, replacing and closing them
-├── routing.ts       frames and batches to features, by module, then type; depth and string checks
+├── routing.ts       frames and batches to features, by module; depth and string checks; the counts
+├── state.ts         a module's state after welcome and on a resend; `sdk.resend`
 ├── instances.ts     the instances table, online state, last seen and the instances API
 └── liveness.ts      the idle sweep and the per-session rate limit
 ```
@@ -90,24 +91,35 @@ hub/core/src/server/sdk-endpoint/
 ### Routing a message
 
 1. Each frame must be UTF-8 JSON of a protocol message or a `batch`, in the session's version, nested at most 64
-   levels deep; otherwise the session closes with `protocolError`. A batch is handled message by message, in order.
+   levels deep; otherwise the session closes with `protocolError`. A batch holds messages, never a batch, and is
+   handled message by message, in order.
 2. NUL characters and unpaired surrogates in strings and property names, which Postgres cannot store, are replaced
    with U+FFFD and counted, so no message can stall the [write queue](database.md#writing-in-batches).
 3. A repeated `hello`, a message without `module` (with a collapsed warning), a module the session did not agree on
    and an unknown one are ignored. Every other message goes to its feature's `onMessage(session, message)`, which
    checks it against its own schema.
-4. A session may send `MICAFOX_SDK_MAX_MESSAGES_PER_SECOND` (1000) messages a second over 10 s; the rest are
-   dropped and counted, with a collapsed warning.
-5. When `onMessage` throws, the error is logged and counted and the session stays open.
+4. A session may send `MICAFOX_SDK_MAX_MESSAGES_PER_SECOND` (1000) messages a second over 10 s: a bucket of ten
+   seconds' worth that refills at the rate, one message of a batch each. The rest are dropped and counted, with a
+   collapsed warning.
+5. When `onMessage` throws, the error is logged, with a collapsed warning, and counted, and the session stays open.
+6. A session's frames are handled one after another, each message after the `onMessage` before it settled. While a
+   frame is being handled the socket is paused, so later frames wait in the kernel and the SDK's own buffer: the hub
+   keeps only what one read of the socket completed, about 64 KiB and at most one frame of
+   `MICAFOX_SDK_MAX_FRAME_BYTES`. A slow feature slows its own SDK down and nothing else; a session that stays
+   paused for 45 s is cut off as idle. A failure of the hub itself while routing closes the session with 1011.
 
 ### Resending the state
 
-1. After a change commits, a feature calls `sdk.resend(environmentId, module)`, which publishes an event on the
-   [bus](server.md#events).
+1. After a change commits, a feature calls `sdk.resend(environmentId, module)`, which looks up the environment's
+   organization and publishes `sdk.state.resend` on the [bus](server.md#events) with `data: { module }`. It never
+   throws: a resend that fails is logged, and the next one or the reconnect heals it. The events streams skip `sdk.*`
+   events, so no browser sees them.
 2. Each replica sends `state(session)` again to its sessions in that environment that agreed on the module.
 3. The state is always complete, never a diff
    ([ADR 0010](../../adr/protocol/0010-send-the-full-breakpoint-set-on-every-change.md)), so a resend that is lost
-   or overtaken is healed by the next one or by the reconnect.
+   or overtaken is healed by the next one or by the reconnect. At most one `state(session)` per session and module
+   is read at a time: asks that come meanwhile make one more read once it settles, and the read they overtook is
+   not sent. A burst of resends costs two reads, and the last state sent is never older than the last ask.
 
 ### Keeping instances
 
@@ -141,7 +153,8 @@ hub/core/src/server/sdk-endpoint/
 1. Open sessions stay; keys in the cache still connect, and others get 503.
 2. Writes wait in the bounded [write queue](database.md#writing-in-batches), and what does not fit is dropped and
    counted.
-3. When `state(session)` cannot read the database, the session closes with 1011 and the SDK reconnects with backoff.
+3. When `state(session)` fails, as it does when it cannot read the database, the session closes with 1011 and the SDK
+   reconnects with backoff.
 
 ## Decisions
 

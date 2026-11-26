@@ -47,7 +47,7 @@ export const debuggerFeature = defineFeature({
   server: routes, // a Fastify plugin, registered encapsulated under /api/v1/<name>
   internal: uiRoutes, // optional; UI-only routes under /api/internal/<name>, not public API
   migrations: [m0001], // migration modules in order, forward-only
-  jobs: [{ name: "expire-breakpoints", everyMs: 60_000, run: expire }], // run({ orgId, signal, log, forOrg })
+  jobs: [{ name: "expire-breakpoints", everyMs: 60_000, run: expire }], // run({ orgId, signal, log, forOrg, sdk })
   retention: [{ name: "snapshots", maxAgeDays: 30, run: deleteSnapshots }], // run({ orgId, olderThan, limit, db })
   protocol: { module: "debugger", state, onMessage }, // the SDK module this feature serves
 });
@@ -56,13 +56,16 @@ export const debuggerFeature = defineFeature({
 - `server` and `internal` are plugins `(app, access)` registered inside the scope that has the actor, so a request
   is 401 before it reaches them. `access` is `inOrganization(request, orgId)`, `inOwningOrg(request, run)` and
   `requireCan(context, action)`, the core's own helpers: the context they give holds the actor, the membership and a
-  [scoped database](database.md#scoping-a-query). Features publish [events](server.md#events).
-- A feature's name is lowercase letters, digits and dashes, and not one the core uses (`projects`, `keys`, `core`, ...),
-  since its routes, its `<name>.<action>` grants and its migrations package take it.
+  [scoped database](database.md#scoping-a-query). `access.sdk.resend(environmentId, module)` sends the module's
+  `state(session)` again to the environment's instances, once a change has committed: [resending the
+  state](sdk-endpoint.md#resending-the-state). Features publish [events](server.md#events).
+- A feature's name is lowercase letters, digits and dashes, and not one the core uses (`projects`, `keys`, `core`,
+  `sdk`, ...), since its routes, its `<name>.<action>` grants and its migrations package take it.
 - Jobs and retention `run` per organization: the scheduler calls them for each organization the gate lets through.
-  A job's `run({ orgId, signal, log, forOrg })` gets `forOrg(run)`, which is `db.forOrg(orgId, run)`, a `log` with the
-  job and the organization bound, and a `signal` that aborts at the run's time limit or when the hub stops: end the
-  work at the next safe point. `everyMs` is a whole number of milliseconds up to 2³¹ − 1.
+  A job's `run({ orgId, signal, log, forOrg, sdk })` gets `forOrg(run)`, which is `db.forOrg(orgId, run)`, a `log`
+  with the job and the organization bound, and a `signal` that aborts at the run's time limit or when the hub stops:
+  end the work at the next safe point. `sdk.resend(environmentId, module)` is the same as in routes. `everyMs` is a
+  whole number of milliseconds up to 2³¹ − 1.
 - `jobs` run under an advisory lock, one run at a time across replicas: [jobs](server.md#jobs).
 - `retention` declares how long the feature keeps its data; hub-core runs each policy as a job, and an operator
   overrides the defaults with `MICAFOX_RETENTION_<NAME>_DAYS`. A policy's `run({ orgId, olderThan, limit, db })`

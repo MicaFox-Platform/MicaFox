@@ -7,8 +7,12 @@ import type { Logger } from "pino";
 import { startHandshake } from "./handshake.js";
 import { createLiveness } from "./liveness.js";
 import type { Liveness } from "./liveness.js";
+import { createSdkCounts, startRouting } from "./routing.js";
+import type { SdkCounts } from "./routing.js";
 import { CLOSE, SdkSessions } from "./sessions.js";
 import type { Connection } from "./sessions.js";
+import { createStateSender } from "./state.js";
+import type { StateSender } from "./state.js";
 import { checkLimits, checkUpgrade, KeyCache } from "./upgrade.js";
 import type { Refusal, UpgradeCheckOptions } from "./upgrade.js";
 import type { Access, KeyUses } from "../access/index.js";
@@ -16,18 +20,26 @@ import { sendProblem } from "../app/index.js";
 import type { HubApp } from "../app/index.js";
 import type { Settings } from "../config/index.js";
 import type { EventBus } from "../events/index.js";
-import type { Gate } from "../feature/index.js";
+import type { Gate, ProtocolModule } from "../feature/index.js";
 import type { Timers } from "../observability/index.js";
+
+export { createSdkResend } from "./state.js";
+export type { SdkCounts, SdkCountName } from "./routing.js";
 
 /** The path the SDK connects to: `MICAFOX_HUB_URL` is `wss://<hub>/sdk`. */
 const SDK_PATH = "/sdk";
 
 /** What the SDK endpoint needs from the hub. */
 export interface SdkEndpointOptions {
-  settings: Pick<Settings, "sdkMaxFrameBytes" | "sdkMaxConnections" | "sdkMaxConnectionsPerKey">;
+  settings: Pick<
+    Settings,
+    "sdkMaxFrameBytes" | "sdkMaxConnections" | "sdkMaxConnectionsPerKey" | "sdkMaxMessagesPerSecond"
+  >;
   access: Access;
   keyUses: KeyUses;
   gate: Gate;
+  /** The SDK module of each feature the hub runs. */
+  modules: readonly ProtocolModule[];
   bus: EventBus;
   log: Logger;
   warnCollapsed: (key: string, fields: Record<string, unknown>, message: string) => void;
@@ -38,6 +50,8 @@ export interface SdkEndpointOptions {
 export interface SdkEndpoint {
   /** Closes every SDK connection with 1001 and settles once they have closed. */
   closeAll: () => Promise<void>;
+  /** What the endpoint dropped or repaired since the hub started, for the metrics. */
+  counts: SdkCounts["list"];
 }
 
 interface Parts {
@@ -47,6 +61,9 @@ interface Parts {
   check: UpgradeCheckOptions;
   /** The connection each request reserved in its key check. */
   connections: WeakMap<IncomingMessage, Connection>;
+  counts: SdkCounts;
+  state: StateSender;
+  modules: ReadonlyMap<string, ProtocolModule>;
 }
 
 // Node marks a request that came through `upgrade`; its socket left the HTTP parser, so after an HTTP answer nothing
@@ -138,6 +155,17 @@ const openSession = (parts: Parts, socket: WebSocket, request: FastifyRequest): 
     gate: parts.options.gate,
     timers: parts.options.clock,
     warnCollapsed: parts.options.warnCollapsed,
+    onWelcomed: (welcomed, modules) => {
+      startRouting(welcomed, socket, {
+        sessions: parts.sessions,
+        modules: parts.modules,
+        counts: parts.counts,
+        maxMessagesPerSecond: parts.options.settings.sdkMaxMessagesPerSecond,
+        now: parts.options.clock.now,
+        warnCollapsed: parts.options.warnCollapsed,
+      });
+      parts.state.sendAll(welcomed, modules);
+    },
   });
 };
 
@@ -191,6 +219,7 @@ const subscribeToChanges = (parts: Parts): void => {
     if (event.type === "entitlements.changed") {
       sessions.closeOrg(event.orgId, CLOSE.goingAway);
     }
+    parts.state.onEvent(event);
   });
 };
 
@@ -201,6 +230,8 @@ const subscribeToChanges = (parts: Parts): void => {
 export const addSdkEndpoint = (app: HubApp, options: SdkEndpointOptions): SdkEndpoint => {
   const { clock, settings } = options;
   const sessions = new SdkSessions({ timers: clock, now: clock.now });
+  const modules = new Map(options.modules.map((module) => [module.module, module]));
+  const counts = createSdkCounts();
   const parts: Parts = {
     options,
     sessions,
@@ -212,6 +243,9 @@ export const addSdkEndpoint = (app: HubApp, options: SdkEndpointOptions): SdkEnd
       limits: { maxConnections: settings.sdkMaxConnections, maxConnectionsPerKey: settings.sdkMaxConnectionsPerKey },
     },
     connections: new WeakMap(),
+    counts,
+    state: createStateSender({ sessions, modules }),
+    modules,
   };
   guardOtherUpgrades(app);
   addSdkRoute(app, parts);
@@ -221,5 +255,6 @@ export const addSdkEndpoint = (app: HubApp, options: SdkEndpointOptions): SdkEnd
       await sessions.closeAll(CLOSE.goingAway);
       parts.liveness.stop();
     },
+    counts: counts.list,
   };
 };

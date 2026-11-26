@@ -105,6 +105,8 @@ export interface HandshakeOptions {
   gate: Gate;
   timers: Timers;
   warnCollapsed: (key: string, fields: Record<string, unknown>, message: string) => void;
+  /** Called once `welcome` is sent, with the modules it lists: routing and state start from here. */
+  onWelcomed: (connection: Connection, modules: readonly string[]) => void;
 }
 
 const welcomeOf = (hello: Hello, modules: string[]): Welcome => ({ version: hello.version, type: "welcome", modules });
@@ -124,17 +126,18 @@ const acceptHello = async (
     sessions.close(connection, CLOSE.internalError);
     return false;
   }
-  if (!sessions.register(connection, hello.instanceId)) {
+  if (!sessions.register(connection, { instanceId: hello.instanceId, modules, version: hello.version })) {
     return false;
   }
   socket.send(JSON.stringify(welcomeOf(hello, modules)));
   connection.log.info({ modules, version: hello.version }, "sdk.connected");
+  parts.onWelcomed(connection, modules);
   return true;
 };
 
 /**
  * Runs the handshake of a new connection: its first frame must be a valid `hello`, answered with `welcome` within
- * 10 s of the upgrade. Later frames are not read here.
+ * 10 s of the upgrade. Later frames are routed from `onWelcomed`.
  */
 export const startHandshake = (connection: Connection, socket: WebSocket, options: HandshakeOptions): void => {
   const { sessions, timers } = options;

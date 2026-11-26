@@ -1,6 +1,6 @@
 import type { FastifyRequest } from "fastify";
 
-import type { Feature, FeatureAccess, FeatureRoutes } from "./contract.js";
+import type { Feature, FeatureAccess, FeatureRoutes, SdkApi } from "./contract.js";
 import type { Gate } from "./gate.js";
 import type { FeatureRegistry } from "./registry.js";
 import { inOrganization, inOwningOrg, requireCan } from "../access/index.js";
@@ -13,6 +13,7 @@ export interface FeatureRoutesOptions {
   registry: FeatureRegistry;
   authorization: Authorization;
   gate: Gate;
+  sdk: SdkApi;
 }
 
 // 403 `entitlement-required` when the organization lacks the feature's entitlement; core features never get here
@@ -54,6 +55,7 @@ const createAccess = (options: FeatureRoutesOptions, feature: string, isGated: b
       });
     },
     requireCan,
+    sdk: options.sdk,
   };
 };
 

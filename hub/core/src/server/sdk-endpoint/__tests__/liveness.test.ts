@@ -3,7 +3,7 @@ import pino from "pino";
 import { describe, expect, it } from "vitest";
 
 import { createManualClock } from "../../../../test/server/manual-clock.js";
-import { createLiveness } from "../liveness.js";
+import { createLiveness, createRateLimit } from "../liveness.js";
 import { SdkSessions } from "../sessions.js";
 
 const KEY = {
@@ -61,5 +61,40 @@ describe("createLiveness", () => {
     liveness.stop();
 
     expect(manual.pendingOf(5000)).toBe(0);
+  });
+});
+
+describe("createRateLimit", () => {
+  // `count` messages taken at once, as a batch takes them
+  const takeMany = (limit: ReturnType<typeof createRateLimit>, count: number): boolean[] =>
+    Array.from({ length: count }, () => limit.take());
+
+  it("lets through 10 seconds' worth at once and drops the rest", () => {
+    const manual = createManualClock();
+    const limit = createRateLimit({ perSecond: 5, now: manual.clock.now });
+
+    const answers = takeMany(limit, 52);
+
+    expect(answers.filter(Boolean)).toHaveLength(50);
+    expect(answers.slice(50)).toEqual([false, false]);
+  });
+
+  it("refills the rate a second", () => {
+    const manual = createManualClock();
+    const limit = createRateLimit({ perSecond: 5, now: manual.clock.now });
+    takeMany(limit, 50);
+
+    manual.advance(1000);
+
+    expect(takeMany(limit, 6).filter(Boolean)).toHaveLength(5);
+  });
+
+  it("never holds more than 10 seconds' worth, however long the session was quiet", () => {
+    const manual = createManualClock();
+    const limit = createRateLimit({ perSecond: 5, now: manual.clock.now });
+
+    manual.advance(3_600_000);
+
+    expect(takeMany(limit, 51).filter(Boolean)).toHaveLength(50);
   });
 });

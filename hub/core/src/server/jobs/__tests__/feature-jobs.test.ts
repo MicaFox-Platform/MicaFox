@@ -7,7 +7,7 @@ import type { TestDatabase } from "../../../../test/db/test-database.js";
 import { emptyFeature, fixtureExtension, paidFeature } from "../../../../test/feature/fixtures.js";
 import { createEntitlements } from "../../access/index.js";
 import { createFeatureRegistry, createGate } from "../../feature/index.js";
-import type { Extension, FeatureJob } from "../../feature/index.js";
+import type { Extension, FeatureJob, SdkApi } from "../../feature/index.js";
 import { scheduleFeatureJob } from "../feature-jobs.js";
 import { OrgRunError } from "../for-each-org.js";
 
@@ -22,7 +22,13 @@ afterEach(async () => {
   );
 });
 
-const setup = async (job: FeatureJob, extension?: Extension) => {
+const sdk: SdkApi = {
+  resend: async () => {
+    await Promise.resolve();
+  },
+};
+
+const setup = async (job: FeatureJob, extension?: Extension, given: SdkApi = sdk) => {
   const test = await openJobsDatabase();
   opened.push(test);
   await createEvents(test.db);
@@ -35,7 +41,7 @@ const setup = async (job: FeatureJob, extension?: Extension) => {
   if (registered === undefined) {
     throw new Error("The fixture has no job");
   }
-  return { test, scheduled: scheduleFeatureJob(registered, { db: test.db, gate, log: test.logger }) };
+  return { test, scheduled: scheduleFeatureJob(registered, { db: test.db, gate, log: test.logger, sdk: given }) };
 };
 
 describe("scheduleFeatureJob", () => {
@@ -89,6 +95,33 @@ describe("scheduleFeatureJob", () => {
     await scheduled.run(neverAborted);
 
     expect(counts).toEqual({ [ORG_A]: 2, [ORG_B]: 1 });
+  });
+
+  it("gives the job the hub's sdk to resend a module's state", async () => {
+    const resent: Array<[string, string]> = [];
+    const { scheduled } = await setup(
+      {
+        name: "expire",
+        everyMs: 60_000,
+        run: async ({ sdk: given }) => {
+          await given.resend("production", "debugger");
+        },
+      },
+      undefined,
+      {
+        resend: async (environmentId, module) => {
+          resent.push([environmentId, module]);
+          await Promise.resolve();
+        },
+      },
+    );
+
+    await scheduled.run(neverAborted);
+
+    expect(resent).toEqual([
+      ["production", "debugger"],
+      ["production", "debugger"],
+    ]);
   });
 
   it("logs with the job and the organization bound", async () => {

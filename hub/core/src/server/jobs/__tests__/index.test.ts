@@ -47,6 +47,11 @@ const build = async (features: readonly Feature[], retentionDays: Record<string,
     log: test.logger,
     clock,
     keyUses: createKeyUses({ db: test.db, now: clock.now }),
+    sdk: {
+      resend: async () => {
+        await Promise.resolve();
+      },
+    },
   });
   started.push(jobs);
   return { test, jobs };

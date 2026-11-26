@@ -3,7 +3,7 @@ import { createEntitlements } from "../../src/server/access/index.js";
 import { createEvents } from "../../src/server/events/index.js";
 import type { EventBus } from "../../src/server/events/index.js";
 import { createFeatureRegistry, createGate, defineExtension } from "../../src/server/feature/index.js";
-import type { Gate } from "../../src/server/feature/index.js";
+import type { Gate, ProtocolModule } from "../../src/server/feature/index.js";
 import { addSdkEndpoint } from "../../src/server/sdk-endpoint/index.js";
 import type { SdkEndpoint, SdkEndpointOptions } from "../../src/server/sdk-endpoint/index.js";
 import { emptyFeature, paidFeature, protocolModule } from "../feature/fixtures.js";
@@ -80,20 +80,38 @@ const createFakeAccess = (keys: Map<string, KeyScope>, database: EndpointApp["da
   };
 };
 
-// A core feature serves `debugger`; an extension feature serves `profiler`, which no organization may use
-const createTestGate = (now: () => number): Gate =>
+// Core features serve `modules`; an extension feature serves `profiler`, which no organization may use
+const createTestGate = (now: () => number, modules: readonly ProtocolModule[]): Gate =>
   createGate(
     createFeatureRegistry(
-      [emptyFeature("debugger", { protocol: protocolModule("debugger") })],
+      modules.map((module) => emptyFeature(module.module, { protocol: module })),
       defineExtension({ features: [paidFeature("profiler", { protocol: protocolModule("profiler") })] }),
     ),
     createEntitlements({ sources: [], now }),
   );
 
+const DEFAULT_SETTINGS: SdkEndpointOptions["settings"] = {
+  sdkMaxFrameBytes: 1_048_576,
+  sdkMaxConnections: 1000,
+  sdkMaxConnectionsPerKey: 500,
+  sdkMaxMessagesPerSecond: 1000,
+};
+
+// Key uses that are kept in a list instead of being written
+const noteIn = (usedKeys: string[]): SdkEndpointOptions["keyUses"] => ({
+  note: (keyId) => {
+    usedKeys.push(keyId);
+  },
+  write: async () => {
+    await Promise.resolve();
+  },
+});
+
 /** Starts the endpoint with the test gate. Organization A has the key of `tokenOf("a")`. */
 export const openEndpointApp = async (
   settings: Partial<SdkEndpointOptions["settings"]> = {},
   gate?: Gate,
+  modules: readonly ProtocolModule[] = [protocolModule("debugger")],
 ): Promise<EndpointApp> => {
   const { app, log } = createTestApp();
   const manual = createManualClock();
@@ -103,17 +121,11 @@ export const openEndpointApp = async (
   const usedKeys: string[] = [];
   const { access, revoke } = createFakeAccess(keys, database);
   const endpoint = addSdkEndpoint(app, {
-    settings: { sdkMaxFrameBytes: 1_048_576, sdkMaxConnections: 1000, sdkMaxConnectionsPerKey: 500, ...settings },
+    settings: { ...DEFAULT_SETTINGS, ...settings },
     access,
-    keyUses: {
-      note: (keyId) => {
-        usedKeys.push(keyId);
-      },
-      write: async () => {
-        await Promise.resolve();
-      },
-    },
-    gate: gate ?? createTestGate(manual.clock.now),
+    keyUses: noteIn(usedKeys),
+    gate: gate ?? createTestGate(manual.clock.now, modules),
+    modules,
     bus,
     log: app.log,
     warnCollapsed: (_key, fields, message) => {

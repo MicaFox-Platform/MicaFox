@@ -52,3 +52,35 @@ export const createLiveness = (options: LivenessOptions): Liveness => {
     },
   };
 };
+
+// A session may spend up to this many seconds' worth of its rate at once, so a burst is fine while the average holds
+const RATE_WINDOW_S = 10;
+
+/** One session's budget of messages. */
+export interface RateLimit {
+  /** Spends one message; false when the session is over its rate and the message is to be dropped. */
+  take: () => boolean;
+}
+
+/**
+ * A token bucket of `perSecond × 10` messages that refills `perSecond` a second: a session sends `perSecond` a second
+ * on average over 10 s. O(1) per message and no timer, as the bucket refills when it is asked.
+ */
+export const createRateLimit = (options: { perSecond: number; now: () => number }): RateLimit => {
+  const { perSecond, now } = options;
+  const capacity = perSecond * RATE_WINDOW_S;
+  let tokens = capacity;
+  let lastMs = now();
+  return {
+    take: () => {
+      const time = now();
+      tokens = Math.min(capacity, tokens + ((time - lastMs) / 1000) * perSecond);
+      lastMs = time;
+      if (tokens < 1) {
+        return false;
+      }
+      tokens -= 1;
+      return true;
+    },
+  };
+};

@@ -27,9 +27,10 @@ import { loadSettings, readSecretFile, summarizeSettings } from "../config/index
 import type { Database } from "../db/index.js";
 import type { Events } from "../events/index.js";
 import { addFeatureRoutes } from "../feature/index.js";
-import type { Extension, Feature, FeatureRegistry, Gate } from "../feature/index.js";
+import type { Extension, Feature, FeatureRegistry, Gate, SdkApi } from "../feature/index.js";
 import { createLogger } from "../observability/index.js";
 import type { HubLogger } from "../observability/index.js";
+import { createSdkResend } from "../sdk-endpoint/index.js";
 
 /** What the app that runs the hub gives it; the settings come from `env`. */
 export interface HubOptions {
@@ -188,6 +189,7 @@ const accessOptionsOf = (parts: {
   publicUrl: () => string;
   featureParts: FeatureParts;
   events: Events;
+  sdk: SdkApi;
 }): AccessOptions => ({
   db: parts.db,
   events: parts.events,
@@ -195,7 +197,7 @@ const accessOptionsOf = (parts: {
   entitlements: parts.featureParts.entitlements,
   addFeatureRoutes: (scope, authorization) => {
     const { registry, gate } = parts.featureParts;
-    addFeatureRoutes(scope, { registry, authorization, gate });
+    addFeatureRoutes(scope, { registry, authorization, gate, sdk: parts.sdk });
   },
   publicUrl: parts.publicUrl,
   now: parts.clock.now,
@@ -219,11 +221,12 @@ export const createHub = (options: HubOptions): Hub => {
   const lifecycle = createRegistry(steps);
   const events = addEvents({ log: logger.log, clock }, lifecycle.addStopHook);
   const keyUses = createKeyUses({ db, now: clock.now });
-  const jobs = addJobs({ settings, db, featureParts, keyUses, log: logger.log, clock }, lifecycle.addStopHook);
+  const sdk = createSdkResend({ db, bus: events.bus, log: logger.log });
+  const jobs = addJobs({ settings, db, featureParts, keyUses, sdk, log: logger.log, clock }, lifecycle.addStopHook);
   registerHealth(app, lifecycle.getPhase);
   const access = addAccess(
     app,
-    accessOptionsOf({ db, options, clock, publicUrl: publicUrl.get, featureParts, events }),
+    accessOptionsOf({ db, options, clock, publicUrl: publicUrl.get, featureParts, events, sdk }),
   );
   addSdk({ app, settings, access, keyUses, featureParts, events, logger, clock }, lifecycle.addStopHook);
 

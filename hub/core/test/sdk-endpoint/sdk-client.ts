@@ -31,6 +31,10 @@ export interface SdkClient {
   firstMessage: Promise<unknown>;
   closed: Promise<Closed>;
   send: (message: unknown) => void;
+  /** Settles with everything the hub sent so far once it has sent `count` messages. */
+  messages: (count: number) => Promise<unknown[]>;
+  /** Sends `data` as it is, for a frame that is not valid JSON or not text. */
+  sendRaw: (data: string | Buffer, options?: { binary?: boolean }) => void;
   /** Sends `hello` and settles with the hub's answer. */
   hello: (hello?: Hello) => Promise<Welcome>;
 }
@@ -69,12 +73,28 @@ const clientOf = (socket: WebSocket): SdkClient => {
   const send = (message: unknown): void => {
     socket.send(JSON.stringify(message));
   };
+  const messages: SdkClient["messages"] = async (count) =>
+    await new Promise((resolve) => {
+      const check = (): void => {
+        if (received.length >= count) {
+          socket.off("message", check);
+          resolve([...received]);
+        }
+      };
+      socket.on("message", check);
+      check();
+    });
+  const sendRaw: SdkClient["sendRaw"] = (data, options = {}) => {
+    socket.send(data, { binary: options.binary ?? false });
+  };
   return {
     socket,
     received,
     firstMessage,
     closed,
     send,
+    messages,
+    sendRaw,
     hello: async (hello = helloOf()) => {
       send(hello);
       // The test asserts the shape of what the hub answered

@@ -202,6 +202,25 @@ describe("addFeatureRoutes", () => {
     expect(reply).toEqual({ status: 200, body: { pong: true } });
   });
 
+  it("gives a feature's routes the hub's sdk to resend a module's state", async () => {
+    tenancy = await openTenancyApp({
+      features: [
+        emptyFeature("quiet", {
+          server: (app, access) => {
+            app.post("/change", async () => {
+              await access.sdk.resend("production", "debugger");
+              return { done: true };
+            });
+          },
+        }),
+      ],
+    });
+
+    await tenancy.post("memberA", "/api/v1/quiet/change", {});
+
+    expect(tenancy.resends).toEqual([["production", "debugger"]]);
+  });
+
   it("answers 500 and never serves the route when a source fails", async () => {
     const app = await openPaid([async () => await Promise.reject(new Error("source down"))]);
 
