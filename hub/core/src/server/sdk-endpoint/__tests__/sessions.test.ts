@@ -26,12 +26,22 @@ const keyOf = (overrides: Partial<KeyScope> = {}): KeyScope => ({
 // The part of a WebSocket the sessions use: closing with a code
 interface FakeSocket {
   closeCodes: number[];
+  sent: string[];
+  readyState: number;
   close: (code: number) => void;
+  send: (frame: string) => void;
 }
 
 const fakeSocket = (): FakeSocket => {
   const closeCodes: number[] = [];
-  return { closeCodes, close: (code) => closeCodes.push(code) };
+  const sent: string[] = [];
+  return {
+    closeCodes,
+    sent,
+    readyState: 1,
+    close: (code) => closeCodes.push(code),
+    send: (frame) => sent.push(frame),
+  };
 };
 
 // The sessions only ever call `close` on a socket; the fake has that alone
@@ -77,9 +87,9 @@ describe("SdkSessions", () => {
   it("closes the session of the same instance in the same environment with 1001", () => {
     const { sessions, open } = setup();
     const old = open();
-    sessions.register(old.connection, INSTANCE);
+    sessions.register(old.connection, { instanceId: INSTANCE, modules: [], version: 1 });
 
-    sessions.register(open().connection, INSTANCE);
+    sessions.register(open().connection, { instanceId: INSTANCE, modules: [], version: 1 });
 
     expect(old.socket.closeCodes).toEqual([1001]);
   });
@@ -87,9 +97,13 @@ describe("SdkSessions", () => {
   it("never replaces the session of an instanceId in another environment", () => {
     const { sessions, open } = setup();
     const production = open();
-    sessions.register(production.connection, INSTANCE);
+    sessions.register(production.connection, { instanceId: INSTANCE, modules: [], version: 1 });
 
-    sessions.register(open(keyOf({ environmentId: "staging" })).connection, INSTANCE);
+    sessions.register(open(keyOf({ environmentId: "staging" })).connection, {
+      instanceId: INSTANCE,
+      modules: [],
+      version: 1,
+    });
 
     expect(production.socket.closeCodes).toEqual([]);
   });
@@ -97,13 +111,13 @@ describe("SdkSessions", () => {
   it("keeps the replacing session when the replaced one closes", async () => {
     const { sessions, open } = setup();
     const old = open();
-    sessions.register(old.connection, INSTANCE);
+    sessions.register(old.connection, { instanceId: INSTANCE, modules: [], version: 1 });
     const replacing = open();
-    sessions.register(replacing.connection, INSTANCE);
+    sessions.register(replacing.connection, { instanceId: INSTANCE, modules: [], version: 1 });
     old.raw.destroy();
     await old.connection.closed;
 
-    sessions.register(open().connection, INSTANCE);
+    sessions.register(open().connection, { instanceId: INSTANCE, modules: [], version: 1 });
 
     expect(replacing.socket.closeCodes).toEqual([1001]);
   });
@@ -113,7 +127,7 @@ describe("SdkSessions", () => {
     const { connection } = open();
     sessions.close(connection, 1008);
 
-    expect(sessions.register(connection, INSTANCE)).toBe(false);
+    expect(sessions.register(connection, { instanceId: INSTANCE, modules: [], version: 1 })).toBe(false);
   });
 
   it("closes every connection of a revoked key with its code, and no other", () => {
@@ -169,5 +183,67 @@ describe("SdkSessions", () => {
     await closing;
 
     expect(sessions.size).toBe(0);
+  });
+
+  it("lists the registered sessions of an environment that agreed on a module", () => {
+    const { sessions, open } = setup();
+    const agreed = open();
+    const other = open();
+    const elsewhere = open(keyOf({ environmentId: "staging" }));
+    const unregistered = open();
+    sessions.register(agreed.connection, { instanceId: "a", modules: ["debugger", "metrics"], version: 1 });
+    sessions.register(other.connection, { instanceId: "b", modules: ["metrics"], version: 1 });
+    sessions.register(elsewhere.connection, { instanceId: "c", modules: ["debugger"], version: 1 });
+
+    expect([
+      sessions.inEnvironment("production", "debugger"),
+      sessions.inEnvironment("production", "metrics"),
+      unregistered.connection.session,
+    ]).toEqual([[agreed.connection], [agreed.connection, other.connection], undefined]);
+  });
+
+  it("gives a registered session what a feature sees of the instance", () => {
+    const { sessions, open } = setup();
+    const { connection } = open();
+
+    sessions.register(connection, { instanceId: INSTANCE, modules: ["debugger"], version: 1 });
+
+    expect(connection.session).toEqual({
+      orgId: ORG_A,
+      projectId: "project-1",
+      environmentId: "production",
+      instanceId: INSTANCE,
+    });
+  });
+
+  it("leaves the environment's list when the connection closes, and a closing session is not listed", async () => {
+    const { sessions, open } = setup();
+    const closing = open();
+    const closed = open();
+    sessions.register(closing.connection, { instanceId: "a", modules: ["debugger"], version: 1 });
+    sessions.register(closed.connection, { instanceId: "b", modules: ["debugger"], version: 1 });
+    sessions.close(closing.connection, 1001);
+    closed.raw.destroy();
+    await closed.connection.closed;
+
+    expect(sessions.inEnvironment("production", "debugger")).toEqual([]);
+  });
+
+  it("sends a frame to an open session and to none that is closing or whose socket is not open", () => {
+    const { sessions, open } = setup();
+    const open1 = open();
+    const closing = open();
+    const notOpen = open();
+    notOpen.socket.readyState = 2;
+    sessions.close(closing.connection, 1001);
+
+    const answers = [open1, closing, notOpen].map(({ connection }) => sessions.send(connection, "frame"));
+
+    expect([answers, open1.socket.sent, closing.socket.sent, notOpen.socket.sent]).toEqual([
+      [true, false, false],
+      ["frame"],
+      [],
+      [],
+    ]);
   });
 });

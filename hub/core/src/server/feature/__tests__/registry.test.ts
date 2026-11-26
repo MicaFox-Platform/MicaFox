@@ -87,12 +87,16 @@ describe("createFeatureRegistry", () => {
 
   it("refuses a name that is not lowercase letters, digits and dashes, and the names the core uses", () => {
     expect(() =>
-      createFeatureRegistry([emptyFeature("Debugger"), emptyFeature("projects"), emptyFeature("me")], undefined),
+      createFeatureRegistry(
+        [emptyFeature("Debugger"), emptyFeature("projects"), emptyFeature("me"), emptyFeature("sdk")],
+        undefined,
+      ),
     ).toThrow(
       withProblems([
         'The feature name "Debugger" is not lowercase letters, digits and dashes, from a letter',
         'The feature name "projects" is the core\'s own: choose another',
         'The feature name "me" is the core\'s own: choose another',
+        'The feature name "sdk" is the core\'s own: choose another',
       ]),
     );
   });

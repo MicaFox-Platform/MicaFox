@@ -17,6 +17,7 @@ export type {
   ProtocolModule,
   Registered,
   RetentionPolicy,
+  SdkApi,
   SdkSession,
 } from "./feature/index.js";
 export type { EntitlementSource, OrgContext } from "./access/index.js";

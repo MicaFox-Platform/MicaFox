@@ -11,7 +11,7 @@ import type { Database, MigrationPackage } from "../db/index.js";
 import { createEvents } from "../events/index.js";
 import type { Events } from "../events/index.js";
 import { createFeatureRegistry, createGate } from "../feature/index.js";
-import type { Extension, Feature, FeatureRegistry, Gate } from "../feature/index.js";
+import type { Extension, Feature, FeatureRegistry, Gate, SdkApi } from "../feature/index.js";
 import { createJobs } from "../jobs/index.js";
 import type { Jobs } from "../jobs/index.js";
 import type { HubLogger } from "../observability/index.js";
@@ -145,7 +145,15 @@ export const addEvents = (
  * ready.
  */
 export const addJobs = (
-  parts: { settings: Settings; db: Database; featureParts: FeatureParts; keyUses: KeyUses; log: Logger; clock: Clock },
+  parts: {
+    settings: Settings;
+    db: Database;
+    featureParts: FeatureParts;
+    keyUses: KeyUses;
+    sdk: SdkApi;
+    log: Logger;
+    clock: Clock;
+  },
   addStopHook: (name: string, run: () => Promise<void>, options?: { phase?: StopHook["phase"] }) => void,
 ): Jobs => {
   const jobs = createJobs({
@@ -157,6 +165,7 @@ export const addJobs = (
     log: parts.log,
     clock: parts.clock,
     keyUses: parts.keyUses,
+    sdk: parts.sdk,
   });
   addStopHook(
     "jobs-halt",
@@ -192,6 +201,7 @@ export const addSdk = (
     access: parts.access,
     keyUses: parts.keyUses,
     gate: parts.featureParts.gate,
+    modules: parts.featureParts.registry.modules.map(({ part }) => part),
     bus: parts.events.bus,
     log: parts.logger.log,
     warnCollapsed: parts.logger.warnCollapsed,

@@ -23,6 +23,15 @@ export interface ProtocolModule {
   onMessage: (session: SdkSession, message: Message) => Promise<void>;
 }
 
+/** What a feature may ask of the SDK endpoint: docs/architecture/hub/sdk-endpoint.md#resending-the-state. */
+export interface SdkApi {
+  /**
+   * Sends `state(session)` of `module` again to the instances of the environment that agreed on it. Call it once the
+   * change has committed. It never throws: a resend that fails is logged, and the next one or the reconnect heals it.
+   */
+  resend: (environmentId: string, module: string) => Promise<void>;
+}
+
 /** What a job's run gets for one organization: docs/architecture/hub/server.md#jobs. */
 export interface JobContext {
   orgId: string;
@@ -32,6 +41,7 @@ export interface JobContext {
   log: Logger;
   /** Runs `run` in a transaction that sees and writes only the rows of `orgId`: `db.forOrg(orgId, run)`. */
   forOrg: <T>(run: (db: Transaction<HubTables>) => Promise<T>) => Promise<T>;
+  sdk: SdkApi;
 }
 
 /** Work a feature repeats; the scheduler runs it every `everyMs` for each organization that may use the feature. */
@@ -76,6 +86,7 @@ export interface FeatureAccess {
   ) => Promise<T>;
   /** 403 `forbidden` unless the actor may do `action` in the organization of `context`. */
   requireCan: (context: OrgContext, action: string) => void;
+  sdk: SdkApi;
 }
 
 /** A feature's routes: a Fastify plugin the hub registers encapsulated under the feature's path. */

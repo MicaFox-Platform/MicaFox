@@ -146,12 +146,14 @@ Paths, errors and pagination: [HTTP API](../../api/hub/http.md). Why:
    rolls back publishes nothing and a subscriber that reads the database finds the change. `actor` is `{ userId }`;
    `data` holds ids, as hints of what to reload, never a secret or a content. Types are `<feature>.<noun>.<verb>`,
    such as `debugger.snapshot.created`; core ones are `project.*`, `environment.*`, `key.*`, `member.*` and
-   `invite.*`. Today the core publishes `project.created`, `project.updated`, `environment.created`,
-   `environment.updated`, `key.created` and `key.revoked`; a project's first `production` environment comes with
-   `project.created`.
+   `invite.*`. `sdk.*` events, such as `sdk.state.resend`, are for the
+   [SDK endpoint](sdk-endpoint.md#resending-the-state) alone. Today the core publishes `project.created`,
+   `project.updated`, `environment.created`, `environment.updated`, `key.created` and `key.revoked`; a project's
+   first `production` environment comes with `project.created`.
 2. In S2 the bus is in-process. Subscribers are the events streams, which pass on what belongs to their session's
-   organizations, and the [SDK endpoint](sdk-endpoint.md#resending-the-state). A subscriber that throws is logged and
-   never fails the publisher. With several replicas the same interface carries events through Postgres.
+   organizations, except `sdk.*`, and the [SDK endpoint](sdk-endpoint.md#resending-the-state). A subscriber that
+   throws is logged and never fails the publisher. With several replicas the same interface carries events through
+   Postgres.
 3. `GET /api/internal/events` needs a session. It is `text/event-stream`: first `event: reset` with `data: {}`, then
    for each event `event: <type>` with the event as JSON in `data`, and a `: keepalive` comment every 25 s. The
    organizations are the user's memberships when the stream opens. A user has at most 10 streams; one more ends

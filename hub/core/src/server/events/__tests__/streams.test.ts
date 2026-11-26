@@ -73,6 +73,24 @@ describe("createStreams", () => {
     expect([eventsOf(memberOfA.written).length, eventsOf(memberOfB.written).length]).toEqual([1, 0]);
   });
 
+  it("keeps the events of the SDK endpoint from the browsers of the organization", () => {
+    const { bus, open } = setup();
+    const { written } = open("user-a", ["org-a"]);
+
+    bus.publish({
+      ...eventOf("org-a"),
+      type: "sdk.state.resend",
+      environmentId: "env-1",
+      data: { module: "debugger" },
+    });
+    bus.publish(eventOf("org-a"));
+
+    expect(written.filter((frame) => frame.startsWith("event: "))).toEqual([
+      "event: reset\ndata: {}\n\n",
+      expect.stringContaining("event: key.created"),
+    ]);
+  });
+
   it("sends a keepalive comment every 25 seconds", () => {
     const { open } = setup();
     const { written } = open("user-a", ["org-a"]);

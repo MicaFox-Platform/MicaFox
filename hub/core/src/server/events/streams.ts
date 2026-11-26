@@ -1,10 +1,17 @@
 import type { EventBus } from "./bus.js";
+import type { HubEvent } from "./event.js";
 import { EventStream } from "./stream.js";
 import type { StreamSink } from "./stream.js";
 import type { Timers } from "../observability/index.js";
 
 // A comment this often keeps proxies from closing a stream that is quiet
 const KEEPALIVE_MS = 25_000;
+
+// The prefix of the events the SDK endpoint keeps to itself, such as `sdk.state.resend`
+const SDK_EVENT_PREFIX = "sdk.";
+
+// `sdk.*` events are for the SDK endpoint: a browser has no use for them
+const isForBrowsers = (event: HubEvent): boolean => !event.type.startsWith(SDK_EVENT_PREFIX);
 
 /** A user has at most this many open streams, one per browser tab; one more ends their oldest. */
 export const MAX_STREAMS_PER_USER = 10;
@@ -79,8 +86,10 @@ export const createStreams = (bus: EventBus, timers: Timers): Streams => {
   const byUser = new Map<string, Set<Entry>>();
 
   bus.subscribe((event) => {
-    for (const { stream } of byOrg.get(event.orgId) ?? []) {
-      stream.offer(event);
+    if (isForBrowsers(event)) {
+      for (const { stream } of byOrg.get(event.orgId) ?? []) {
+        stream.offer(event);
+      }
     }
   });
 

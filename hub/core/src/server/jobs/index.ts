@@ -10,7 +10,7 @@ import { createScheduler } from "./scheduler.js";
 import type { JobClock } from "./scheduler.js";
 import type { KeyUses } from "../access/index.js";
 import type { Database } from "../db/index.js";
-import type { FeatureRegistry, Gate } from "../feature/index.js";
+import type { FeatureRegistry, Gate, SdkApi } from "../feature/index.js";
 
 export type { RunCount, RunResult } from "./run-counts.js";
 export type { JobClock } from "./scheduler.js";
@@ -28,6 +28,8 @@ export interface JobsOptions {
   clock: JobClock;
   /** The last use of project keys the SDK endpoint notes; a core job writes it. */
   keyUses: KeyUses;
+  /** What a feature's jobs get to resend the state of an SDK module. */
+  sdk: SdkApi;
 }
 
 /** The hub's jobs: hub-core's, the features', and a job per retention policy. */
@@ -44,7 +46,7 @@ export interface Jobs {
 
 /** Builds the jobs of the hub: docs/architecture/hub/server.md#jobs. Nothing runs before `start`. */
 export const createJobs = (options: JobsOptions): Jobs => {
-  const { db, gate, log, clock, registry, retentionDays } = options;
+  const { db, gate, log, clock, registry, retentionDays, sdk } = options;
   const locks = options.databaseUrl.startsWith("pglite:")
     ? PGLITE_LOCKS
     : createPostgresLocks(options.databaseUrl, log);
@@ -54,7 +56,7 @@ export const createJobs = (options: JobsOptions): Jobs => {
   const scheduler = createScheduler({
     jobs: [
       ...createCoreJobs({ db, now: clock.now, keyUses: options.keyUses }),
-      ...registry.jobs.map((job) => scheduleFeatureJob(job, parts)),
+      ...registry.jobs.map((job) => scheduleFeatureJob(job, { ...parts, sdk })),
       ...registry.retention.map((policy) => scheduleRetention(policy, { ...parts, retentionDays, now: clock.now })),
     ],
     locks,
