@@ -23,6 +23,7 @@ export type { Migration, MigrationPackage } from "./migrator/index.js";
 export { addOrgPolicy, ORG_POLICY } from "./policies.js";
 export { APP_ROLE } from "./pglite/index.js";
 export { NestedScopeError } from "./scope.js";
+export { hasUnstorable, replaceUnstorable } from "./storable-text.js";
 export type { Database, HubTables } from "./scope.js";
 
 /** What the database needs from the settings and the hub. */

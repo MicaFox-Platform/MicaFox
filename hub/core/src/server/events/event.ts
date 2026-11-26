@@ -3,6 +3,9 @@ export interface EventActor {
   userId: string;
 }
 
+/** The actor of a change no user made, such as a resend or an SDK that connects. */
+export const SYSTEM_ACTOR: EventActor = { userId: "system" };
+
 /**
  * What a part announces once a change is committed: docs/architecture/hub/server.md#events. `type` is
  * `<feature>.<noun>.<verb>`, and `data` holds ids only, as hints of what to reload, never a secret or a content.

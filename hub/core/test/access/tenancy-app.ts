@@ -4,9 +4,12 @@ import { addAccess, createEntitlements } from "../../src/server/access/index.js"
 import type { Access, Actor, ActorResolver } from "../../src/server/access/index.js";
 import type { HubApp } from "../../src/server/app/index.js";
 import { CORE_MIGRATIONS, migrate } from "../../src/server/db/index.js";
+import type { Database } from "../../src/server/db/index.js";
 import type { Events } from "../../src/server/events/index.js";
 import { addFeatureRoutes, createFeatureRegistry, createGate } from "../../src/server/feature/index.js";
 import type { Extension, Feature, SdkApi } from "../../src/server/feature/index.js";
+import { createInstances } from "../../src/server/sdk-endpoint/index.js";
+import type { Instances } from "../../src/server/sdk-endpoint/index.js";
 import { openTestDatabase, ORG_A, ORG_B } from "../db/test-database.js";
 import type { TestDatabase } from "../db/test-database.js";
 import { createTestEvents } from "../events/test-events.js";
@@ -46,6 +49,8 @@ export interface TenancyApp {
   access: Access;
   /** The bus the routes publish to and the streams of the app. */
   events: Events;
+  /** The connected instances, whose routes the app has. */
+  instances: Instances;
   /** The `[environmentId, module]` of each `sdk.resend` a route made, in order. */
   resends: Array<[string, string]>;
   log: LogCapture;
@@ -70,7 +75,7 @@ const resolveTestActor: ActorResolver = async (request) => {
 
 // The test database, migrated, with organizations A and B
 const openDatabaseWithOrganizations = async (): Promise<TestDatabase> => {
-  const test = await openTestDatabase();
+  const test = await openTestDatabase({ migrated: true });
   await migrate(
     test.db,
     { url: test.ownerUrl ?? test.url, packages: [CORE_MIGRATIONS], log: test.logger },
@@ -96,6 +101,17 @@ const createSdkRecorder = (): { sdk: SdkApi; resends: Array<[string, string]> } 
   };
 };
 
+// The connected instances over the test database, with their warnings in the app's log
+const createTestInstances = (db: Database, events: Events, app: HubApp): Instances =>
+  createInstances({
+    db,
+    bus: events.bus,
+    now: Date.now,
+    warnCollapsed: (_key, fields, message) => {
+      app.log.warn(fields, message);
+    },
+  });
+
 /** Opens the test database, migrates it, adds the two organizations and the access plugin to an app. */
 export const openTenancyApp = async (
   options: { publicUrl?: string; features?: readonly Feature[]; extension?: Extension } = {},
@@ -107,6 +123,7 @@ export const openTenancyApp = async (
   const gate = createGate(registry, entitlements);
   const events = createTestEvents();
   const { sdk, resends } = createSdkRecorder();
+  const instances = createTestInstances(test.db, events, app);
   const access = addAccess(app, {
     db: test.db,
     events,
@@ -114,6 +131,7 @@ export const openTenancyApp = async (
     features: registry.features.map(({ feature }) => feature.name),
     entitlements,
     addFeatureRoutes: (scope, authorization) => {
+      instances.addRoutes(scope, authorization);
       addFeatureRoutes(scope, { registry, authorization, gate, sdk });
     },
     publicUrl: () => options.publicUrl ?? "https://hub.example.com",
@@ -132,6 +150,7 @@ export const openTenancyApp = async (
     test,
     access,
     events,
+    instances,
     resends,
     log,
     get: async (name, url) => await send(name, { method: "GET", url }),

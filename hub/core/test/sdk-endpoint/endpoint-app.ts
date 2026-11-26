@@ -1,3 +1,5 @@
+import { createRecordingInstances } from "./recording-instances.js";
+import type { RecordingInstances } from "./recording-instances.js";
 import type { KeyRevokedListener, KeyScope } from "../../src/server/access/index.js";
 import { createEntitlements } from "../../src/server/access/index.js";
 import { createEvents } from "../../src/server/events/index.js";
@@ -35,6 +37,8 @@ export interface EndpointApp {
   manual: ManualClock;
   bus: EventBus;
   endpoint: SdkEndpoint;
+  /** The instances the endpoint records its sessions in. */
+  instances: RecordingInstances;
   /** The active keys by token; a test adds and removes them. */
   keys: Map<string, KeyScope>;
   /** Makes every key lookup fail, as when Postgres is down, or wait until `hold` settles. */
@@ -119,6 +123,7 @@ export const openEndpointApp = async (
   const keys = new Map([[tokenOf("a"), keyOf("a")]]);
   const database: EndpointApp["database"] = { isDown: false, lookups: 0 };
   const usedKeys: string[] = [];
+  const instances = createRecordingInstances();
   const { access, revoke } = createFakeAccess(keys, database);
   const endpoint = addSdkEndpoint(app, {
     settings: { ...DEFAULT_SETTINGS, ...settings },
@@ -127,6 +132,7 @@ export const openEndpointApp = async (
     gate: gate ?? createTestGate(manual.clock.now, modules),
     modules,
     bus,
+    instances,
     log: app.log,
     warnCollapsed: (_key, fields, message) => {
       app.log.warn(fields, message);
@@ -140,6 +146,7 @@ export const openEndpointApp = async (
     manual,
     bus,
     endpoint,
+    instances,
     keys,
     database,
     usedKeys,

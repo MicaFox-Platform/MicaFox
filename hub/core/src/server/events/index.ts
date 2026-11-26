@@ -9,6 +9,7 @@ import type { Timers } from "../observability/index.js";
 
 export { addEventsRoute } from "./events-route.js";
 export type { EventBus } from "./bus.js";
+export { SYSTEM_ACTOR } from "./event.js";
 export type { EventActor, HubEvent } from "./event.js";
 export type { Streams } from "./streams.js";
 

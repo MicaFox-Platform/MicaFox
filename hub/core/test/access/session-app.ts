@@ -70,7 +70,7 @@ export const cookieOf = (response: LightMyRequestResponse): string => {
 /** Opens the test database, migrates it and adds the access plugin as the hub does, without a resolver of its own. */
 export const openSessionApp = async (options: SessionAppOptions = {}): Promise<SessionApp> => {
   const publicUrl = options.publicUrl ?? HUB_URL;
-  const test = await openTestDatabase();
+  const test = await openTestDatabase({ migrated: true });
   await migrate(
     test.db,
     { url: test.ownerUrl ?? test.url, packages: [CORE_MIGRATIONS], log: test.logger },

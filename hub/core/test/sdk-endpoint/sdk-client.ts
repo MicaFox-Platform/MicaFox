@@ -2,20 +2,30 @@ import { PROTOCOL_VERSION } from "@micafox/protocol";
 import type { Hello, Welcome } from "@micafox/protocol";
 import { WebSocket } from "ws";
 
+/** What a test changes in a `hello`; `service` and `commit` may be given as `undefined` to leave them out. */
+export type HelloOverrides = Partial<Omit<Hello, "service" | "commit">> & {
+  service?: string | undefined;
+  commit?: string | undefined;
+};
+
 /** A `hello` as the SDK sends it, with `overrides`. */
-export const helloOf = (overrides: Partial<Hello> = {}): Hello => ({
-  version: PROTOCOL_VERSION,
-  type: "hello",
-  instanceId: "8f14e45f-ceea-467f-a0e6-3b5c2a1d9e7b",
-  service: "checkout",
-  labels: { region: "eu" },
-  hostname: "checkout-7d9f",
-  pid: 1,
-  sdk: { name: "@micafox/sdk", version: "0.1.0" },
-  runtime: { name: "node", version: process.versions.node },
-  modules: ["debugger"],
-  ...overrides,
-});
+export const helloOf = (overrides: HelloOverrides = {}): Hello => {
+  const { service = "service" in overrides ? undefined : "checkout", commit, ...rest } = overrides;
+  return {
+    version: PROTOCOL_VERSION,
+    type: "hello",
+    instanceId: "8f14e45f-ceea-467f-a0e6-3b5c2a1d9e7b",
+    labels: { region: "eu" },
+    hostname: "checkout-7d9f",
+    pid: 1,
+    sdk: { name: "@micafox/sdk", version: "0.1.0" },
+    runtime: { name: "node", version: process.versions.node },
+    modules: ["debugger"],
+    ...rest,
+    ...(service === undefined ? {} : { service }),
+    ...(commit === undefined ? {} : { commit }),
+  };
+};
 
 /** How a connection ended. */
 export interface Closed {

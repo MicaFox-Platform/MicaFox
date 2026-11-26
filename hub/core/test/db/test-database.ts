@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 import pg from "pg";
 import pino from "pino";
 import type { Logger } from "pino";
+import { inject } from "vitest";
 
 import { addOrgPolicy, createDatabase } from "../../src/server/db/index.js";
 import type { Database } from "../../src/server/db/index.js";
@@ -98,8 +99,14 @@ const createPostgresScratch = async (adminUrl: string): Promise<PostgresScratch>
   };
 };
 
-/** Opens the test database: PGlite in memory, or a scratch database on `MICAFOX_TEST_DATABASE_URL`. */
-export const openTestDatabase = async (options: { poolSize?: number } = {}): Promise<TestDatabase> => {
+/**
+ * Opens the test database: PGlite in memory, or a scratch database on `MICAFOX_TEST_DATABASE_URL`. A `migrated` one on
+ * PGlite starts from the seed with hub-core's migrations run, so migrating it again finds nothing to run; on Postgres
+ * it starts empty, and the caller's migration runs them.
+ */
+export const openTestDatabase = async (
+  options: { poolSize?: number; migrated?: boolean } = {},
+): Promise<TestDatabase> => {
   const scratch =
     isOnPostgres && TEST_DATABASE_URL !== undefined ? await createPostgresScratch(TEST_DATABASE_URL) : undefined;
   const url = scratch?.url ?? "pglite:memory";
@@ -108,6 +115,7 @@ export const openTestDatabase = async (options: { poolSize?: number } = {}): Pro
   const logger = pino({ level: "debug" }, log.stream);
   const db = createDatabase({
     url,
+    ...(options.migrated === true && scratch === undefined ? { pgliteSeed: inject("pgliteSeed") } : {}),
     poolSize: options.poolSize ?? 10,
     log: logger,
     warnCollapsed: (key, fields) => {

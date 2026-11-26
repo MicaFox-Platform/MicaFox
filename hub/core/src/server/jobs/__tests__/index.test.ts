@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { openJobsDatabase } from "../../../../test/db/jobs-database.js";
 import type { TestDatabase } from "../../../../test/db/test-database.js";
 import { emptyFeature } from "../../../../test/feature/fixtures.js";
+import { createRecordingInstances } from "../../../../test/sdk-endpoint/recording-instances.js";
 import { createEntitlements, createKeyUses } from "../../access/index.js";
 import { createFeatureRegistry, createGate } from "../../feature/index.js";
 import type { Feature } from "../../feature/index.js";
@@ -47,6 +48,7 @@ const build = async (features: readonly Feature[], retentionDays: Record<string,
     log: test.logger,
     clock,
     keyUses: createKeyUses({ db: test.db, now: clock.now }),
+    instances: createRecordingInstances(),
     sdk: {
       resend: async () => {
         await Promise.resolve();
@@ -132,7 +134,9 @@ describe("createJobs", () => {
 
     expect(jobs.runs().sort((a, b) => a.job.localeCompare(b.job))).toEqual([
       { job: "bad-job", result: "failed", count: 1 },
+      { job: "core.delete-stale-instances", result: "ok", count: 1 },
       { job: "core.expire-sessions", result: "ok", count: 1 },
+      { job: "core.write-instances-last-seen", result: "ok", count: 1 },
       { job: "core.write-key-last-use", result: "ok", count: 1 },
       { job: "ok-job", result: "ok", count: 1 },
       { job: "retention.events", result: "ok", count: 1 },

@@ -114,10 +114,13 @@ does not belong to; a member gets 403 `forbidden` on all three routes.
 ### Instances
 
 `GET /api/v1/environments/{environmentId}/instances` — a page of the app instances that connected to the
-environment in the last 7 days, online first, then by last seen: `{ id, online, service, labels, hostname, pid,
-sdk: { name, version }, runtime: { name, version }, modules, commit, protocolVersion, keyPrefix, connectedAt,
-lastSeenAt }`. `id` is the SDK's `instanceId`; the other fields come from its last
-[`hello`](../protocol.md#hello), cut to the hub's limits. `?online=true` and `?service=` filter it.
+environment in the last 7 days, online first, then by last seen, newest first: `{ id, online, service?, labels,
+hostname, pid, sdk: { name, version }, runtime: { name, version }, modules, commit?, protocolVersion, keyPrefix,
+connectedAt, lastSeenAt }`. `id` is the SDK's `instanceId`; the other fields come from its last
+[`hello`](../protocol.md#hello), cut to the hub's limits; `service` and `commit` are left out when the `hello` has
+none, and `modules` are the ones the hub agreed on. `online` is true while a hub holds the instance's session.
+`?online=true` or `?online=false` and `?service=` filter it; it pages like every list, with `limit` and `cursor`.
+Any member may read it; an environment of another organization is 404.
 
 ### SDK endpoint
 

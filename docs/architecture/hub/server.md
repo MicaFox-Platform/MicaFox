@@ -145,11 +145,12 @@ Paths, errors and pagination: [HTTP API](../../api/hub/http.md). Why:
 1. A part publishes `{ type, orgId, environmentId?, actor, data }` once its transaction commits, so a change that
    rolls back publishes nothing and a subscriber that reads the database finds the change. `actor` is `{ userId }`;
    `data` holds ids, as hints of what to reload, never a secret or a content. Types are `<feature>.<noun>.<verb>`,
-   such as `debugger.snapshot.created`; core ones are `project.*`, `environment.*`, `key.*`, `member.*` and
-   `invite.*`. `sdk.*` events, such as `sdk.state.resend`, are for the
+   such as `debugger.snapshot.created`; core ones are `project.*`, `environment.*`, `key.*`, `instance.*`, `member.*`
+   and `invite.*`. `sdk.*` events, such as `sdk.state.resend`, are for the
    [SDK endpoint](sdk-endpoint.md#resending-the-state) alone. Today the core publishes `project.created`,
-   `project.updated`, `environment.created`, `environment.updated`, `key.created` and `key.revoked`; a project's
-   first `production` environment comes with `project.created`.
+   `project.updated`, `environment.created`, `environment.updated`, `key.created`, `key.revoked`,
+   `instance.connected` and `instance.disconnected`; a project's first `production` environment comes with
+   `project.created`.
 2. In S2 the bus is in-process. Subscribers are the events streams, which pass on what belongs to their session's
    organizations, except `sdk.*`, and the [SDK endpoint](sdk-endpoint.md#resending-the-state). A subscriber that
    throws is logged and never fails the publisher. With several replicas the same interface carries events through
@@ -179,7 +180,8 @@ Paths, errors and pagination: [HTTP API](../../api/hub/http.md). Why:
    failed.
 4. Core jobs: delete expired sessions every hour (7 days without use, 30 days at most); delete invites and reset
    links every hour; write the last use of project keys (`core.write-key-last-use`) and the last seen time of online
-   [instances](sdk-endpoint.md#keeping-instances) every minute; delete instances offline for 7 days every hour; run
+   [instances](sdk-endpoint.md#keeping-instances) (`core.write-instances-last-seen`) every minute; delete instances
+   offline for 7 days (`core.delete-stale-instances`) every hour; run
    each feature's retention policy every hour, per organization, in batches. Core jobs are named `core.<name>`, and
    a retention policy's job `retention.<name>`. The jobs of keys, instances and the debugger come with their own
    components.

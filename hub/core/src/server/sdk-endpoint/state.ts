@@ -5,14 +5,12 @@ import type { Logger } from "pino";
 import { CLOSE } from "./sessions.js";
 import type { Connection, SdkSessions } from "./sessions.js";
 import type { Database } from "../db/index.js";
+import { SYSTEM_ACTOR } from "../events/index.js";
 import type { EventBus, HubEvent } from "../events/index.js";
 import type { ProtocolModule, SdkApi, SdkSession } from "../feature/index.js";
 
 /** The event `sdk.resend` publishes; the SDK endpoint of every replica listens for it, the events streams skip it. */
 const RESEND_EVENT = "sdk.state.resend";
-
-// A resend has no user behind it: it follows a change that a route, a job or the hub itself already committed
-const SYSTEM_ACTOR = { userId: "system" };
 
 /**
  * `sdk.resend` for the features: finds the organization of the environment and publishes the resend event on the

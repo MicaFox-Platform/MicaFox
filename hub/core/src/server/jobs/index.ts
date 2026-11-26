@@ -11,6 +11,7 @@ import type { JobClock } from "./scheduler.js";
 import type { KeyUses } from "../access/index.js";
 import type { Database } from "../db/index.js";
 import type { FeatureRegistry, Gate, SdkApi } from "../feature/index.js";
+import type { Instances } from "../sdk-endpoint/index.js";
 
 export type { RunCount, RunResult } from "./run-counts.js";
 export type { JobClock } from "./scheduler.js";
@@ -28,6 +29,8 @@ export interface JobsOptions {
   clock: JobClock;
   /** The last use of project keys the SDK endpoint notes; a core job writes it. */
   keyUses: KeyUses;
+  /** The connected instances; core jobs write their last seen time and delete the stale ones. */
+  instances: Instances;
   /** What a feature's jobs get to resend the state of an SDK module. */
   sdk: SdkApi;
 }
@@ -55,7 +58,7 @@ export const createJobs = (options: JobsOptions): Jobs => {
   const counts = createRunCounts();
   const scheduler = createScheduler({
     jobs: [
-      ...createCoreJobs({ db, now: clock.now, keyUses: options.keyUses }),
+      ...createCoreJobs({ db, now: clock.now, keyUses: options.keyUses, instances: options.instances }),
       ...registry.jobs.map((job) => scheduleFeatureJob(job, { ...parts, sdk })),
       ...registry.retention.map((policy) => scheduleRetention(policy, { ...parts, retentionDays, now: clock.now })),
     ],

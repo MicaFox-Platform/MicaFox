@@ -7,7 +7,7 @@ import type { TestDatabase } from "../db/test-database.js";
 
 /** Opens the test database with hub-core's migrations and organizations A and B. */
 export const openJobsDatabase = async (): Promise<TestDatabase> => {
-  const test = await openTestDatabase();
+  const test = await openTestDatabase({ migrated: true });
   await migrate(
     test.db,
     { url: test.ownerUrl ?? test.url, packages: [CORE_MIGRATIONS], log: test.logger },

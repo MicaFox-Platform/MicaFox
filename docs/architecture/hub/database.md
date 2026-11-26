@@ -42,6 +42,7 @@ hub/core/src/server/db/
 ├── policies.ts       the RLS policy helpers migrations use
 ├── connect.ts        waiting for an unreachable database with backoff, and the check of the app role
 ├── value-types.ts    the Postgres types both dialects return as text
+├── storable-text.ts  what Postgres cannot store in text, NUL and unpaired surrogates, and replacing it
 ├── migrator/         the ordered migrator: what is missing, history, target (lock and connection), RLS check, grants
 ├── writer/           the write queue: batching, upserts, per-organization groups, limits, rejected rows
 ├── pglite/           the PGlite dialect, the app role inside it, loading and writing the seed
